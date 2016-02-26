@@ -24,7 +24,13 @@ source-repository head
   location: https://github.com/jbracker/supermonad-plugin.git
 
 library
-  exposed-modules:
+  exposed-modules: Control.Supermonad.Plugin
+                 , Control.Supermonad.Plugin.Utils
+                 , Control.Supermonad.Plugin.Log
+                 , Control.Supermonad.Plugin.Detect
+                 , Control.Supermonad.Plugin.Debug
+                 , Control.Supermonad.Plugin.Constraint
+                 , Control.Supermonad.Plugin.Environment
   other-modules:
   other-extensions:
   build-depends:  base         >=4.8 && <5,
