@@ -34,12 +34,10 @@ import Class ( Class(..) )
 import Type
   ( Type, TyVar
   , mkTyVarTy, mkAppTys, mkTyConTy
-  , getTyVar_maybe
   , getClassPredTys_maybe
-  , splitTyConApp_maybe
   )
 import TyCon ( TyCon )
-import TcType ( mkTcEqPred, isAmbiguousTyVar )
+import TcType ( mkTcEqPred )
 
 import Control.Supermonad.Plugin.Utils
   ( collectTopTyCons
