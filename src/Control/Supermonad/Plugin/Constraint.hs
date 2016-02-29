@@ -12,22 +12,16 @@ module Control.Supermonad.Plugin.Constraint
   , mkDerivedClassCt
     -- * Constraint inspection
   , isClassConstraint
-  , isFullyAppliedClassConstraint
-  , isTyConAppliedClassConstraint
   , constraintClassType
   , constraintClassTyArgs
   , constraintClassTyCon
-  , constraintPolymonadTyArgs'
-  , constraintPolymonadTyArgs
   , constraintTyCons
   , constraintTcVars
-  , constraintTopAmbiguousTyVars
   , constraintLocation
   , constraintSourceLocation
   , constraintTyVars
   ) where
 
-import Data.Maybe ( isJust, catMaybes, fromMaybe )
 import Data.Set ( Set )
 import qualified Data.Set as S
 
@@ -101,33 +95,6 @@ isClassConstraint wantedClass ct =
       _ -> False
     _ -> False
 
--- | Check if the given constraint is fully applied, i.e., if the
---   constraint is a class constraint and the arguments do not contain
---   any type variables.
-isFullyAppliedClassConstraint :: Ct -> Bool
-isFullyAppliedClassConstraint ct = case constraintClassTyArgs ct of
-  Just tyArgs -> all S.null (collectTyVars <$> tyArgs)
-  Nothing -> False
-
--- | Check if the given constraint is a class constraint and all arguments
---   consist of non-variable type constructor (partially) applied to their
---   arguments.
---
---   /Examples/:
---
--- >>> isTyConAppliedClassConstraint (Polymonad m Identity Maybe)
--- False -- because of 'm'
---
--- >>> isTyConAppliedClassConstraint (Polymonad (Session a b) (Session () ()) Maybe)
--- True -- because 'a' and 'b' are not the top level type-constructor
---
--- >>> isTyConAppliedClassConstraint (Polymonad Maybe (m () ()) (m () ()))
--- False -- because of 'm'
-isTyConAppliedClassConstraint :: Ct -> Bool
-isTyConAppliedClassConstraint ct = case constraintClassTyArgs ct of
-  Just tyArgs -> all isJust $ splitTyConApp_maybe <$> tyArgs
-  Nothing -> False
-
 -- | Retrieves the class and type arguments of the given
 --   type class constraint.
 --   Only works if the constraint is a type class constraint, otherwise
@@ -143,24 +110,6 @@ constraintClassType ct = case ct of
 --   See 'constraintClassType'.
 constraintClassTyArgs :: Ct -> Maybe [Type]
 constraintClassTyArgs = fmap snd . constraintClassType
-
--- | Extracts the type arguments of the given constraints.
---   Only keeps those constraints that are type class constraints
---   and have exactly three arguments.
-constraintPolymonadTyArgs' :: [Ct] -> [(Ct, Type, Type, Type)]
-constraintPolymonadTyArgs' cts
-  = fmap (\(ct, Just (p0, p1, p2)) -> (ct, p0, p1, p2))
-  $ filter (\(_, ts) -> isJust ts)
-  $ fmap (\ct -> (ct, constraintPolymonadTyArgs ct)) cts
-
--- | Extracts the type arguments of the given constraint.
---   Only works if the given constraints is a type class constraint
---   and has exactly three arguments.
-constraintPolymonadTyArgs :: Ct -> Maybe (Type, Type, Type)
-constraintPolymonadTyArgs ct = case constraintClassTyArgs ct of
-    Just [t0, t1, t2] -> Just (t0, t1, t2)
-    _ -> Nothing
-
 
 -- | Retrieves the type constructor of the given type class constraint.
 --   See 'constraintClassType'.
@@ -178,15 +127,6 @@ constraintTyCons ct = maybe S.empty collectTopTyCons $ constraintClassTyArgs ct
 --   Only collects those on the top level (See 'collectTopTcVars').
 constraintTcVars :: Ct -> Set TyVar
 constraintTcVars ct = maybe S.empty collectTopTcVars $ constraintClassTyArgs ct
-
--- | Collects the top-level ambiguous type variables in the constraints
---   arguments. Only returns non-empty sets if the constraint is a class
---   constraint and actually has arguments.
-constraintTopAmbiguousTyVars :: Ct -> Set TyVar
-constraintTopAmbiguousTyVars ct = ambTvs
-  where tyArgs = fromMaybe [] (constraintClassTyArgs ct)
-        tvArgs = catMaybes $ getTyVar_maybe <$> tyArgs
-        ambTvs = S.fromList $ filter isAmbiguousTyVar tvArgs
 
 -- | Retrieve the source location the given constraint originated from.
 constraintLocation :: Ct -> CtLoc
