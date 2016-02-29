@@ -11,6 +11,7 @@ module Control.Supermonad.Plugin.Environment
   , getSupermonadModule
   , getIdentityTyCon, getIdentityModule
   , getGivenConstraints, getWantedConstraints
+  , getWantedReturnConstraints
   , getInstEnvs
   , throwPluginError
     -- * Debug and Error Output
@@ -40,7 +41,8 @@ import FastString ( unpackFS )
 import qualified Control.Supermonad.Plugin.Log as L
 import Control.Supermonad.Plugin.Constraint
   ( GivenCt, WantedCt
-  , constraintSourceLocation )
+  , constraintSourceLocation
+  , isClassConstraint )
 import Control.Supermonad.Plugin.Detect
   ( findSupermonadModule
   , findBindClass, findReturnClass
@@ -152,16 +154,22 @@ getIdentityTyCon :: SupermonadPluginM TyCon
 getIdentityTyCon = asks smEnvIdentityTyCon
 
 -- | Returns all of the /given/ and /derived/ constraints of this plugin call.
-getGivenConstraints :: SupermonadPluginM [Ct]
+getGivenConstraints :: SupermonadPluginM [GivenCt]
 getGivenConstraints = asks smEnvGivenConstraints
 
 -- | Returns all of the wanted constraints of this plugin call.
-getWantedConstraints :: SupermonadPluginM [Ct]
+getWantedConstraints :: SupermonadPluginM [WantedCt]
 getWantedConstraints = asks smEnvWantedConstraints
 
 -- | Shortcut to access the instance environments.
 getInstEnvs :: SupermonadPluginM InstEnvs
 getInstEnvs = runTcPlugin TcPluginM.getInstEnvs
+
+getWantedReturnConstraints :: SupermonadPluginM [WantedCt]
+getWantedReturnConstraints = do
+  wantedCts <- getWantedConstraints
+  returnCls <- getReturnClass
+  return $ filter (isClassConstraint returnCls) wantedCts
 
 -- -----------------------------------------------------------------------------
 -- Plugin debug and error printing
