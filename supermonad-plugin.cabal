@@ -26,13 +26,14 @@ source-repository head
 library
   exposed-modules: Control.Supermonad
                  , Control.Supermonad.Plugin
-                 , Control.Supermonad.Plugin.Utils
-                 , Control.Supermonad.Plugin.Log
-                 , Control.Supermonad.Plugin.Detect
-                 , Control.Supermonad.Plugin.Debug
-                 , Control.Supermonad.Plugin.Constraint
-                 , Control.Supermonad.Plugin.Environment
-  other-modules:
+                 , Control.Supermonad.Prelude
+                 , Control.Supermonad.Functions
+  other-modules: Control.Supermonad.Plugin.Utils
+               , Control.Supermonad.Plugin.Log
+               , Control.Supermonad.Plugin.Detect
+               , Control.Supermonad.Plugin.Debug
+               , Control.Supermonad.Plugin.Constraint
+               , Control.Supermonad.Plugin.Environment
   other-extensions:
   build-depends:  base         >=4.8 && <5,
                   safe         >=0.3 && <0.4,
