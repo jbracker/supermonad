@@ -27,7 +27,7 @@ library
   exposed-modules: Control.Supermonad
                  , Control.Supermonad.Plugin
                  , Control.Supermonad.Prelude
-                 , Control.Supermonad.Functions
+                 -- , Control.Supermonad.Functions
   other-modules: Control.Supermonad.Plugin.Utils
                , Control.Supermonad.Plugin.Log
                , Control.Supermonad.Plugin.Detect

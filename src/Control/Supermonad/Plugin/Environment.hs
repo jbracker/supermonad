@@ -24,6 +24,7 @@ import Data.List ( groupBy )
 
 import Control.Monad ( unless, forM_ )
 import Control.Monad.Trans.Reader ( ReaderT, runReaderT, asks )
+import Control.Monad.Trans.Writer ( WriterT, runWriterT )
 import Control.Monad.Trans.Except ( ExceptT, runExceptT, throwE )
 import Control.Monad.Trans.Class ( lift )
 
@@ -33,6 +34,7 @@ import InstEnv ( InstEnvs )
 import TyCon ( TyCon )
 import TcRnTypes ( Ct )
 import TcPluginM ( TcPluginM, tcPluginIO )
+import TcEvidence ( EvTerm )
 import qualified TcPluginM
 import Outputable ( Outputable )
 import SrcLoc ( srcSpanFileName_maybe )
@@ -56,7 +58,7 @@ import Control.Supermonad.Plugin.Detect
 -- -----------------------------------------------------------------------------
 
 -- | The plugin monad.
-type SupermonadPluginM = ReaderT SupermonadPluginEnv (ExceptT String TcPluginM)
+type SupermonadPluginM = WriterT SupermonadPluginResult (ReaderT SupermonadPluginEnv (ExceptT String TcPluginM))
 
 -- | The read-only environent of the plugin.
 data SupermonadPluginEnv = SupermonadPluginEnv
@@ -76,6 +78,22 @@ data SupermonadPluginEnv = SupermonadPluginEnv
   -- ^ The wanted constraints (all of them).
   }
 
+-- | The write-only result of the plugin.
+data SupermonadPluginResult = SupermonadPluginResult 
+  { smResultEvidence :: [(EvTerm, Ct)]
+  -- ^ The produced result evidence of the plugin.
+  , smResultDerived  :: [Ct]
+  -- ^ The produced derived constraints produced by the plugin.
+  }
+
+instance Monoid SupermonadPluginResult where
+  mappend a b = SupermonadPluginResult 
+    { smResultEvidence = smResultEvidence a ++ smResultEvidence b
+    , smResultDerived  = smResultDerived  a ++ smResultDerived  b }
+  mempty = SupermonadPluginResult 
+    { smResultEvidence = []
+    , smResultDerived  = [] }
+
 -- | @runPmPlugin givenAndDerived wanted m@ runs the given polymonad plugin solver @m@
 --   within the type checker plugin monad. The /given/ and /derived/ constraints are
 --   passed in through @givenAndDerived@ and the /wanted/ constraints are passed in
@@ -92,8 +110,9 @@ runSupermonadPlugin givenCts wantedCts smM = do
   mIdMdl <- findIdentityModule
   mIdTyCon <- findIdentityTyCon
   case (mSupermonadMdl, mBindCls, mReturnCls, mIdMdl, mIdTyCon) of
-    (Right supermonadMdl, Just bindCls, Just returnCls, Right idMdl, Just idTyCon) ->
-      runExceptT $ runReaderT smM $ SupermonadPluginEnv
+    (Right supermonadMdl, Just bindCls, Just returnCls, Right idMdl, Just idTyCon) -> do
+      let (_, result) = runWriterT smM
+      runExceptT $ runReaderT (runWriterT smMCont) $ SupermonadPluginEnv
         { smEnvSupermonadModule = supermonadMdl
         , smEnvBindClass        = bindCls
         , smEnvReturnClass      = returnCls
@@ -127,39 +146,42 @@ runSupermonadPlugin givenCts wantedCts smM = do
 
 -- | Execute the given 'TcPluginM' computation within the polymonad plugin monad.
 runTcPlugin :: TcPluginM a -> SupermonadPluginM a
-runTcPlugin = lift . lift
+runTcPlugin = lift . lift . lift
 
 -- -----------------------------------------------------------------------------
 -- Plugin Environment Access
 -- -----------------------------------------------------------------------------
 
+smAsks :: (SupermonadPluginEnv -> a) -> SupermonadPluginM a
+smAsks = lift . asks
+
 -- | Returns the 'Control.Supermonad.Bind' class.
 getBindClass :: SupermonadPluginM Class
-getBindClass = asks smEnvBindClass
+getBindClass = smAsks smEnvBindClass
 
 -- | Returns the 'Control.Supermonad.Return' class.
 getReturnClass :: SupermonadPluginM Class
-getReturnClass = asks smEnvReturnClass
+getReturnClass = smAsks smEnvReturnClass
 
 -- | The 'Control.Supermonad' module.
 getSupermonadModule :: SupermonadPluginM Module
-getSupermonadModule = asks smEnvSupermonadModule
+getSupermonadModule = smAsks smEnvSupermonadModule
 
 -- | Returns the module that contains the 'Data.Functor.Identity' data type.
 getIdentityModule :: SupermonadPluginM Module
-getIdentityModule = asks smEnvIdentityModule
+getIdentityModule = smAsks smEnvIdentityModule
 
 -- | Returns the type constructor of the 'Data.Functor.Identity' data type.
 getIdentityTyCon :: SupermonadPluginM TyCon
-getIdentityTyCon = asks smEnvIdentityTyCon
+getIdentityTyCon = smAsks smEnvIdentityTyCon
 
 -- | Returns all of the /given/ and /derived/ constraints of this plugin call.
 getGivenConstraints :: SupermonadPluginM [GivenCt]
-getGivenConstraints = asks smEnvGivenConstraints
+getGivenConstraints = smAsks smEnvGivenConstraints
 
 -- | Returns all of the wanted constraints of this plugin call.
 getWantedConstraints :: SupermonadPluginM [WantedCt]
-getWantedConstraints = asks smEnvWantedConstraints
+getWantedConstraints = smAsks smEnvWantedConstraints
 
 -- | Shortcut to access the instance environments.
 getInstEnvs :: SupermonadPluginM InstEnvs
@@ -191,7 +213,7 @@ assertM condM msg = do
 -- | Throw an error with the given message in the plugin.
 --   This will abort all further actions.
 throwPluginError :: String -> SupermonadPluginM a
-throwPluginError = lift . throwE
+throwPluginError = lift . lift . throwE
 
 -- | Print some generic outputable object from the plugin (Unsafe).
 printObj :: Outputable o => o -> SupermonadPluginM ()
