@@ -12,10 +12,12 @@ module Control.Supermonad.Plugin.Environment
   , getIdentityTyCon, getIdentityModule
   , getGivenConstraints, getWantedConstraints
   , setWantedConstraints
+  , getCurrentResults
   , getInstEnvs
   , addEvidenceResult, addEvidenceResults
   , addDerivedResult, addDerivedResults
   , processAndRemoveWantedConstraints
+  , whenNoResults
   , throwPluginError
     -- * Debug and Error Output
   , assert, assertM
@@ -24,11 +26,12 @@ module Control.Supermonad.Plugin.Environment
   ) where
 
 import Data.List ( groupBy, partition )
+import Data.Monoid ( Monoid(..), (<>) )
 
+import Control.Arrow ( (***) )
 import Control.Monad ( unless, forM_ )
 import Control.Monad.Reader ( ReaderT, runReaderT, asks )
-import Control.Monad.Writer ( WriterT, runWriterT, tell )
-import Control.Monad.State  ( StateT , evalStateT, gets, get, put )
+import Control.Monad.State  ( StateT , runStateT , gets, get, put, modify )
 import Control.Monad.Except ( ExceptT, runExceptT, throwError )
 import Control.Monad.Trans.Class ( lift )
 
@@ -61,11 +64,10 @@ import Control.Supermonad.Plugin.Detect
 -- -----------------------------------------------------------------------------
 
 -- | The plugin monad.
-type SupermonadPluginM = WriterT SupermonadPluginResult 
-                       ( ReaderT SupermonadPluginEnv 
+type SupermonadPluginM = ReaderT SupermonadPluginEnv 
                        ( StateT  SupermonadPluginState 
                        ( ExceptT String TcPluginM
-                       ) ) )
+                       ) )
 
 -- | The read-only environent of the plugin.
 data SupermonadPluginEnv = SupermonadPluginEnv
@@ -97,12 +99,17 @@ instance Monoid SupermonadPluginResult where
     { smResultEvidence = []
     , smResultDerived  = [] }
 
+isEmptyResult :: SupermonadPluginResult -> Bool
+isEmptyResult res = null (smResultDerived res) && null (smResultEvidence res)
+
 -- | The modifiable state of the plugin.
 data SupermonadPluginState = SupermonadPluginState 
   { smStateGivenConstraints  :: [GivenCt]
   -- ^ The given and derived constraints (all of them).
   , smStateWantedConstraints :: [WantedCt]
   -- ^ The wanted constraints (all of them).
+  , smStateResult :: SupermonadPluginResult
+  -- ^ The current results of the supermonad plugin.
   }
 
 -- | @runPmPlugin givenAndDerived wanted m@ runs the given polymonad plugin solver @m@
@@ -122,10 +129,11 @@ runSupermonadPlugin givenCts wantedCts smM = do
   mIdTyCon <- findIdentityTyCon
   case (mSupermonadMdl, mBindCls, mReturnCls, mIdMdl, mIdTyCon) of
     (Right supermonadMdl, Just bindCls, Just returnCls, Right idMdl, Just idTyCon) -> do
-      let state = SupermonadPluginState 
+      let initState = SupermonadPluginState 
             { smStateGivenConstraints  = givenCts
-            , smStateWantedConstraints = wantedCts }
-      eResult <- runExceptT $ flip evalStateT state $ runReaderT (runWriterT smM) $ SupermonadPluginEnv
+            , smStateWantedConstraints = wantedCts
+            , smStateResult = mempty }
+      eResult <- runExceptT $ flip runStateT initState $ runReaderT smM $ SupermonadPluginEnv
         { smEnvSupermonadModule  = supermonadMdl
         , smEnvBindClass         = bindCls
         , smEnvReturnClass       = returnCls
@@ -133,7 +141,7 @@ runSupermonadPlugin givenCts wantedCts smM = do
         , smEnvIdentityTyCon     = idTyCon }
       return $ case eResult of
         Left  err -> Left err
-        Right (_a, res) -> Right $ TcPluginOk (smResultEvidence res) (smResultDerived res)
+        Right (_a, res) -> Right $ TcPluginOk (smResultEvidence $ smStateResult res) (smResultDerived $ smStateResult res)
     (Left mdlErrMsg, _, _, _, _) -> do
       let msg = "Could not find " ++ supermonadModuleName ++ " module:"
       L.printErr msg
@@ -159,7 +167,7 @@ runSupermonadPlugin givenCts wantedCts smM = do
 
 -- | Execute the given 'TcPluginM' computation within the polymonad plugin monad.
 runTcPlugin :: TcPluginM a -> SupermonadPluginM a
-runTcPlugin = lift . lift . lift . lift
+runTcPlugin = lift . lift . lift
 
 -- -----------------------------------------------------------------------------
 -- Plugin Environment Access
@@ -202,17 +210,20 @@ setWantedConstraints wantedCts = do
 getInstEnvs :: SupermonadPluginM InstEnvs
 getInstEnvs = runTcPlugin TcPluginM.getInstEnvs
 
+getCurrentResults :: SupermonadPluginM ([(EvTerm, WantedCt)], [Ct])
+getCurrentResults = (\res -> (smResultEvidence res, smResultDerived res)) <$> gets smStateResult
+
 addEvidenceResult :: (EvTerm, WantedCt) -> SupermonadPluginM ()
 addEvidenceResult evidence = addEvidenceResults [evidence]
 
 addEvidenceResults :: [(EvTerm, WantedCt)] -> SupermonadPluginM ()
-addEvidenceResults evidence = tell $ SupermonadPluginResult evidence []
+addEvidenceResults evidence = modify $ \s -> s { smStateResult = smStateResult s <> (SupermonadPluginResult evidence []) } 
 
 addDerivedResult :: Ct -> SupermonadPluginM ()
 addDerivedResult derived = addDerivedResults [derived]
 
 addDerivedResults :: [Ct] -> SupermonadPluginM ()
-addDerivedResults derived = tell $ SupermonadPluginResult [] derived
+addDerivedResults derived = modify $ \s -> s { smStateResult = smStateResult s <> (SupermonadPluginResult [] derived) }
 
 processAndRemoveWantedConstraints :: (WantedCt -> Bool) -> (WantedCt -> SupermonadPluginM ([(EvTerm, WantedCt)], [Ct])) -> SupermonadPluginM ()
 processAndRemoveWantedConstraints predicate process = do
@@ -223,6 +234,13 @@ processAndRemoveWantedConstraints predicate process = do
     addEvidenceResults evidence
     addDerivedResults  derived
   setWantedConstraints restCts
+
+whenNoResults :: SupermonadPluginM () -> SupermonadPluginM ()
+whenNoResults m = do
+  empty <- (uncurry (&&) . (null *** null)) <$> getCurrentResults
+  if empty then m else return ()
+
+-- listens :: MonadWriter w m => (w -> b) -> m a -> m (a, b)
 
 -- -----------------------------------------------------------------------------
 -- Plugin debug and error printing

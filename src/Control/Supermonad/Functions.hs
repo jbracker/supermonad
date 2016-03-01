@@ -4,6 +4,9 @@
 -- Needed to use supermonads instead of standard monads.
 {-# LANGUAGE RebindableSyntax #-}
 
+-- TODO: Remove. For dev purposes
+{-# LANGUAGE ScopedTypeVariables #-}
+
 -- Plugin ----------------------------------------------------------------------
 
 {-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
@@ -28,27 +31,28 @@ module Control.Supermonad.Functions
     -- ** Generalizations of list functions
   , join
   -- , msum, mfilter -- FIXME: Requires an alternative of 'MonadPlus'.
-  , filterM
-  , mapAndUnzipM
-  , zipWithM, zipWithM_
-  , foldM, foldM_
-  , replicateM, replicateM_
+  -- , filterM -- TODO: Plugin does not support
+  -- , mapAndUnzipM
+  -- , zipWithM, zipWithM_
+  -- , foldM, foldM_
+  -- , replicateM, replicateM_
     -- ** Conditional execution of monadic expressions
   -- , guard -- FIXME: Requires an alternative of 'Alternative'
-  , when, unless
+  -- , when, unless
     -- ** Monadic lifting operators
   , liftM, liftM2, liftM3
   -- , liftM4, liftM5 -- TODO
-  , ap
+  -- , ap
     -- ** Strict monadic functions
-  , (<$!>)
+  -- , (<$!>)
     -- * Additional generalized supermonad functions
-  , (<$>)
+  -- , (<$>)
   ) where
 
 import qualified Prelude as P
 import Prelude
   ( Bool(..), Int
+  , Functor(..)
   , (.), ($)
   , id, flip
   , not
@@ -81,12 +85,12 @@ f =<< ma = ma >>= f
 (<=<) g f x = f x >>= g
 
 -- | When the condition is true do the given action.
-when :: (Bind n Identity m, Return m) => Bool -> n () -> m ()
+when :: (Functor m, Return m) => Bool -> m () -> m ()
 when True  s = void s
 when False _ = return ()
 
 -- | When the condition is false do the given action.
-unless :: (Bind n Identity m, Return m) => Bool -> n () -> m ()
+unless :: (Functor m, Return m) => Bool -> m () -> m ()
 unless b = when (not b)
 
 -- | Map the given function on each element of the list and collect the results.
@@ -117,7 +121,7 @@ join :: (Bind m n p) => m (n a) -> p a
 join k = k >>= id
 
 -- | Ignore the result of a computation.
-void :: (Bind m Identity n) => m a -> n ()
+void :: (Functor m) => m a -> m ()
 void = (>> return ())
 
 -- | 'mapM' ignoring the result.
@@ -141,9 +145,9 @@ sequence_ = void . sequence
 -- | Execute the given computation repeatedly forever.
 forever :: Bind m m m => m a -> m b
 forever ma = ma >> forever ma
-
+{- 
 -- | Like @filter@ but with a monadic predicate and result.
-filterM :: ( Bind n m m, Bind m m m
+filterM :: forall m n a. ( Bind n m m --, Bind m m m
            , Return m, Bind m Identity m)
         => (a -> n Bool) -> [a] -> m [a]
 filterM _f [] = return []
@@ -152,13 +156,16 @@ filterM f (x : xs) = do
   if keep
     then filterM f xs >>= (return . (x :))
     else filterM f xs
-
+-- TODO: Can fix by replacing "filterM f xs >>= (return . (x :))" 
+-- with "(x :) P.<$> filterM f xs" or adding a type annotation: 
+-- "filterM f xs :: m [a]" (ScopedTypeVariables)
+-}
 -- | Map a given monadic function on the list and the unzip the results.
 mapAndUnzipM :: ( Return n, Bind n Identity n
                 , Bind m n n, Bind n n n)
              => (a -> m (b, c)) -> [a] -> n ([b], [c])
 mapAndUnzipM f xs = liftM P.unzip (forM xs f)
-
+{-
 -- | Zip together two list using a monadic function.
 zipWithM :: ( Return n, Bind n Identity n
             , Bind m n n, Bind n n n)
@@ -204,27 +211,28 @@ replicateM_ :: ( Return n
                , Bind m n n, Bind n Identity n)
             => Int -> m a -> n ()
 replicateM_ n = void . replicateM n
-
+-}
 -- | Make arguments and result of a pure function monadic.
-liftM :: (Bind m Identity n) => (a -> b) -> m a -> n b
+liftM :: (Bind m Identity m) => (a -> b) -> m a -> m b
 liftM f ma = ma >>= (return . f)
 
 -- | Make arguments and result of a pure function monadic.
-liftM2 :: (Bind m n p, Bind n Identity n) => (a -> b -> c) -> m a -> n b -> p c
+liftM2 :: (Bind m n p) --, Bind n Identity n) 
+       => (a -> b -> c) -> m a -> n b -> p c
 liftM2 f ma nb = do
   a <- ma
   b <- nb
   return $ f a b
 
 -- | Make arguments and result of a pure function monadic.
-liftM3 :: (Bind m q q, Bind n p q, Bind p Identity p, Bind q Identity q)
+liftM3 :: (Bind m q q, Bind n p q, Bind p Identity p)
        => (a -> b -> c -> d) -> m a -> n b -> p c -> q d
 liftM3 f ma nb pc = do --ma >>= (\a -> nb >>= (\b -> pc >>= (\c -> return $ f a b c)))
   a <- ma
   b <- nb
   c <- pc
   return $ f a b c
-
+{-
 -- | Make the resulting function a monadic function.
 ap :: (Bind m n p, Bind n Identity n) => m (a -> b) -> n a -> p b
 ap mf na = do
@@ -246,3 +254,4 @@ f <$!> m = do
   z `P.seq` return z
 
 -- TODO: Generalize all the other functions in Control.Monad.
+-}

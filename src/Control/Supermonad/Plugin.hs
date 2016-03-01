@@ -18,8 +18,10 @@ import Control.Supermonad.Plugin.Environment
   ( SupermonadPluginM, runSupermonadPlugin
   , getIdentityTyCon
   , getReturnClass
+  , getWantedConstraints
   , processAndRemoveWantedConstraints
-  , printMsg )
+  , whenNoResults
+  , printMsg, printConstraints )
 
 -- -----------------------------------------------------------------------------
 -- The Plugin
@@ -69,7 +71,9 @@ supermonadSolve' _s = do
   -- Get information from the environment
   identityTC <- getIdentityTyCon
   returnCls <- getReturnClass
-
+  
+  getWantedConstraints >>= printConstraints
+  
   -- Default all ambiguous type variables in 'Return' constraints
   -- to 'Identity'.
   processAndRemoveWantedConstraints (isClassConstraint returnCls) $ \returnCt ->
@@ -80,7 +84,7 @@ supermonadSolve' _s = do
           return $ ([], [mkDerivedTypeEqCt returnCt ambTv (mkTyConTy identityTC)])
         else return ([], [])
       _ -> return ([], [])
-  
+  whenNoResults $ printMsg "NO RESULTS"
   -- End of plugin code.
   return ()
 
