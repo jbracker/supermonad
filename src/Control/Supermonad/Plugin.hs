@@ -2,10 +2,6 @@
 module Control.Supermonad.Plugin
   ( plugin ) where
 
-import Data.Maybe ( catMaybes )
-
-import Control.Monad ( forM )
-
 import Plugins ( Plugin(tcPlugin), defaultPlugin )
 import Type ( getTyVar, mkTyConTy )
 import TcRnTypes
@@ -16,11 +12,13 @@ import TcPluginM ( TcPluginM )
 import Control.Supermonad.Plugin.Utils ( isAmbiguousType )
 import Control.Supermonad.Plugin.Constraint
   ( mkDerivedTypeEqCt
-  , constraintClassTyArgs )
+  , constraintClassTyArgs
+  , isClassConstraint )
 import Control.Supermonad.Plugin.Environment
   ( SupermonadPluginM, runSupermonadPlugin
-  , getWantedReturnConstraints
   , getIdentityTyCon
+  , getReturnClass
+  , processAndRemoveWantedConstraints
   , printMsg )
 
 -- -----------------------------------------------------------------------------
@@ -60,31 +58,31 @@ supermonadSolve s given derived wanted = do
     if not $ null wanted then do
       printMsg "Invoke supermonad plugin..."
       supermonadSolve' s
-    else return noResult
+    else return ()
   return $ case res of
     Left _err -> noResult
     Right solution -> solution
 
 -- | The actual plugin code.
-supermonadSolve' :: SupermonadState -> SupermonadPluginM TcPluginResult
+supermonadSolve' :: SupermonadState -> SupermonadPluginM ()
 supermonadSolve' _s = do
   -- Get information from the environment
   identityTC <- getIdentityTyCon
-  returnCts <- getWantedReturnConstraints
+  returnCls <- getReturnClass
 
   -- Default all ambiguous type variables in 'Return' constraints
   -- to 'Identity'.
-  derivedReturnCts <- forM returnCts $ \returnCt ->
+  processAndRemoveWantedConstraints (isClassConstraint returnCls) $ \returnCt ->
     case constraintClassTyArgs returnCt of
       Just [t] -> if isAmbiguousType t
         then do
           let ambTv = getTyVar "Type is not a TyVar" t
-          return $ Just $ mkDerivedTypeEqCt returnCt ambTv (mkTyConTy identityTC)
-        else return Nothing
-      _ -> return Nothing
-
-  -- Return the derived constraints and evidence for selected instances.
-  return $ TcPluginOk [] (catMaybes derivedReturnCts)
+          return $ ([], [mkDerivedTypeEqCt returnCt ambTv (mkTyConTy identityTC)])
+        else return ([], [])
+      _ -> return ([], [])
+  
+  -- End of plugin code.
+  return ()
 
 noResult :: TcPluginResult
 noResult = TcPluginOk [] []

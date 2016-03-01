@@ -11,8 +11,11 @@ module Control.Supermonad.Plugin.Environment
   , getSupermonadModule
   , getIdentityTyCon, getIdentityModule
   , getGivenConstraints, getWantedConstraints
-  , getWantedReturnConstraints
+  , setWantedConstraints
   , getInstEnvs
+  , addEvidenceResult, addEvidenceResults
+  , addDerivedResult, addDerivedResults
+  , processAndRemoveWantedConstraints
   , throwPluginError
     -- * Debug and Error Output
   , assert, assertM
@@ -20,19 +23,20 @@ module Control.Supermonad.Plugin.Environment
   , printConstraints
   ) where
 
-import Data.List ( groupBy )
+import Data.List ( groupBy, partition )
 
 import Control.Monad ( unless, forM_ )
-import Control.Monad.Trans.Reader ( ReaderT, runReaderT, asks )
-import Control.Monad.Trans.Writer ( WriterT, runWriterT )
-import Control.Monad.Trans.Except ( ExceptT, runExceptT, throwE )
+import Control.Monad.Reader ( ReaderT, runReaderT, asks )
+import Control.Monad.Writer ( WriterT, runWriterT, tell )
+import Control.Monad.State  ( StateT , evalStateT, gets, get, put )
+import Control.Monad.Except ( ExceptT, runExceptT, throwError )
 import Control.Monad.Trans.Class ( lift )
 
 import Class ( Class )
 import Module ( Module )
 import InstEnv ( InstEnvs )
 import TyCon ( TyCon )
-import TcRnTypes ( Ct )
+import TcRnTypes ( Ct, TcPluginResult(..) )
 import TcPluginM ( TcPluginM, tcPluginIO )
 import TcEvidence ( EvTerm )
 import qualified TcPluginM
@@ -43,8 +47,7 @@ import FastString ( unpackFS )
 import qualified Control.Supermonad.Plugin.Log as L
 import Control.Supermonad.Plugin.Constraint
   ( GivenCt, WantedCt
-  , constraintSourceLocation
-  , isClassConstraint )
+  , constraintSourceLocation )
 import Control.Supermonad.Plugin.Detect
   ( findSupermonadModule
   , findBindClass, findReturnClass
@@ -58,24 +61,24 @@ import Control.Supermonad.Plugin.Detect
 -- -----------------------------------------------------------------------------
 
 -- | The plugin monad.
-type SupermonadPluginM = WriterT SupermonadPluginResult (ReaderT SupermonadPluginEnv (ExceptT String TcPluginM))
+type SupermonadPluginM = WriterT SupermonadPluginResult 
+                       ( ReaderT SupermonadPluginEnv 
+                       ( StateT  SupermonadPluginState 
+                       ( ExceptT String TcPluginM
+                       ) ) )
 
 -- | The read-only environent of the plugin.
 data SupermonadPluginEnv = SupermonadPluginEnv
-  { smEnvSupermonadModule    :: Module
+  { smEnvSupermonadModule :: Module
   -- ^ The 'Control.Supermonad' module.
-  , smEnvBindClass     :: Class
+  , smEnvBindClass :: Class
   -- ^ The 'Bind' class.
-  , smEnvReturnClass     :: Class
+  , smEnvReturnClass :: Class
   -- ^ The 'Return' class.
   , smEnvIdentityModule :: Module
   -- ^ The 'Data.Functor.Identity' module.
-  , smEnvIdentityTyCon  :: TyCon
+  , smEnvIdentityTyCon :: TyCon
   -- ^ The 'Identity' type constructor.
-  , smEnvGivenConstraints  :: [GivenCt]
-  -- ^ The given and derived constraints (all of them).
-  , smEnvWantedConstraints :: [WantedCt]
-  -- ^ The wanted constraints (all of them).
   }
 
 -- | The write-only result of the plugin.
@@ -94,6 +97,14 @@ instance Monoid SupermonadPluginResult where
     { smResultEvidence = []
     , smResultDerived  = [] }
 
+-- | The modifiable state of the plugin.
+data SupermonadPluginState = SupermonadPluginState 
+  { smStateGivenConstraints  :: [GivenCt]
+  -- ^ The given and derived constraints (all of them).
+  , smStateWantedConstraints :: [WantedCt]
+  -- ^ The wanted constraints (all of them).
+  }
+
 -- | @runPmPlugin givenAndDerived wanted m@ runs the given polymonad plugin solver @m@
 --   within the type checker plugin monad. The /given/ and /derived/ constraints are
 --   passed in through @givenAndDerived@ and the /wanted/ constraints are passed in
@@ -102,7 +113,7 @@ instance Monoid SupermonadPluginResult where
 --   The function will make sure that only the polymonad constraints
 --   and actually /given/, /derived/ or /wanted/ constraints
 --   are kept, respectivly.
-runSupermonadPlugin :: [GivenCt] -> [WantedCt] -> SupermonadPluginM a -> TcPluginM (Either String a)
+runSupermonadPlugin :: [GivenCt] -> [WantedCt] -> SupermonadPluginM a -> TcPluginM (Either String TcPluginResult)
 runSupermonadPlugin givenCts wantedCts smM = do
   mSupermonadMdl <- findSupermonadModule
   mBindCls <- findBindClass
@@ -111,16 +122,18 @@ runSupermonadPlugin givenCts wantedCts smM = do
   mIdTyCon <- findIdentityTyCon
   case (mSupermonadMdl, mBindCls, mReturnCls, mIdMdl, mIdTyCon) of
     (Right supermonadMdl, Just bindCls, Just returnCls, Right idMdl, Just idTyCon) -> do
-      let (_, result) = runWriterT smM
-      runExceptT $ runReaderT (runWriterT smMCont) $ SupermonadPluginEnv
-        { smEnvSupermonadModule = supermonadMdl
-        , smEnvBindClass        = bindCls
-        , smEnvReturnClass      = returnCls
-        , smEnvIdentityModule     = idMdl
-        , smEnvIdentityTyCon    = idTyCon
-        , smEnvGivenConstraints  = givenCts
-        , smEnvWantedConstraints = wantedCts
-        }
+      let state = SupermonadPluginState 
+            { smStateGivenConstraints  = givenCts
+            , smStateWantedConstraints = wantedCts }
+      eResult <- runExceptT $ flip evalStateT state $ runReaderT (runWriterT smM) $ SupermonadPluginEnv
+        { smEnvSupermonadModule  = supermonadMdl
+        , smEnvBindClass         = bindCls
+        , smEnvReturnClass       = returnCls
+        , smEnvIdentityModule    = idMdl
+        , smEnvIdentityTyCon     = idTyCon }
+      return $ case eResult of
+        Left  err -> Left err
+        Right (_a, res) -> Right $ TcPluginOk (smResultEvidence res) (smResultDerived res)
     (Left mdlErrMsg, _, _, _, _) -> do
       let msg = "Could not find " ++ supermonadModuleName ++ " module:"
       L.printErr msg
@@ -146,52 +159,70 @@ runSupermonadPlugin givenCts wantedCts smM = do
 
 -- | Execute the given 'TcPluginM' computation within the polymonad plugin monad.
 runTcPlugin :: TcPluginM a -> SupermonadPluginM a
-runTcPlugin = lift . lift . lift
+runTcPlugin = lift . lift . lift . lift
 
 -- -----------------------------------------------------------------------------
 -- Plugin Environment Access
 -- -----------------------------------------------------------------------------
 
-smAsks :: (SupermonadPluginEnv -> a) -> SupermonadPluginM a
-smAsks = lift . asks
-
 -- | Returns the 'Control.Supermonad.Bind' class.
 getBindClass :: SupermonadPluginM Class
-getBindClass = smAsks smEnvBindClass
+getBindClass = asks smEnvBindClass
 
 -- | Returns the 'Control.Supermonad.Return' class.
 getReturnClass :: SupermonadPluginM Class
-getReturnClass = smAsks smEnvReturnClass
+getReturnClass = asks smEnvReturnClass
 
 -- | The 'Control.Supermonad' module.
 getSupermonadModule :: SupermonadPluginM Module
-getSupermonadModule = smAsks smEnvSupermonadModule
+getSupermonadModule = asks smEnvSupermonadModule
 
 -- | Returns the module that contains the 'Data.Functor.Identity' data type.
 getIdentityModule :: SupermonadPluginM Module
-getIdentityModule = smAsks smEnvIdentityModule
+getIdentityModule = asks smEnvIdentityModule
 
 -- | Returns the type constructor of the 'Data.Functor.Identity' data type.
 getIdentityTyCon :: SupermonadPluginM TyCon
-getIdentityTyCon = smAsks smEnvIdentityTyCon
+getIdentityTyCon = asks smEnvIdentityTyCon
 
 -- | Returns all of the /given/ and /derived/ constraints of this plugin call.
 getGivenConstraints :: SupermonadPluginM [GivenCt]
-getGivenConstraints = smAsks smEnvGivenConstraints
+getGivenConstraints = gets smStateGivenConstraints
 
 -- | Returns all of the wanted constraints of this plugin call.
 getWantedConstraints :: SupermonadPluginM [WantedCt]
-getWantedConstraints = smAsks smEnvWantedConstraints
+getWantedConstraints = gets smStateWantedConstraints
+
+setWantedConstraints :: [WantedCt] -> SupermonadPluginM ()
+setWantedConstraints wantedCts = do 
+  state <- get
+  put $ state { smStateWantedConstraints = wantedCts }
 
 -- | Shortcut to access the instance environments.
 getInstEnvs :: SupermonadPluginM InstEnvs
 getInstEnvs = runTcPlugin TcPluginM.getInstEnvs
 
-getWantedReturnConstraints :: SupermonadPluginM [WantedCt]
-getWantedReturnConstraints = do
+addEvidenceResult :: (EvTerm, WantedCt) -> SupermonadPluginM ()
+addEvidenceResult evidence = addEvidenceResults [evidence]
+
+addEvidenceResults :: [(EvTerm, WantedCt)] -> SupermonadPluginM ()
+addEvidenceResults evidence = tell $ SupermonadPluginResult evidence []
+
+addDerivedResult :: Ct -> SupermonadPluginM ()
+addDerivedResult derived = addDerivedResults [derived]
+
+addDerivedResults :: [Ct] -> SupermonadPluginM ()
+addDerivedResults derived = tell $ SupermonadPluginResult [] derived
+
+processAndRemoveWantedConstraints :: (WantedCt -> Bool) -> (WantedCt -> SupermonadPluginM ([(EvTerm, WantedCt)], [Ct])) -> SupermonadPluginM ()
+processAndRemoveWantedConstraints predicate process = do
   wantedCts <- getWantedConstraints
-  returnCls <- getReturnClass
-  return $ filter (isClassConstraint returnCls) wantedCts
+  let (foundCts, restCts) = partition predicate wantedCts
+  forM_ foundCts $ \wantedCt -> do
+    (evidence, derived) <- process wantedCt
+    addEvidenceResults evidence
+    addDerivedResults  derived
+  setWantedConstraints restCts
 
 -- -----------------------------------------------------------------------------
 -- Plugin debug and error printing
@@ -213,7 +244,7 @@ assertM condM msg = do
 -- | Throw an error with the given message in the plugin.
 --   This will abort all further actions.
 throwPluginError :: String -> SupermonadPluginM a
-throwPluginError = lift . lift . throwE
+throwPluginError = throwError
 
 -- | Print some generic outputable object from the plugin (Unsafe).
 printObj :: Outputable o => o -> SupermonadPluginM ()
