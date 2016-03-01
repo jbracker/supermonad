@@ -3,7 +3,7 @@ module Control.Supermonad.Plugin
   ( plugin ) where
 
 import Plugins ( Plugin(tcPlugin), defaultPlugin )
-import Type ( getTyVar, mkTyConTy )
+import Type ( Type, eqType, getTyVar, mkTyConTy )
 import TcRnTypes
   ( Ct(..)
   , TcPlugin(..), TcPluginResult(..) )
@@ -17,7 +17,7 @@ import Control.Supermonad.Plugin.Constraint
 import Control.Supermonad.Plugin.Environment
   ( SupermonadPluginM, runSupermonadPlugin
   , getIdentityTyCon
-  , getReturnClass
+  , getReturnClass, getBindClass
   , getWantedConstraints
   , processAndRemoveWantedConstraints
   , whenNoResults
@@ -68,15 +68,32 @@ supermonadSolve s given derived wanted = do
 -- | The actual plugin code.
 supermonadSolve' :: SupermonadState -> SupermonadPluginM ()
 supermonadSolve' _s = do
+  getWantedConstraints >>= printConstraints
+  
+  processWantedReturnConstraints
+  
+  whenNoResults $ do
+    printMsg "NO RESULTS"
+    processWantedFunctorBindConstraints
+  
+  -- End of plugin code.
+  return ()
+
+noResult :: TcPluginResult
+noResult = TcPluginOk [] []
+
+-- -----------------------------------------------------------------------------
+-- Plugin processing steps
+-- -----------------------------------------------------------------------------
+
+processWantedReturnConstraints :: SupermonadPluginM ()
+processWantedReturnConstraints = do
   -- Get information from the environment
   identityTC <- getIdentityTyCon
   returnCls <- getReturnClass
-  
-  getWantedConstraints >>= printConstraints
-  
   -- Default all ambiguous type variables in 'Return' constraints
   -- to 'Identity'.
-  processAndRemoveWantedConstraints (isClassConstraint returnCls) $ \returnCt ->
+  processAndRemoveWantedConstraints (return . isClassConstraint returnCls) $ \returnCt ->
     case constraintClassTyArgs returnCt of
       Just [t] -> if isAmbiguousType t
         then do
@@ -84,9 +101,35 @@ supermonadSolve' _s = do
           return $ ([], [mkDerivedTypeEqCt returnCt ambTv (mkTyConTy identityTC)])
         else return ([], [])
       _ -> return ([], [])
-  whenNoResults $ printMsg "NO RESULTS"
-  -- End of plugin code.
-  return ()
 
-noResult :: TcPluginResult
-noResult = TcPluginOk [] []
+processWantedFunctorBindConstraints :: SupermonadPluginM ()
+processWantedFunctorBindConstraints = do
+  
+  processAndRemoveWantedConstraints (isBindConstraintWith isFunctorBindConstraint) $ \bindCt -> do
+    -- TODO: Pick the correct functor instance
+    return ([], [])
+  
+  where 
+    isFunctorBindConstraint :: Type -> Type -> Type -> SupermonadPluginM Bool
+    isFunctorBindConstraint t1 t2 t3 = do
+      idTC <- mkTyConTy <$> getIdentityTyCon
+      return $ (eqType t2 idTC && eqType t1 t3) -- Bind m Identity m
+            || (eqType t1 idTC && eqType t2 t3) -- Bind Identity m m
+
+-- -----------------------------------------------------------------------------
+-- General plugin utilities
+-- -----------------------------------------------------------------------------
+      
+isBindConstraintWith :: (Type -> Type -> Type -> SupermonadPluginM Bool) -> Ct -> SupermonadPluginM Bool
+isBindConstraintWith p ct = do
+  bindCls <- getBindClass
+  case (isClassConstraint bindCls ct, constraintClassTyArgs ct) of
+    (True, Just [t1, t2, t3]) -> p t1 t2 t3
+    _ -> return False
+  
+
+
+
+
+
+

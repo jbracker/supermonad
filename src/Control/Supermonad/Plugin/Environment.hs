@@ -48,6 +48,8 @@ import SrcLoc ( srcSpanFileName_maybe )
 import FastString ( unpackFS )
 
 import qualified Control.Supermonad.Plugin.Log as L
+import Control.Supermonad.Plugin.Utils
+  ( partitionM )
 import Control.Supermonad.Plugin.Constraint
   ( GivenCt, WantedCt
   , constraintSourceLocation )
@@ -225,10 +227,10 @@ addDerivedResult derived = addDerivedResults [derived]
 addDerivedResults :: [Ct] -> SupermonadPluginM ()
 addDerivedResults derived = modify $ \s -> s { smStateResult = smStateResult s <> (SupermonadPluginResult [] derived) }
 
-processAndRemoveWantedConstraints :: (WantedCt -> Bool) -> (WantedCt -> SupermonadPluginM ([(EvTerm, WantedCt)], [Ct])) -> SupermonadPluginM ()
+processAndRemoveWantedConstraints :: (WantedCt -> SupermonadPluginM Bool) -> (WantedCt -> SupermonadPluginM ([(EvTerm, WantedCt)], [Ct])) -> SupermonadPluginM ()
 processAndRemoveWantedConstraints predicate process = do
   wantedCts <- getWantedConstraints
-  let (foundCts, restCts) = partition predicate wantedCts
+  (foundCts, restCts) <- partitionM predicate wantedCts
   forM_ foundCts $ \wantedCt -> do
     (evidence, derived) <- process wantedCt
     addEvidenceResults evidence
