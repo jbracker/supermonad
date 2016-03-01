@@ -22,6 +22,7 @@ module Control.Supermonad.Plugin.Utils (
   , lookupBy
   , allM, anyM
   , fromLeft, fromRight
+  , partitionM
   ) where
 
 import Data.Maybe ( listToMaybe, catMaybes )
@@ -251,3 +252,13 @@ fromLeft (Right _) = error "fromLeft: Applied to 'Right'"
 fromRight :: Either a b -> b
 fromRight (Left _) = error "fromRight: Applied to 'Left'"
 fromRight (Right b) = b
+
+-- | Partition a list into two lists based on a predicate involving a monadic 
+--   computation.
+partitionM :: (Monad m) => (a -> m Bool) -> [a] -> m ([a], [a])
+partitionM p [] = return ([], [])
+partitionM p (x : xs) = do
+  (ts, fs) <- partitionM p xs
+  b <- p x
+  return $ if b then (x : ts, fs) else (ts, x : fs)
+  
