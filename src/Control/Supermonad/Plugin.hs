@@ -114,18 +114,12 @@ processWantedFunctorBindConstraints :: SupermonadPluginM ()
 processWantedFunctorBindConstraints = do
   
   processAndRemoveWantedConstraints (isBindConstraintWith areBindFunctorArguments) $ \bindCt -> do
-    printMsg "Solve functor bind constraint:"
-    printConstraints [bindCt]
     let Just [t, _, _] = constraintClassTyArgs bindCt
     if isAmbiguousType t then do
-      printMsg "Functor bind constraint includes ambiguous variable:"
-      printObj bindCt
       return ([], [])
     else do
       instFunctor <- getBindFunctorInstance
       givenCts <- getGivenConstraints
-      printMsg "Given Constraints:"
-      printConstraints givenCts
       eEvidence <- runTcPlugin $ produceEvidenceFor givenCts instFunctor [t]
       -- This assumes that the functor instance has the following head 
       -- "(Functor m) => Bind m Identity m" and therefore there is only one variable.
@@ -139,8 +133,23 @@ processWantedFunctorBindConstraints = do
           return ([], [])
   
   processAndRemoveWantedConstraints (isBindConstraintWith areBindApplyArguments) $ \bindCt -> do
-    -- TODO: Pick the correct functor instance
-    return ([], [])
+    let Just [t, _, _] = constraintClassTyArgs bindCt
+    if isAmbiguousType t then do
+      return ([], [])
+    else do
+      instApply <- getBindApplyInstance
+      givenCts <- getGivenConstraints
+      eEvidence <- runTcPlugin $ produceEvidenceFor givenCts instApply [t]
+      -- This assumes that the functor instance has the following head 
+      -- "(Functor m) => Bind Identity m m" and therefore there is only one variable.
+      -- produceEvidenceFor :: [GivenCt] -> ClsInst -> [Type] -> TcPluginM (Either SDoc EvTerm)
+      case eEvidence of
+        Right evidence -> return ([(evidence, bindCt)], [])
+        Left err -> do
+          printMsg "Failed to produce evidence for functor apply bind constraint:"
+          printObj bindCt
+          printMsg $ showSDocUnsafe err
+          return ([], [])
 
 -- -----------------------------------------------------------------------------
 -- General plugin utilities
