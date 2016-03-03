@@ -15,6 +15,10 @@ module Control.Supermonad.Plugin.Detect
   , identityTyConName
   , findIdentityModule
   , findIdentityTyCon
+   -- * Functor Bind Instance Detection
+  , areFunctorBindArguments
+  , findFunctorBindInstances
+  , functorClassName, functorModuleName
   ) where
 
 import Data.Maybe ( catMaybes, listToMaybe )
@@ -25,8 +29,11 @@ import TcRnTypes
   ( TcGblEnv(..)
   , TcTyThing(..) )
 import Type
-  ( TyThing(..) )
-import TyCon ( TyCon )
+  ( Type, TyThing(..)
+  , mkTyConTy
+  , splitTyConApp_maybe
+  , eqType )
+import TyCon ( TyCon, isClassTyCon )
 import TcPluginM
   ( TcPluginM
   , getEnvs, getInstEnvs
@@ -53,12 +60,17 @@ import Class
 import InstEnv
   ( ClsInst(..)
   , instEnvElts
-  , ie_global )
+  , ie_global
+  , classInstances )
 import PrelNames ( mAIN_NAME )
 
 import Control.Supermonad.Plugin.Log
   ( pmErrMsg
   , pprToStr )
+import Control.Supermonad.Plugin.Instance
+  ( instanceType )
+import Control.Supermonad.Plugin.Utils
+  ( getTyConName )
 
 -- -----------------------------------------------------------------------------
 -- Constant Names (Magic Numbers...)
@@ -86,6 +98,12 @@ identityTyConName = "Identity"
 
 supermonadPreudeModuleName :: String
 supermonadPreudeModuleName = "Control.Supermonad.Prelude"
+
+functorClassName :: String
+functorClassName = "Functor"
+
+functorModuleName :: String
+functorModuleName = "Data.Functor"
 
 -- -----------------------------------------------------------------------------
 -- Polymonad Class Detection
@@ -150,6 +168,61 @@ findIdentityTyCon = do
   case mdls of
     [] -> return Nothing
     _ -> findTyConByNameAndModule (mkTcOcc identityTyConName) mdls
+
+-- -----------------------------------------------------------------------------
+-- Functor Bind Instance Detection
+-- -----------------------------------------------------------------------------
+
+areFunctorBindArguments :: TyCon -> Type -> Type -> Type -> Bool
+areFunctorBindArguments idTyCon t1 t2 t3 =
+  let idTC = mkTyConTy idTyCon
+  in (eqType t2 idTC && eqType t1 t3) || -- Bind m Identity m
+     (eqType t1 idTC && eqType t2 t3)    -- Bind Identity m m
+
+isFunctorBindInstance :: Class -> TyCon -> ClsInst -> Bool
+isFunctorBindInstance bindCls idTyCon inst = 
+  let (_cts, cls, _tc, args) = instanceType inst
+      idTC = mkTyConTy idTyCon
+  in cls == bindCls && hasOnlyFunctorConstraint inst && case args of
+    [t1, t2, t3] -> eqType t2 idTC && eqType t1 t3 -- Bind m Identity m
+    _ -> False
+
+isApplyBindInstance :: Class -> TyCon -> ClsInst -> Bool
+isApplyBindInstance bindCls idTyCon inst =
+  let (_cts, cls, _tc, args) = instanceType inst
+      idTC = mkTyConTy idTyCon
+  in cls == bindCls && hasOnlyFunctorConstraint inst && case args of
+    [t1, t2, t3] -> eqType t1 idTC && eqType t2 t3 -- Bind Identity m m
+    _ -> False
+
+isFunctorTyCon :: TyCon -> Bool
+isFunctorTyCon tc = isClassTyCon tc && getTyConName tc == functorClassName
+
+hasOnlyFunctorConstraint :: ClsInst -> Bool
+hasOnlyFunctorConstraint inst =
+  let (cts, _, _, _) = instanceType inst
+  in case cts of
+    [ctType] -> case splitTyConApp_maybe ctType of
+      Just (ctTyCon, _ctArgs) -> isFunctorTyCon ctTyCon
+      Nothing -> False
+    _ -> False
+
+-- | Requires the bind class and identity type constructor as argument.
+--   Returns the pair of instances (Bind m Identity m, Bind Identity n n)
+--   if these instances can be found.
+findFunctorBindInstances :: Class -> TyCon -> TcPluginM (Maybe (ClsInst, ClsInst))
+findFunctorBindInstances bindCls idTyCon = do
+  let isFunctorBindInst = isFunctorBindInstance bindCls idTyCon
+  let isApplyBindInst = isApplyBindInstance bindCls idTyCon
+  bindInsts <-  filter (\inst -> isFunctorBindInst inst || isApplyBindInst inst) 
+            <$> findInstancesInScope bindCls
+  case bindInsts of
+    [b1, b2] -> do
+      if isFunctorBindInst b1 then
+        return $ Just (b1, b2)
+      else
+        return $ Just (b2, b1)
+    _ -> return Nothing
 
 -- -----------------------------------------------------------------------------
 -- Local Utility Functions
@@ -248,3 +321,9 @@ isImportedFrom rdrElt mdl = case gre_prov rdrElt of
   LocalDef -> False
   Imported [] -> False
   Imported impSpecs -> moduleName mdl == importSpecModule (last impSpecs)
+
+-- | Returns a list of all 'Control.Polymonad' instances that are currently in scope.
+findInstancesInScope :: Class -> TcPluginM [ClsInst]
+findInstancesInScope cls = do
+  instEnvs <- TcPluginM.getInstEnvs
+  return $ classInstances instEnvs cls
