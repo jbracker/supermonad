@@ -256,7 +256,7 @@ fromRight (Right b) = b
 -- | Partition a list into two lists based on a predicate involving a monadic 
 --   computation.
 partitionM :: (Monad m) => (a -> m Bool) -> [a] -> m ([a], [a])
-partitionM p [] = return ([], [])
+partitionM _ [] = return ([], [])
 partitionM p (x : xs) = do
   (ts, fs) <- partitionM p xs
   b <- p x

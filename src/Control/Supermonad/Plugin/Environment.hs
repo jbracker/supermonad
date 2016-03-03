@@ -25,8 +25,8 @@ module Control.Supermonad.Plugin.Environment
   , printConstraints
   ) where
 
-import Data.List ( groupBy, partition )
-import Data.Monoid ( Monoid(..), (<>) )
+import Data.List ( groupBy )
+import Data.Monoid ( (<>) )
 
 import Control.Arrow ( (***) )
 import Control.Monad ( unless, forM_ )
@@ -101,8 +101,8 @@ instance Monoid SupermonadPluginResult where
     { smResultEvidence = []
     , smResultDerived  = [] }
 
-isEmptyResult :: SupermonadPluginResult -> Bool
-isEmptyResult res = null (smResultDerived res) && null (smResultEvidence res)
+--isEmptyResult :: SupermonadPluginResult -> Bool
+--isEmptyResult res = null (smResultDerived res) && null (smResultEvidence res)
 
 -- | The modifiable state of the plugin.
 data SupermonadPluginState = SupermonadPluginState 
