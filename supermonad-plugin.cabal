@@ -33,6 +33,7 @@ library
                , Control.Supermonad.Plugin.Detect
                , Control.Supermonad.Plugin.Debug
                , Control.Supermonad.Plugin.Constraint
+               , Control.Supermonad.Plugin.Instance
                , Control.Supermonad.Plugin.Environment
   other-extensions:
   build-depends:  base         >=4.8 && <5,
