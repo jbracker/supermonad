@@ -3,7 +3,8 @@ module Control.Supermonad.Plugin
   ( plugin ) where
 
 import Plugins ( Plugin(tcPlugin), defaultPlugin )
-import Type ( Type, eqType, getTyVar, mkTyConTy )
+import Type ( Type, getTyVar, mkTyConTy )
+import TyCon ( TyCon )
 import TcRnTypes
   ( Ct(..)
   , TcPlugin(..), TcPluginResult(..) )
@@ -14,6 +15,8 @@ import Control.Supermonad.Plugin.Constraint
   ( mkDerivedTypeEqCt
   , constraintClassTyArgs
   , isClassConstraint )
+import Control.Supermonad.Plugin.Detect
+  ( areBindFunctorArguments, areBindApplyArguments )
 import Control.Supermonad.Plugin.Environment
   ( SupermonadPluginM, runSupermonadPlugin
   , getIdentityTyCon
@@ -105,26 +108,24 @@ processWantedReturnConstraints = do
 processWantedFunctorBindConstraints :: SupermonadPluginM ()
 processWantedFunctorBindConstraints = do
   
-  processAndRemoveWantedConstraints (isBindConstraintWith isFunctorBindConstraint) $ \bindCt -> do
+  processAndRemoveWantedConstraints (isBindConstraintWith areBindFunctorArguments) $ \bindCt -> do
     -- TODO: Pick the correct functor instance
     return ([], [])
   
-  where 
-    isFunctorBindConstraint :: Type -> Type -> Type -> SupermonadPluginM Bool
-    isFunctorBindConstraint t1 t2 t3 = do
-      idTC <- mkTyConTy <$> getIdentityTyCon
-      return $ (eqType t2 idTC && eqType t1 t3) -- Bind m Identity m
-            || (eqType t1 idTC && eqType t2 t3) -- Bind Identity m m
+  processAndRemoveWantedConstraints (isBindConstraintWith areBindApplyArguments) $ \bindCt -> do
+    -- TODO: Pick the correct functor instance
+    return ([], [])
 
 -- -----------------------------------------------------------------------------
 -- General plugin utilities
 -- -----------------------------------------------------------------------------
       
-isBindConstraintWith :: (Type -> Type -> Type -> SupermonadPluginM Bool) -> Ct -> SupermonadPluginM Bool
+isBindConstraintWith :: (TyCon -> Type -> Type -> Type -> Bool) -> Ct -> SupermonadPluginM Bool
 isBindConstraintWith p ct = do
   bindCls <- getBindClass
+  idTyCon <- getIdentityTyCon
   case (isClassConstraint bindCls ct, constraintClassTyArgs ct) of
-    (True, Just [t1, t2, t3]) -> p t1 t2 t3
+    (True, Just [t1, t2, t3]) -> return $ p idTyCon t1 t2 t3
     _ -> return False
   
 

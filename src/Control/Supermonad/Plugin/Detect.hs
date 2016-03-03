@@ -16,7 +16,8 @@ module Control.Supermonad.Plugin.Detect
   , findIdentityModule
   , findIdentityTyCon
    -- * Functor Bind Instance Detection
-  , areFunctorBindArguments
+  , areBindFunctorArguments
+  , areBindApplyArguments
   , findFunctorBindInstances
   , functorClassName, functorModuleName
   ) where
@@ -173,26 +174,28 @@ findIdentityTyCon = do
 -- Functor Bind Instance Detection
 -- -----------------------------------------------------------------------------
 
-areFunctorBindArguments :: TyCon -> Type -> Type -> Type -> Bool
-areFunctorBindArguments idTyCon t1 t2 t3 =
+areBindFunctorArguments :: TyCon -> Type -> Type -> Type -> Bool
+areBindFunctorArguments idTyCon t1 t2 t3 =
   let idTC = mkTyConTy idTyCon
-  in (eqType t2 idTC && eqType t1 t3) || -- Bind m Identity m
-     (eqType t1 idTC && eqType t2 t3)    -- Bind Identity m m
+  in eqType t2 idTC && eqType t1 t3 -- Bind m Identity m
+
+areBindApplyArguments :: TyCon -> Type -> Type -> Type -> Bool
+areBindApplyArguments idTyCon t1 t2 t3 =
+  let idTC = mkTyConTy idTyCon
+  in eqType t1 idTC && eqType t2 t3 -- Bind Identity m m
 
 isFunctorBindInstance :: Class -> TyCon -> ClsInst -> Bool
 isFunctorBindInstance bindCls idTyCon inst = 
   let (_cts, cls, _tc, args) = instanceType inst
-      idTC = mkTyConTy idTyCon
   in cls == bindCls && hasOnlyFunctorConstraint inst && case args of
-    [t1, t2, t3] -> eqType t2 idTC && eqType t1 t3 -- Bind m Identity m
+    [t1, t2, t3] -> areBindFunctorArguments idTyCon t1 t2 t3 -- Bind m Identity m
     _ -> False
 
 isApplyBindInstance :: Class -> TyCon -> ClsInst -> Bool
 isApplyBindInstance bindCls idTyCon inst =
   let (_cts, cls, _tc, args) = instanceType inst
-      idTC = mkTyConTy idTyCon
   in cls == bindCls && hasOnlyFunctorConstraint inst && case args of
-    [t1, t2, t3] -> eqType t1 idTC && eqType t2 t3 -- Bind Identity m m
+    [t1, t2, t3] -> areBindApplyArguments idTyCon t1 t2 t3 -- Bind Identity m m
     _ -> False
 
 isFunctorTyCon :: TyCon -> Bool
