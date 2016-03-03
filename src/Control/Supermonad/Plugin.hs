@@ -9,7 +9,9 @@ import TcRnTypes
   ( Ct(..)
   , TcPlugin(..), TcPluginResult(..) )
 import TcPluginM ( TcPluginM )
+import Outputable ( showSDocUnsafe )
 
+import Control.Supermonad.Plugin.Log ( pprToStr )
 import Control.Supermonad.Plugin.Utils ( isAmbiguousType )
 import Control.Supermonad.Plugin.Constraint
   ( mkDerivedTypeEqCt
@@ -17,14 +19,18 @@ import Control.Supermonad.Plugin.Constraint
   , isClassConstraint )
 import Control.Supermonad.Plugin.Detect
   ( areBindFunctorArguments, areBindApplyArguments )
+import Control.Supermonad.Plugin.Evidence
+  ( produceEvidenceFor )
 import Control.Supermonad.Plugin.Environment
   ( SupermonadPluginM, runSupermonadPlugin
   , getIdentityTyCon
   , getReturnClass, getBindClass
-  , getWantedConstraints
+  , getWantedConstraints, getGivenConstraints
+  , getBindFunctorInstance, getBindApplyInstance
   , processAndRemoveWantedConstraints
   , whenNoResults
-  , printMsg, printConstraints )
+  , runTcPlugin
+  , printMsg, printObj, printConstraints )
 
 -- -----------------------------------------------------------------------------
 -- The Plugin
@@ -76,7 +82,6 @@ supermonadSolve' _s = do
   processWantedReturnConstraints
   
   whenNoResults $ do
-    printMsg "NO RESULTS"
     processWantedFunctorBindConstraints
   
   -- End of plugin code.
@@ -109,8 +114,29 @@ processWantedFunctorBindConstraints :: SupermonadPluginM ()
 processWantedFunctorBindConstraints = do
   
   processAndRemoveWantedConstraints (isBindConstraintWith areBindFunctorArguments) $ \bindCt -> do
-    -- TODO: Pick the correct functor instance
-    return ([], [])
+    printMsg "Solve functor bind constraint:"
+    printConstraints [bindCt]
+    let Just [t, _, _] = constraintClassTyArgs bindCt
+    if isAmbiguousType t then do
+      printMsg "Functor bind constraint includes ambiguous variable:"
+      printObj bindCt
+      return ([], [])
+    else do
+      instFunctor <- getBindFunctorInstance
+      givenCts <- getGivenConstraints
+      printMsg "Given Constraints:"
+      printConstraints givenCts
+      eEvidence <- runTcPlugin $ produceEvidenceFor givenCts instFunctor [t]
+      -- This assumes that the functor instance has the following head 
+      -- "(Functor m) => Bind m Identity m" and therefore there is only one variable.
+      -- produceEvidenceFor :: [GivenCt] -> ClsInst -> [Type] -> TcPluginM (Either SDoc EvTerm)
+      case eEvidence of
+        Right evidence -> return ([(evidence, bindCt)], [])
+        Left err -> do
+          printMsg "Failed to produce evidence for functor bind constraint:"
+          printObj bindCt
+          printMsg $ showSDocUnsafe err
+          return ([], [])
   
   processAndRemoveWantedConstraints (isBindConstraintWith areBindApplyArguments) $ \bindCt -> do
     -- TODO: Pick the correct functor instance
