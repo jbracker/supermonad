@@ -12,6 +12,7 @@ module Control.Supermonad.Plugin.Utils (
   , skolemVarsBindFun
   , eqTyVar, eqTyVar'
   , eqTyCon
+  , getTyConName
   , isAmbiguousType
   , getTyConWithArgKinds
   , applyTyCon
@@ -33,6 +34,8 @@ import qualified Data.Set as S
 import Control.Monad ( forM )
 import Control.Arrow ( second )
 
+import Name ( nameOccName )
+import OccName ( occNameString )
 import Type
   ( Type, TyVar, TvSubst
   , getTyVar_maybe
@@ -43,7 +46,9 @@ import Type
   , mkTyConTy, mkTyVarTy, mkAppTys
   , mkTopTvSubst
   , eqType )
-import TyCon ( TyCon, tyConArity, tyConKind )
+import TyCon 
+  ( TyCon
+  , tyConArity, tyConKind, tyConName )
 import Var ( tyVarKind )
 import TcType ( isAmbiguousTyVar )
 import Kind ( Kind, splitKindFunTys )
@@ -142,6 +147,10 @@ eqTyVar' tv ty = case getTyVar_maybe ty of
 -- TODO: Test!
 eqTyCon :: TyCon -> Type -> Bool
 eqTyCon tc = eqType (mkTyConTy tc)
+
+-- | Returns the string representation of the given type constructor in the source code.
+getTyConName :: TyCon -> String
+getTyConName = occNameString . nameOccName . tyConName
 
 -- | Get the element of a list at a given index (If that element exists).
 atIndex :: [a] -> Int -> Maybe a
