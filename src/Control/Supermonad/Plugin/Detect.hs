@@ -66,7 +66,7 @@ import PrelNames ( mAIN_NAME )
 
 import Control.Supermonad.Plugin.Log
   ( pmErrMsg
-  , pprToStr )
+  , pprToStr, printObj, printObjTrace )
 import Control.Supermonad.Plugin.Instance
   ( instanceType )
 import Control.Supermonad.Plugin.Utils
@@ -198,14 +198,15 @@ isApplyBindInstance bindCls idTyCon inst =
 isFunctorTyCon :: TyCon -> Bool
 isFunctorTyCon tc = isClassTyCon tc && getTyConName tc == functorClassName
 
+isFunctorTyConApp :: Type -> Bool
+isFunctorTyConApp t = case splitTyConApp_maybe t of
+  Just (ctTyCon, ctArgs) | length ctArgs == 1 -> isFunctorTyCon ctTyCon
+  _ -> False
+
 hasOnlyFunctorConstraint :: ClsInst -> Bool
 hasOnlyFunctorConstraint inst =
   let (cts, _, _, _) = instanceType inst
-  in case cts of
-    [ctType] -> case splitTyConApp_maybe ctType of
-      Just (ctTyCon, _ctArgs) -> isFunctorTyCon ctTyCon
-      Nothing -> False
-    _ -> False
+  in (length cts <= 2) && all isFunctorTyConApp cts
 
 -- | Requires the bind class and identity type constructor as argument.
 --   Returns the pair of instances (Bind m Identity m, Bind Identity n n)

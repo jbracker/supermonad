@@ -12,6 +12,7 @@ module Control.Supermonad.Plugin.Environment
   , getIdentityTyCon, getIdentityModule
   , getGivenConstraints, getWantedConstraints
   , setWantedConstraints
+  , getBindApplyInstance, getBindFunctorInstance
   , getCurrentResults
   , getInstEnvs
   , addEvidenceResult, addEvidenceResults
@@ -37,7 +38,7 @@ import Control.Monad.Trans.Class ( lift )
 
 import Class ( Class )
 import Module ( Module )
-import InstEnv ( InstEnvs )
+import InstEnv ( InstEnvs, ClsInst )
 import TyCon ( TyCon )
 import TcRnTypes ( Ct, TcPluginResult(..) )
 import TcPluginM ( TcPluginM, tcPluginIO )
@@ -57,6 +58,7 @@ import Control.Supermonad.Plugin.Detect
   ( findSupermonadModule
   , findBindClass, findReturnClass
   , findIdentityModule, findIdentityTyCon
+  , findFunctorBindInstances
   , supermonadModuleName, identityModuleName
   , bindClassName, returnClassName
   , identityTyConName )
@@ -83,6 +85,10 @@ data SupermonadPluginEnv = SupermonadPluginEnv
   -- ^ The 'Data.Functor.Identity' module.
   , smEnvIdentityTyCon :: TyCon
   -- ^ The 'Identity' type constructor.
+  , smEnvBindFunctorInstance :: ClsInst
+  -- ^ The first functor bind instance: Bind m Identity m.
+  , smEnvBindApplyInstance :: ClsInst
+  -- ^ The second functor bind instance: Bind Identity m m.
   }
 
 -- | The write-only result of the plugin.
@@ -129,8 +135,12 @@ runSupermonadPlugin givenCts wantedCts smM = do
   mReturnCls <- findReturnClass
   mIdMdl <- findIdentityModule
   mIdTyCon <- findIdentityTyCon
-  case (mSupermonadMdl, mBindCls, mReturnCls, mIdMdl, mIdTyCon) of
-    (Right supermonadMdl, Just bindCls, Just returnCls, Right idMdl, Just idTyCon) -> do
+  mFuncBindInsts <- case (mBindCls, mIdTyCon) of
+    (Just bindCls, Just idTyCon) -> findFunctorBindInstances bindCls idTyCon
+    _ -> return Nothing
+  
+  case (mSupermonadMdl, mBindCls, mReturnCls, mIdMdl, mIdTyCon, mFuncBindInsts) of
+    (Right supermonadMdl, Just bindCls, Just returnCls, Right idMdl, Just idTyCon, Just (bindInstFunc, bindInstApply)) -> do
       let initState = SupermonadPluginState 
             { smStateGivenConstraints  = givenCts
             , smStateWantedConstraints = wantedCts
@@ -140,32 +150,39 @@ runSupermonadPlugin givenCts wantedCts smM = do
         , smEnvBindClass         = bindCls
         , smEnvReturnClass       = returnCls
         , smEnvIdentityModule    = idMdl
-        , smEnvIdentityTyCon     = idTyCon }
+        , smEnvIdentityTyCon     = idTyCon
+        , smEnvBindFunctorInstance = bindInstFunc
+        , smEnvBindApplyInstance   = bindInstApply }
       return $ case eResult of
         Left  err -> Left err
         Right (_a, res) -> Right $ TcPluginOk (smResultEvidence $ smStateResult res) (smResultDerived $ smStateResult res)
-    (Left mdlErrMsg, _, _, _, _) -> do
+    (Left mdlErrMsg, _, _, _, _, _) -> do
       let msg = "Could not find " ++ supermonadModuleName ++ " module:"
       L.printErr msg
       L.printErr mdlErrMsg
       return $ Left $ msg ++ " " ++ mdlErrMsg
-    (_, Nothing, _, _, _) -> do
+    (_, Nothing, _, _, _, _) -> do
       let msg = "Could not find " ++ bindClassName ++ " class!"
       L.printErr msg
       return $ Left msg
-    (_, _, Nothing, _, _) -> do
+    (_, _, Nothing, _, _, _) -> do
       let msg = "Could not find " ++ returnClassName ++ " class!"
       L.printErr msg
       return $ Left msg
-    (_, _, _, Left mdlErrMsg, _) -> do
+    (_, _, _, Left mdlErrMsg, _, _) -> do
       let msg = "Could not find " ++ identityModuleName ++ " module:"
       L.printErr msg
       L.printErr mdlErrMsg
       return $ Left $ msg ++ " " ++ mdlErrMsg
-    (_, _, _, _, Nothing) -> do
+    (_, _, _, _, Nothing, _) -> do
       let msg = "Could not find " ++ identityTyConName ++ " type constructor!"
       L.printErr msg
       return $ Left msg
+    (_, _, _, _, _, Nothing) -> do
+      let msg = "Could not find functor bind instances!"
+      L.printErr msg
+      return $ Left msg
+
 
 -- | Execute the given 'TcPluginM' computation within the polymonad plugin monad.
 runTcPlugin :: TcPluginM a -> SupermonadPluginM a
@@ -202,6 +219,14 @@ getGivenConstraints = gets smStateGivenConstraints
 -- | Returns all of the wanted constraints of this plugin call.
 getWantedConstraints :: SupermonadPluginM [WantedCt]
 getWantedConstraints = gets smStateWantedConstraints
+
+-- | Returns the functor bind instance: Bind m Identity m.
+getBindFunctorInstance :: SupermonadPluginM ClsInst
+getBindFunctorInstance = asks smEnvBindFunctorInstance
+
+-- | Returns the functor apply bind instance: Bind Identity m m.
+getBindApplyInstance :: SupermonadPluginM ClsInst
+getBindApplyInstance = asks smEnvBindApplyInstance
 
 setWantedConstraints :: [WantedCt] -> SupermonadPluginM ()
 setWantedConstraints wantedCts = do 
