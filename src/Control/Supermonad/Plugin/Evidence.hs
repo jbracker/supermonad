@@ -48,6 +48,7 @@ import FamInstEnv ( normaliseType )
 import Outputable ( ($$), SDoc )
 import qualified Outputable as O
 
+import Control.Supermonad.Plugin.Log ( printObj, printMsg )
 import Control.Supermonad.Plugin.Constraint
   ( GivenCt
   , constraintTyVars )
@@ -224,8 +225,25 @@ produceEvidenceForCt givenCts ct =
           -- Produce evidence for the evaluated term and
           -- add the appropriate cast to the produced evidence
           let (cls, args) = getClassPredTys evalCt
-          fmap (\ev -> EvCast ev (TcSymCo $ TcCoercion coer)) <$> produceClassCtEv cls args
-        Just (ctCls, ctArgs) -> produceClassCtEv ctCls ctArgs
+          res <- fmap (\ev -> EvCast ev (TcSymCo $ TcCoercion coer)) <$> produceClassCtEv cls args
+          -- If this failed there may still be a given constraint that matches...
+          case res of
+            Right _ -> return res
+            Left _ -> do
+              newRes <- return $ (\ev -> EvCast ev (TcCoercion coer)) <$> produceGivenCtEv evalCt
+              case newRes of
+                Right _ -> return newRes
+                Left _ -> return res
+        Just (ctCls, ctArgs) -> do
+          res <- produceClassCtEv ctCls ctArgs
+          -- If this failed there may still be a given constraint that matches...
+          case res of
+            Right _ -> return res
+            Left _ -> do
+              newRes <- return $ produceGivenCtEv ct
+              case newRes of
+                Right _ -> return newRes
+                Left _ -> return res
         -- In any other case, lets try if one of the given constraints can help...
         _ | containsTyFunApp ct -> do
           -- Evaluate it...
