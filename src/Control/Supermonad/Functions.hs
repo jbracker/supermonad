@@ -34,7 +34,7 @@ module Control.Supermonad.Functions
   -- , filterM -- TODO: Plugin does not support
   , mapAndUnzipM
   , zipWithM, zipWithM_
-  -- , foldM, foldM_
+  , foldM, foldM_
   -- , replicateM, replicateM_
     -- ** Conditional execution of monadic expressions
   -- , guard -- FIXME: Requires an alternative of 'Alternative'
@@ -42,11 +42,11 @@ module Control.Supermonad.Functions
     -- ** Monadic lifting operators
   , liftM, liftM2, liftM3
   -- , liftM4, liftM5 -- TODO
-  -- , ap
+  , ap
     -- ** Strict monadic functions
-  -- , (<$!>)
+  , (<$!>)
     -- * Additional generalized supermonad functions
-  -- , (<$>)
+  , (<$>)
   ) where
 
 import qualified Prelude as P
@@ -159,29 +159,20 @@ zipWithM f xs ys = sequence $ P.zipWith f xs ys
 -- | Same as 'zipWithM', but ignores the results.
 zipWithM_ :: (Return n, Bind m n n) => (a -> b -> m c) -> [a] -> [b] -> n ()
 zipWithM_ f xs ys = void $ zipWithM f xs ys
-{-
+
 -- | Fold the given foldable using a monadic function.
 --   See 'foldl'.
-foldM :: ( P.Foldable t
-         , Return m, Bind m Identity m
-         , Bind m m m)
-      => (b -> a -> m b) -> b -> t a -> m b
-foldM f e = P.foldl f'(return e)
+foldM :: ( P.Foldable t, Return m, Bind m n m) => (b -> a -> n b) -> b -> t a -> m b
+foldM f e = P.foldl f' (return e)
   where f' mb a = mb >>= \b -> f b a
-        -- :: (Bind m m m) => m b -> a -> m b
 
 -- | Same as 'foldM', but ignores the result.
-foldM_ :: ( P.Foldable t
-          , Return m, Bind m Identity m
-          , Bind m m m)
-       => (b -> a -> m b) -> b -> t a -> m ()
+foldM_ :: (P.Foldable t, Return m, Bind m n m) => (b -> a -> n b) -> b -> t a -> m ()
 foldM_ f e = void . foldM f e
-
+{-
 -- | Repeats the given monadic operation for the given amount of times and
 --   returns the accumulated results.
-replicateM :: ( Return n
-              , Bind m n n, Bind n Identity n)
-           => Int -> m a -> n [a]
+replicateM :: (Return n, Bind m n n) => Int -> m a -> n [a]
 replicateM n _ma | n <= 0 = return []
 replicateM n ma = do
   a <- ma
@@ -189,9 +180,7 @@ replicateM n ma = do
   return $ a : as
 
 -- | Same as 'replicateM', but ignores the results.
-replicateM_ :: ( Return n
-               , Bind m n n, Bind n Identity n)
-            => Int -> m a -> n ()
+replicateM_ :: (Return n, Bind m n n) => Int -> m a -> n ()
 replicateM_ n = void . replicateM n
 -}
 -- | Make arguments and result of a pure function monadic.
@@ -214,26 +203,23 @@ liftM3 f ma nb pc = do --ma >>= (\a -> nb >>= (\b -> pc >>= (\c -> return $ f a 
   b <- nb
   c <- pc
   return $ f a b c
-{-
+
 -- | Make the resulting function a monadic function.
-ap :: (Bind m n p, Bind n Identity n) => m (a -> b) -> n a -> p b
+ap :: (Bind m n p) => m (a -> b) -> n a -> p b
 ap mf na = do
   f <- mf
   a <- na
   return $ f a
 
 -- | Apply the given function to the result of a computation.
-(<$>) :: (Bind m Identity n) => (a -> b) -> m a -> n b
+(<$>) :: (Functor m) => (a -> b) -> m a -> m b
 f <$> m = do
   x <- m
   return (f x)
 
 -- | Strict version of '<$>'.
-(<$!>) :: (Bind m Identity n) => (a -> b) -> m a -> n b
+(<$!>) :: (Functor m) => (a -> b) -> m a -> m b
 f <$!> m = do
   x <- m
   let z = f x
   z `P.seq` return z
-
--- TODO: Generalize all the other functions in Control.Monad.
--}
