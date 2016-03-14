@@ -87,25 +87,17 @@ module Control.Supermonad.Prelude
   , P.IOError
   , P.ioError, P.userError
 
-    -- * Polymonads
+    -- * Supermonads
   , module Control.Supermonad
-  --, PM.Polymonad(..), PM.return, PM.fail
-  --, PM.Identity(..), PM.runIdentity
     -- ** Replacement functions
   , F.mapM_, F.sequence_, (F.=<<)
     -- ** Traversable replacement functions
   , F.mapM, F.sequence
     -- * Fix rebindable syntax
-  , ifThenElse
+  , F.ifThenElse
   ) where
 
 import qualified Prelude as P
 
 import Control.Supermonad
 import qualified Control.Supermonad.Functions as F
-
--- | Standard implementation of if-then-else. Necessary because we are
---   going to use @RebindableSyntax@ together with this prelude.
-ifThenElse :: P.Bool -> a -> a -> a
-ifThenElse P.True  t _ = t
-ifThenElse P.False _ f = f

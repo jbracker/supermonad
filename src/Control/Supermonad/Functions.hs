@@ -47,6 +47,8 @@ module Control.Supermonad.Functions
   , (<$!>)
     -- * Additional generalized supermonad functions
   , (<$>)
+    -- * Addition due to RebindableSyntax
+  , ifThenElse
   ) where
 
 import qualified Prelude as P
@@ -68,6 +70,8 @@ infixr 1 =<<
 infixr 1 >=>
 infixr 1 <=<
 
+-- | Standard implementation of if-then-else. Necessary because we are
+--   going to use @RebindableSyntax@ together with this prelude.
 ifThenElse :: Bool -> a -> a -> a
 ifThenElse True  t _f = t
 ifThenElse False _t f = f
