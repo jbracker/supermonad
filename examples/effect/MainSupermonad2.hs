@@ -5,6 +5,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE PolyKinds #-}
 
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -23,13 +24,21 @@ import qualified Control.Effect as E
 import Control.Effect ( Effect, Plus, Unit, Inv )
 import Control.Effect.Reader
 
-instance (Effect m, Inv m s (Unit m), s ~ Plus m s (Unit m)) => Functor (m (s :: k)) where
+instance ( Effect m
+         , Inv m s (Unit m)
+         , s ~ Plus m s (Unit m)
+         ) => Functor (m (s :: k)) where
   fmap f ma = ma E.>>= (E.return . f)
 
-instance (Effect m, h ~ Plus m f g
-         , f ~ Plus m f (Unit m), g ~ Plus m g (Unit m), h ~ Plus m h (Unit m)
+instance ( Effect m
+         , h ~ Plus m f g
          , Inv m f g
-         , Inv m f (Unit m), Inv m g (Unit m), Inv m h (Unit m)
+         , f ~ Plus m f (Unit m)
+         , g ~ Plus m g (Unit m)
+         , h ~ Plus m h (Unit m)
+         , Inv m f (Unit m)
+         , Inv m g (Unit m)
+         , Inv m h (Unit m)
          ) => Bind (m (f :: k)) (m (g :: k)) (m (h :: k)) where
   (>>=) = (E.>>=)
 
