@@ -40,6 +40,8 @@ instance Bind [] [] [] where
   (>>=) = (P.>>=)
 instance Bind P.Maybe P.Maybe P.Maybe where
   (>>=) = (P.>>=)
+instance Bind P.IO P.IO P.IO where
+  (>>=) = (P.>>=)
 
 -- -----------------------------------------------------------------------------
 -- Return Type Class
@@ -55,6 +57,8 @@ instance Return [] where
   return = P.return
 instance Return P.Maybe where
   return = P.return
+instance Return P.IO where
+  return = P.return
 
 -- -----------------------------------------------------------------------------
 -- Fail Type Class
@@ -69,4 +73,6 @@ instance Fail Identity where
 instance Fail [] where
   fail = P.fail
 instance Fail P.Maybe where
-  fail _ = P.Nothing
+  fail = P.fail
+instance Fail P.IO where
+  fail = P.fail
