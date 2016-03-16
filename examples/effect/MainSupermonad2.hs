@@ -9,6 +9,7 @@
 
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -31,15 +32,13 @@ instance ( Effect m
   fmap f ma = ma E.>>= (E.return . f)
 
 instance ( Effect m
-         , h ~ Plus m f g
          , Inv m f g
          , f ~ Plus m f (Unit m)
          , g ~ Plus m g (Unit m)
-         , h ~ Plus m h (Unit m)
          , Inv m f (Unit m)
          , Inv m g (Unit m)
-         , Inv m h (Unit m)
-         ) => Bind (m (f :: k)) (m (g :: k)) (m (h :: k)) where
+         ) => Bind (m (f :: k)) (m (g :: k)) where
+  type BindF (m f) (m g) = m (Plus m f g)
   (>>=) = (E.>>=)
 
 instance (Effect m, h ~ Unit m) => Return (m (h :: k)) where

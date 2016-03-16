@@ -8,7 +8,9 @@
 {-# LANGUAGE PolyKinds #-}
 
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -24,22 +26,20 @@ import Control.Effect ( Effect, Plus, Unit, Inv )
 import qualified Control.Effect as E
 import Control.Effect.State
 
-instance ( Effect m
-         , Inv m s (Unit m)
-         , s ~ Plus m s (Unit m)
-         ) => Functor (m (s :: k)) where
+instance ( Inv State s '[]
+         , s ~ Plus State s '[]
+         ) => Functor (State (s :: [*])) where
   fmap f ma = ma E.>>= (E.return . f)
-
-instance ( Effect m
-         , h ~ Plus m f g
-         , Inv m f g
-         , f ~ Plus m f (Unit m)
-         , g ~ Plus m g (Unit m)
-         , h ~ Plus m h (Unit m)
-         , Inv m f (Unit m)
-         , Inv m g (Unit m)
-         , Inv m h (Unit m)
-         ) => Bind (m (f :: k)) (m (g :: k)) (m (h :: k)) where
+-- Inv State f g
+instance ( Inv State f g
+         , Inv State f '[]
+         , f ~ Plus State f '[]
+         , Inv State g '[]
+         , g ~ Plus State g '[]
+         , Inv State (Plus State f g) '[]
+         , Plus State (Plus State f g) '[] ~ (Plus State f g)
+         ) => Bind (State (f :: [*])) (State (g :: [*])) where
+  type BindF (State f) (State g) = State (Plus State f g)
   (>>=) = (E.>>=)
 
 instance (Effect m, h ~ Unit m) => Return (m (h :: k)) where
