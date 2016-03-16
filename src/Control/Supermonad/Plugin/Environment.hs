@@ -15,9 +15,11 @@ module Control.Supermonad.Plugin.Environment
   , getBindApplyInstance, getBindFunctorInstance
   , getCurrentResults
   , getInstEnvs
+  , getBindInstances
   , addEvidenceResult, addEvidenceResults
   , addDerivedResult, addDerivedResults
   , processAndRemoveWantedConstraints
+  , processEachWantedConstraint
   , whenNoResults
   , throwPluginError
     -- * Debug and Error Output
@@ -30,7 +32,7 @@ import Data.List ( groupBy )
 import Data.Monoid ( (<>) )
 
 import Control.Arrow ( (***) )
-import Control.Monad ( unless, forM_ )
+import Control.Monad ( unless, forM, forM_ )
 import Control.Monad.Reader ( ReaderT, runReaderT, asks )
 import Control.Monad.State  ( StateT , runStateT , gets, get, put, modify )
 import Control.Monad.Except ( ExceptT, runExceptT, throwError )
@@ -59,6 +61,7 @@ import Control.Supermonad.Plugin.Detect
   , findBindClass, findReturnClass
   , findIdentityModule, findIdentityTyCon
   , findFunctorBindInstances
+  , findInstancesInScope
   , supermonadModuleName, identityModuleName
   , bindClassName, returnClassName
   , identityTyConName )
@@ -89,6 +92,7 @@ data SupermonadPluginEnv = SupermonadPluginEnv
   -- ^ The first functor bind instance: Bind m Identity m.
   , smEnvBindApplyInstance :: ClsInst
   -- ^ The second functor bind instance: Bind Identity m m.
+  , smEnvBindInstances :: [ClsInst]
   }
 
 -- | The write-only result of the plugin.
@@ -138,13 +142,13 @@ runSupermonadPlugin givenCts wantedCts smM = do
   mFuncBindInsts <- case (mBindCls, mIdTyCon) of
     (Just bindCls, Just idTyCon) -> findFunctorBindInstances bindCls idTyCon
     _ -> return Nothing
-  
   case (mSupermonadMdl, mBindCls, mReturnCls, mIdMdl, mIdTyCon, mFuncBindInsts) of
     (Right supermonadMdl, Just bindCls, Just returnCls, Right idMdl, Just idTyCon, Just (bindInstFunc, bindInstApply)) -> do
       let initState = SupermonadPluginState 
             { smStateGivenConstraints  = givenCts
             , smStateWantedConstraints = wantedCts
             , smStateResult = mempty }
+      bindInsts <- findInstancesInScope bindCls
       eResult <- runExceptT $ flip runStateT initState $ runReaderT smM $ SupermonadPluginEnv
         { smEnvSupermonadModule  = supermonadMdl
         , smEnvBindClass         = bindCls
@@ -152,7 +156,8 @@ runSupermonadPlugin givenCts wantedCts smM = do
         , smEnvIdentityModule    = idMdl
         , smEnvIdentityTyCon     = idTyCon
         , smEnvBindFunctorInstance = bindInstFunc
-        , smEnvBindApplyInstance   = bindInstApply }
+        , smEnvBindApplyInstance   = bindInstApply
+        , smEnvBindInstances       = bindInsts }
       return $ case eResult of
         Left  err -> Left err
         Right (_a, res) -> Right $ TcPluginOk (smResultEvidence $ smStateResult res) (smResultDerived $ smStateResult res)
@@ -220,13 +225,18 @@ getGivenConstraints = gets smStateGivenConstraints
 getWantedConstraints :: SupermonadPluginM [WantedCt]
 getWantedConstraints = gets smStateWantedConstraints
 
--- | Returns the functor bind instance: Bind m Identity m.
+-- | Returns the functor bind instance: @Bind m Identity m@.
 getBindFunctorInstance :: SupermonadPluginM ClsInst
 getBindFunctorInstance = asks smEnvBindFunctorInstance
 
--- | Returns the functor apply bind instance: Bind Identity m m.
+-- | Returns the functor apply bind instance: @Bind Identity m m@.
 getBindApplyInstance :: SupermonadPluginM ClsInst
 getBindApplyInstance = asks smEnvBindApplyInstance
+
+-- | Returns all bind instances including those given by
+--   'getBindApplyInstance' and 'getBindFunctorInstance'.
+getBindInstances :: SupermonadPluginM [ClsInst]
+getBindInstances = asks smEnvBindInstances
 
 setWantedConstraints :: [WantedCt] -> SupermonadPluginM ()
 setWantedConstraints wantedCts = do 
@@ -261,6 +271,16 @@ processAndRemoveWantedConstraints predicate process = do
     addEvidenceResults evidence
     addDerivedResults  derived
   setWantedConstraints restCts
+
+-- | Goes over each wanted constraint and applies the processing function.
+--   If the processing function returns true the constraint is discarded,
+--   otherwise it is kept for further processing. The processing function 
+--   has to add the results manually using 'addEvidenceResult' and 'addDerivedResult'.
+processEachWantedConstraint :: (WantedCt -> SupermonadPluginM Bool) -> SupermonadPluginM ()
+processEachWantedConstraint process = do
+  wantedCts <- getWantedConstraints
+  keepCts <- forM wantedCts process
+  setWantedConstraints $ fmap snd $ filter (not . fst) $ zip keepCts wantedCts
 
 whenNoResults :: SupermonadPluginM () -> SupermonadPluginM ()
 whenNoResults m = do
