@@ -124,7 +124,7 @@ processWantedFunctorBindConstraints :: SupermonadPluginM ()
 processWantedFunctorBindConstraints = do
   
   processAndRemoveWantedConstraints (isBindConstraintWith areBindFunctorArguments) $ \bindCt -> do
-    let Just [t, _, _] = constraintClassTyArgs bindCt
+    let Just [t, _] = constraintClassTyArgs bindCt
     if isAmbiguousType t then do
       return ([], [])
     else do
@@ -143,7 +143,7 @@ processWantedFunctorBindConstraints = do
           return ([], [])
   
   processAndRemoveWantedConstraints (isBindConstraintWith areBindApplyArguments) $ \bindCt -> do
-    let Just [t, _, _] = constraintClassTyArgs bindCt
+    let Just [t, _] = constraintClassTyArgs bindCt
     if isAmbiguousType t then do
       return ([], [])
     else do
@@ -205,12 +205,12 @@ selectOnlyMatchingBindInstance wantedCt =
 -- General plugin utilities
 -- -----------------------------------------------------------------------------
       
-isBindConstraintWith :: (TyCon -> Type -> Type -> Type -> Bool) -> Ct -> SupermonadPluginM Bool
+isBindConstraintWith :: (TyCon -> Type -> Type -> Bool) -> Ct -> SupermonadPluginM Bool
 isBindConstraintWith p ct = do
   bindCls <- getBindClass
   idTyCon <- getIdentityTyCon
   case (isClassConstraint bindCls ct, constraintClassTyArgs ct) of
-    (True, Just [t1, t2, t3]) -> return $ p idTyCon t1 t2 t3
+    (True, Just [t1, t2]) -> return $ p idTyCon t1 t2
     _ -> return False
   
 

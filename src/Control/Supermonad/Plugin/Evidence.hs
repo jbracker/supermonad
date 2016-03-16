@@ -167,7 +167,7 @@ produceEvidenceForCt givenCts ct =
           case res of
             Right _ -> return res
             Left _ -> do
-              newRes <- return $ (\ev -> EvCast ev (TcCoercion coer)) <$> produceGivenCtEv evalCt
+              newRes <- return $ (\ev -> EvCast ev (TcSymCo $ TcCoercion coer)) <$> produceGivenCtEv evalCt
               case newRes of
                 Right _ -> return newRes
                 Left _ -> return res
