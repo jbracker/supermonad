@@ -2,6 +2,9 @@
 module Control.Supermonad.Plugin
   ( plugin ) where
 
+import Data.Maybe ( catMaybes )
+import Control.Monad ( forM )
+
 import Plugins ( Plugin(tcPlugin), defaultPlugin )
 import Type ( Type, getTyVar, mkTyConTy )
 import TyCon ( TyCon )
@@ -9,25 +12,31 @@ import TcRnTypes
   ( Ct(..)
   , TcPlugin(..), TcPluginResult(..) )
 import TcPluginM ( TcPluginM )
+import TcEvidence ( EvTerm )
 import Outputable ( showSDocUnsafe )
 
 import Control.Supermonad.Plugin.Log ( pprToStr )
 import Control.Supermonad.Plugin.Utils ( isAmbiguousType )
 import Control.Supermonad.Plugin.Constraint
-  ( mkDerivedTypeEqCt
+  ( WantedCt
+  , mkDerivedTypeEqCt
   , constraintClassTyArgs
   , isClassConstraint )
 import Control.Supermonad.Plugin.Detect
   ( areBindFunctorArguments, areBindApplyArguments )
 import Control.Supermonad.Plugin.Evidence
-  ( produceEvidenceFor )
+  ( produceEvidenceFor, matchInstanceTyVars )
 import Control.Supermonad.Plugin.Environment
   ( SupermonadPluginM, runSupermonadPlugin
   , getIdentityTyCon
   , getReturnClass, getBindClass
   , getWantedConstraints, getGivenConstraints
   , getBindFunctorInstance, getBindApplyInstance
+  , getBindInstances
+  , addEvidenceResult
+  , addDerivedResults
   , processAndRemoveWantedConstraints
+  , processEachWantedConstraint
   , whenNoResults
   , runTcPlugin
   , printMsg, printObj, printConstraints )
@@ -81,8 +90,9 @@ supermonadSolve' _s = do
   
   processWantedReturnConstraints
   
-  whenNoResults $ do
-    processWantedFunctorBindConstraints
+  whenNoResults processWantedFunctorBindConstraints
+  
+  whenNoResults processWantedBindConstraintsWithOnlyOneMatchingInstance
   
   -- End of plugin code.
   return ()
@@ -150,6 +160,46 @@ processWantedFunctorBindConstraints = do
           printObj bindCt
           printMsg $ showSDocUnsafe err
           return ([], [])
+
+processWantedBindConstraintsWithOnlyOneMatchingInstance :: SupermonadPluginM ()
+processWantedBindConstraintsWithOnlyOneMatchingInstance =
+  processEachWantedConstraint $ \wantedCt -> do
+    bindCls <- getBindClass
+    if isClassConstraint bindCls wantedCt then do
+      eEv <- selectOnlyMatchingBindInstance wantedCt
+      case eEv of
+        Just (ev, eqs) -> do
+          addEvidenceResult ev
+          addDerivedResults eqs
+          return True -- Discard
+        Nothing -> return False -- Keep
+    else return False -- Keep
+
+
+
+selectOnlyMatchingBindInstance :: WantedCt -> SupermonadPluginM (Maybe ((EvTerm, WantedCt), [Ct]))
+selectOnlyMatchingBindInstance wantedCt =
+  case constraintClassTyArgs wantedCt of
+    Just tyArgs -> do
+      bindInsts <- getBindInstances
+      mFoundInstEvs <- forM bindInsts $ \bindInst -> 
+        case matchInstanceTyVars bindInst tyArgs of
+          Just (instVariableArgs, ambEqs) -> do
+            givenCts <- getGivenConstraints
+            eResult <- runTcPlugin $ produceEvidenceFor givenCts bindInst instVariableArgs -- TcPluginM (Either SDoc EvTerm)
+            -- mkDerivedTypeEqCt :: Ct -> TyVar -> Type -> Ct
+            return $ case eResult of
+              Left _err -> Nothing
+              Right ev -> Just (bindInst, (ev, wantedCt), fmap (uncurry $ mkDerivedTypeEqCt wantedCt) ambEqs)
+          Nothing -> return Nothing
+      let foundInstEvs = catMaybes mFoundInstEvs
+      -- Only keep those matches that actually found a type for every argument.
+      case fmap (\(_, ev, eqs) -> (ev, eqs)) foundInstEvs of
+        -- Only one matching instance, try to use it...
+        [ev] -> return $ Just ev
+        -- More then one or no matching instance...
+        _ -> return Nothing
+    Nothing -> return Nothing
 
 -- -----------------------------------------------------------------------------
 -- General plugin utilities
