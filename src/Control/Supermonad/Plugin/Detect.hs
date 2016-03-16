@@ -15,15 +15,16 @@ module Control.Supermonad.Plugin.Detect
   , identityTyConName
   , findIdentityModule
   , findIdentityTyCon
-   -- * Functor Bind Instance Detection
+    -- * Functor Bind Instance Detection
   , areBindFunctorArguments
   , areBindApplyArguments
   , findFunctorBindInstances
   , functorClassName, functorModuleName
+    -- * General detection utilities
+  , findInstancesInScope
   ) where
 
 import Data.Maybe ( catMaybes, listToMaybe )
-
 import Control.Monad ( forM, liftM )
 
 import TcRnTypes
@@ -67,7 +68,7 @@ import PrelNames ( mAIN_NAME )
 
 import Control.Supermonad.Plugin.Log
   ( pmErrMsg
-  , pprToStr, printObj, printObjTrace )
+  , pprToStr ) --, printObj, printObjTrace )
 import Control.Supermonad.Plugin.Instance
   ( instanceType )
 import Control.Supermonad.Plugin.Utils
