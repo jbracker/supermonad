@@ -1,10 +1,11 @@
 
-{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE RebindableSyntax #-}
 
--- Requires for instances
+-- Required for instances
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 
 -- Use the polymonad plugin.
 {-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
@@ -33,7 +34,8 @@ import Control.Concurrent.SimpleSession.SessionTypes
 instance Functor (Session i j) where
   fmap = fmap
 
-instance Bind (Session i j) (Session j k) (Session i k) where
+instance Bind (Session i j) (Session j k) where
+  type BindF (Session i j) (Session j k) = Session i k
   (>>=) = (>>>=)
 
 instance Return (Session i i) where
