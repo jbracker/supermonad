@@ -10,16 +10,14 @@ module Control.Supermonad.Plugin.Evidence
   , produceEvidenceFor
   ) where
 
-import Data.Either ( isLeft, isRight )
-import Data.Maybe ( catMaybes, isJust, fromMaybe )
-import Data.List ( find )
+import Data.Either ( isLeft )
+import Data.List ( find, partition )
 import qualified Data.Set as S
 
 import Control.Monad ( forM )
-import Control.Arrow ( first )
 
 import Type
-  ( Type, TyVar, Kind
+  ( Type, TyVar
   , mkTopTvSubst, mkTyVarTy
   , substTy, substTys
   , eqType
@@ -30,7 +28,7 @@ import Type
 import TyCon
   ( TyCon
   , isTupleTyCon, isTypeFamilyTyCon, isTypeSynonymTyCon )
-import Class ( Class, classTyCon )
+import Class ( Class )
 import Coercion ( Coercion(..) )
 import CoAxiom ( Role(..) )
 import InstEnv
@@ -48,16 +46,11 @@ import FamInstEnv ( normaliseType )
 import Outputable ( ($$), SDoc )
 import qualified Outputable as O
 
-import Control.Supermonad.Plugin.Log ( printObj, printMsg )
-import Control.Supermonad.Plugin.Constraint
-  ( GivenCt
-  , constraintTyVars )
+import Control.Supermonad.Plugin.Constraint ( GivenCt )
 import Control.Supermonad.Plugin.Utils
   ( fromLeft, fromRight
   , collectTyVars
-  , skolemVarsBindFun
-  , applyTyCon
-  , associations )
+  , skolemVarsBindFun )
 
 
 -- | Try to evaluate the given type as far as possible by evaluating contained
@@ -76,74 +69,18 @@ evaluateType r t = do
 --
 --   This function is meant for use in conjunction with 'isInstanceOf',
 --   'isInstantiatedBy' and 'produceEvidenceFor'.
-matchInstanceTyVars :: ClsInst -> [Type] -> Maybe [Type]
+--   
+--   The second element of the pair shows how each ambiguous type variable in 
+--   the given list type arguments would be bound by the instance.
+matchInstanceTyVars :: ClsInst -> [Type] -> Maybe ([Type], [(TyVar, Type)])
 matchInstanceTyVars inst instArgs = do
   let (instVars, _cts, _cls, tyArgs) = instanceSig inst
   -- Old Version:
   -- let instVarSet = printObjTrace $ mkVarSet instVars
   -- subst <- printObjTrace $ tcMatchTys instVarSet tyArgs instArgs
-  let ctVars = filter (not . isAmbiguousTyVar) $ S.toList $ S.unions $ fmap collectTyVars instArgs
+  let (ctVars, ambVars) = partition (not . isAmbiguousTyVar) $ S.toList $ S.unions $ fmap collectTyVars instArgs
   subst <- tcUnifyTys (skolemVarsBindFun ctVars) tyArgs instArgs
-  return $ substTy subst . mkTyVarTy <$> instVars
-{-
--- | Checks if the given arguments types to the free variables in the
---   class instance actually form a valid instantiation of that instance.
---   The given arguments need to match up with the list of free type variables
---   given for the class instance ('is_tvs').
---
---   The instance argument types can be created using 'matchInstanceTyVars'.
---
---   The list of given constraints that can be used to check of they
---   fulfill the instance constraints, in case there are no instances
---   that can fulfill them.
---
---   For details on the accepted arguments and support of type extensions,
---   see 'produceEvidenceFor'.
-isInstantiatedBy :: [GivenCt] -> ClsInst -> [Type] -> TcPluginM (Either String Bool)
-isInstantiatedBy givenCts inst instArgs = do
-  eEvTerm <- produceEvidenceFor givenCts inst instArgs
-  case eEvTerm of
-    Left _err -> return $ Right False
-    Right _ev -> return $ Right True
-
--- | Check if a given polymonad constraint can potentially be instantiated using the given
---   type constructors. By potentially we mean: First, check if the
---   polymonad instance can actually be applied to some combination of
---   the type constructors. Then check if all resulting constraints that
---   do not contain free variables actually can be instantiated.
-isPotentiallyInstantiatedPolymonad :: [GivenCt] -> ClsInst -> [(Either TyCon TyVar, [Kind])] -> TcPluginM Bool
-isPotentiallyInstantiatedPolymonad givenCts pmInst tyCons = do
-  -- Get the type constructors partially applied to some new variables to find potential matches
-  mAppliedTyCons <- mapM applyTyCon tyCons
-  case (catMaybes mAppliedTyCons, all isJust mAppliedTyCons) of
-    -- Only proceed if all type constructors are now indeed unary
-    (appliedTyCons, True) -> do
-      -- Create argument triplets
-      let tyConAssocs = fmap snd <$> associations [ (pos, appliedTyCons) | pos <- [0..2 :: Int]]
-      -- Now look at the instance and see if unification with any of our
-      -- triplets of arguments delivers a match.
-      fmap or $ forM tyConAssocs $ \tyConAssoc ->
-        case matchInstanceTyVars pmInst (fst <$> tyConAssoc) of
-          Just instArgMatches -> do
-            -- Create a substitution from our map.
-            let (instTyVars, instCts, _cls, _tyArgs) = instanceSig pmInst
-            let subst = mkTopTvSubst $ zip instTyVars instArgMatches
-            -- Substitute the matchings into the instance constraints.
-            let substInstCts = substTys subst instCts
-            -- Collect all instance constraints that do not contain variables.
-            let appliedInstCts = filter isFullyAppliedConstraint substInstCts
-            -- Check if we can produce evidence for them.
-            appliedInstCtEv <- mapM (produceEvidenceForCt givenCts) appliedInstCts
-            -- If so this instance is potentially instantiated.
-            return $ all isRight appliedInstCtEv
-          Nothing -> return False
-    _ -> return False
-  where
-    -- | The constraint is fully applied if it does not contain variables,
-    --   except for those contained in the given constraints.
-    isFullyAppliedConstraint :: Type -> Bool
-    isFullyAppliedConstraint t = collectTyVars t `S.isSubsetOf` S.unions (constraintTyVars <$> givenCts)
--}
+  return $ (substTy subst . mkTyVarTy <$> instVars, fmap (\v -> (v, substTy subst $ mkTyVarTy v)) ambVars)
 
 -- | Apply the given instance dictionary to the given type arguments
 --   and try to produce evidence for the application.
