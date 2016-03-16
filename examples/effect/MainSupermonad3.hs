@@ -10,7 +10,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
---{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 -- Ignore our orphan instance in this file.
 {-# OPTIONS_GHC -fno-warn-orphans #-}
