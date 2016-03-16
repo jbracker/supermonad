@@ -1,7 +1,6 @@
 
 {-# LANGUAGE MultiParamTypeClasses  #-} -- for 'Bind' class.
-{-# LANGUAGE TypeFamilies #-} -- for 'Bind' class.
-{-# LANGUAGE FlexibleContexts #-} -- for 'Bind' class: Allows functor constraint for result
+{-# LANGUAGE FunctionalDependencies #-} -- for 'Bind' class.
 
 {-# LANGUAGE FlexibleInstances #-} -- for 'Bind Identity a a' and 'Bind a Identity a' instances.
 
@@ -27,27 +26,21 @@ import Data.Functor.Identity ( Identity( Identity, runIdentity ) )
 -- -----------------------------------------------------------------------------
 
 -- | TODO
-class (Functor m, Functor n, Functor (BindF m n)) => Bind m n where
-  type BindF m n :: * -> *
-  (>>=) :: m a -> (a -> n b) -> (BindF m n) b
-  (>>)  :: m a -> n b -> (BindF m n) b
+class (Functor m, Functor n, Functor p) => Bind m n p | m n -> p where
+  (>>=) :: m a -> (a -> n b) -> p b
+  (>>)  :: m a -> n b -> p b
   ma >> mb = ma >>= const mb
 
-instance (Functor a) => Bind Identity a where
-  type BindF Identity a = a
+instance (Functor a) => Bind Identity a a where
   ma >>= f = f (runIdentity ma)
-instance (Functor a) => Bind a Identity where
-  type BindF a Identity = a
+instance (Functor a) => Bind a Identity a where
   ma >>= f = fmap (runIdentity . f) ma
 
-instance Bind [] [] where
-  type BindF [] [] = []
+instance Bind [] [] [] where
   (>>=) = (P.>>=)
-instance Bind P.Maybe P.Maybe where
-  type BindF P.Maybe P.Maybe = P.Maybe
+instance Bind P.Maybe P.Maybe P.Maybe where
   (>>=) = (P.>>=)
-instance Bind P.IO P.IO where
-  type BindF P.IO P.IO = P.IO
+instance Bind P.IO P.IO P.IO where
   (>>=) = (P.>>=)
 
 -- -----------------------------------------------------------------------------

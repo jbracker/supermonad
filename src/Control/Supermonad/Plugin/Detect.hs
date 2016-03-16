@@ -68,7 +68,7 @@ import PrelNames ( mAIN_NAME )
 
 import Control.Supermonad.Plugin.Log
   ( pmErrMsg
-  , pprToStr ) -- , printObj, printObjTrace )
+  , pprToStr ) --, printObj, printObjTrace )
 import Control.Supermonad.Plugin.Instance
   ( instanceType )
 import Control.Supermonad.Plugin.Utils
@@ -135,7 +135,7 @@ isSupermonadModule mdl = mdlName `elem` [pmMdlName, pmPrelName, mAIN_NAME]
 -- | Checks if the given class matches the shape of the 'Bind'
 --   type class and is defined in the right module.
 isBindClass :: Class -> Bool
-isBindClass cls = isClass cls isSupermonadModule bindClassName 2
+isBindClass cls = isClass cls isSupermonadModule bindClassName 3
 
 -- | Checks if the given class matches the shape of the 'Return'
 --   type class and is defined in the right module.
@@ -175,28 +175,28 @@ findIdentityTyCon = do
 -- Functor Bind Instance Detection
 -- -----------------------------------------------------------------------------
 
-areBindFunctorArguments :: TyCon -> Type -> Type -> Bool
-areBindFunctorArguments idTyCon _t1 t2 =
+areBindFunctorArguments :: TyCon -> Type -> Type -> Type -> Bool
+areBindFunctorArguments idTyCon t1 t2 t3 =
   let idTC = mkTyConTy idTyCon
-  in eqType t2 idTC -- && eqType t1 t3 -- Bind m Identity
+  in eqType t2 idTC && eqType t1 t3 -- Bind m Identity m
 
-areBindApplyArguments :: TyCon -> Type -> Type -> Bool
-areBindApplyArguments idTyCon t1 _t2 =
+areBindApplyArguments :: TyCon -> Type -> Type -> Type -> Bool
+areBindApplyArguments idTyCon t1 t2 t3 =
   let idTC = mkTyConTy idTyCon
-  in eqType t1 idTC -- && eqType t2 t3 -- Bind Identity m
+  in eqType t1 idTC && eqType t2 t3 -- Bind Identity m m
 
 isFunctorBindInstance :: Class -> TyCon -> ClsInst -> Bool
 isFunctorBindInstance bindCls idTyCon inst = 
   let (_cts, cls, _tc, args) = instanceType inst
   in cls == bindCls && hasOnlyFunctorConstraint inst && case args of
-    [t1, t2] -> areBindFunctorArguments idTyCon t1 t2 -- Bind m Identity
+    [t1, t2, t3] -> areBindFunctorArguments idTyCon t1 t2 t3 -- Bind m Identity m
     _ -> False
 
 isApplyBindInstance :: Class -> TyCon -> ClsInst -> Bool
 isApplyBindInstance bindCls idTyCon inst =
   let (_cts, cls, _tc, args) = instanceType inst
   in cls == bindCls && hasOnlyFunctorConstraint inst && case args of
-    [t1, t2] -> areBindApplyArguments idTyCon t1 t2 -- Bind Identity m
+    [t1, t2, t3] -> areBindApplyArguments idTyCon t1 t2 t3 -- Bind Identity m m
     _ -> False
 
 isFunctorTyCon :: TyCon -> Bool
@@ -210,7 +210,7 @@ isFunctorTyConApp t = case splitTyConApp_maybe t of
 hasOnlyFunctorConstraint :: ClsInst -> Bool
 hasOnlyFunctorConstraint inst =
   let (cts, _, _, _) = instanceType inst
-  in (length cts <= 3) && all isFunctorTyConApp cts
+  in (length cts <= 2) && all isFunctorTyConApp cts
 
 -- | Requires the bind class and identity type constructor as argument.
 --   Returns the pair of instances (Bind m Identity m, Bind Identity n n)
