@@ -9,9 +9,8 @@
 
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE TypeFamilies #-}
 
-{-# LANGUAGE UndecidableInstances #-}
+--{-# LANGUAGE UndecidableInstances #-}
 
 -- Ignore our orphan instance in this file.
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -30,25 +29,8 @@ import GHC.TypeLits
 instance Functor (Counter (s :: Nat)) where
   fmap f ma = ma E.>>= (E.return . f)
 
-instance Bind (Counter (f :: Nat)) (Counter (g :: Nat)) where
-  type BindF (Counter f) (Counter g) = Counter (f + g)
+instance (h ~ (f + g)) => Bind (Counter (f :: Nat)) (Counter (g :: Nat)) (Counter (h :: Nat)) where
   (>>=) = (E.>>=)
-{-
-Functional dependencies do not work for this instance, if 'UndecidableInstances' is not active:
-  instance (h ~ (f + g)) => Bind (Counter (f :: Nat)) (Counter (g :: Nat)) (Counter (h :: Nat)) where
-    (>>=) = (E.>>=)
-because:
-  MainSupermonad3.hs:32:10:
-    Illegal instance declaration for
-      ‘Bind (Counter f) (Counter g) (Counter h)’
-      The coverage condition fails in class ‘Bind’
-        for functional dependency: ‘m n -> p’
-      Reason: lhs types ‘Counter f’, ‘Counter g’
-        do not jointly determine rhs type ‘Counter h’
-      Using UndecidableInstances might help
-    In the instance declaration for
-      ‘Bind (Counter (f :: Nat)) (Counter (g :: Nat)) (Counter (h :: Nat))’
--}
 
 instance (h ~ 0) => Return (Counter (h :: Nat)) where
   return = E.return
