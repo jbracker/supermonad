@@ -88,7 +88,7 @@ supermonadSolve' :: SupermonadState -> SupermonadPluginM ()
 supermonadSolve' _s = do
   getWantedConstraints >>= printConstraints
   
-  processWantedReturnConstraints
+  whenNoResults processWantedReturnConstraints
   
   whenNoResults processWantedFunctorBindConstraints
   
