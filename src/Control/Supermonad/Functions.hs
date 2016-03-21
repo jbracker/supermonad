@@ -137,7 +137,9 @@ sequence_ = void . sequence
 -- | Execute the given computation repeatedly forever.
 forever :: (Bind n m m) => n a -> m b
 forever na = na >> forever na
-{- 
+
+{-
+
 -- | Like @filter@ but with a monadic predicate and result.
 filterM :: forall m n a. ( Bind n m m --, Bind m m m
            , Return m, Bind m Identity m)
