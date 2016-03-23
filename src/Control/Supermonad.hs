@@ -4,6 +4,8 @@
 
 {-# LANGUAGE FlexibleInstances #-} -- for 'Bind Identity a a' and 'Bind a Identity a' instances.
 
+{-# LANGUAGE NoImplicitPrelude #-}
+
 -- | Representation of supermonads in Haskell.
 module Control.Supermonad
   ( Bind(..), Return(..), Fail(..)
@@ -56,6 +58,11 @@ instance Bind [] [] [] where
   (>>=) = (P.>>=)
 instance Bind P.Maybe P.Maybe P.Maybe where
   (>>=) = (P.>>=)
+-- | This instance is valid. Together with the instances for 'P.Maybe' and list
+--   it still forms a supermonad.
+instance Bind P.Maybe [] [] where
+  (P.Just a) >>= f = f a
+  P.Nothing  >>= f = []
 instance Bind P.IO P.IO P.IO where
   (>>=) = (P.>>=)
 instance Bind (P.Either e) (P.Either e) (P.Either e) where
@@ -82,15 +89,17 @@ instance Bind (STL.ST s) (STL.ST s) (STL.ST s) where
   (>>=) = (P.>>=)
 instance (Arrow.ArrowApply a) => Bind (Arrow.ArrowMonad a) (Arrow.ArrowMonad a) (Arrow.ArrowMonad a) where
   (>>=) = (P.>>=)
--- | TODO / FIXME: The wrapped monad instances for Functor and Monad are both 
+-- | TODO / FIXME: The wrapped monad instances for 'Functor' and 'P.Monad' are both 
 --   based on @m@ being a monad, although the functor instance should only be 
 --   dependend on @m@ being a functor (as can be seen below). This can only be
---   fixed by either giving a custom version of 'WrappedMonad' here or by fixing
---   the version of 'WrappedMonad' in base.
+--   fixed by either giving a custom version of 'App.WrappedMonad' here or by fixing
+--   the version of 'App.WrappedMonad' in base.
 --   Once this issue is fixed we can replace the 'P.Monad' constraint
 --   with a 'Functor' constraint.
+--   
 --   > instance (Functor m) => Functor (App.WrappedMonad m) where
 --   >   fmap f m = App.WrapMonad $ fmap (App.unwrapMonad m) f
+--   
 instance (Bind m m m, P.Monad m) => Bind (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) where
   m >>= f = App.WrapMonad $ (App.unwrapMonad m) >>= (App.unwrapMonad . f)
 

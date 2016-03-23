@@ -1,3 +1,7 @@
+
+-- This is only needed to generate Haddock documentation.
+{-# LANGUAGE TemplateHaskell #-}
+
 -- | Provides the supermonad plugin for GHC.
 module Control.Supermonad.Plugin
   ( plugin ) where
