@@ -1,3 +1,6 @@
+{-# LANGUAGE RebindableSyntax #-}
+{-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
+
 {-
 ******************************************************************************
 *                                  H M T C                                   *
@@ -19,6 +22,8 @@ module TypeChecker (
     typeCheck,          -- :: A.AST -> D MTIR
     testTypeChecker     -- :: String -> [(Name,Type)] -> IO ()
 ) where
+
+import Control.Supermonad.Prelude
 
 
 -- Standard library imports
@@ -93,18 +98,18 @@ chkCmd env (A.CmdCall {A.ccProc = p, A.ccArgs = es, A.cmdSrcPos = sp}) = do
         notProcMsg t = "Not a procedure; return type is " ++ show t
 -- T-SEQ (generalized to sequence of any length)
 chkCmd env (A.CmdSeq {A.csCmds = cs, A.cmdSrcPos = sp}) = do
-    cs' <- mapM (chkCmd env) cs                         -- env |- cs
+    cs' <- mapM (chkCmd env) cs  :: D [Command] -- NOTE: Type annotation to guide plugin (same reason as in library)
     return (CmdSeq {csCmds = cs', cmdSrcPos = sp})
 -- T-IF
 chkCmd env (A.CmdIf {A.ciCondThens = ecs, A.ciMbElse = mbce,
                      A.cmdSrcPos=sp}) = do
-    ecs'  <- mapM (tcCondThen env) ecs                  -- env |- es : Boolean
+    ecs'  <- mapM (tcCondThen env) ecs :: D [(Expression, Command)] -- NOTE: Type annotation to guide plugin (same reason as in library)
                                                         -- env |- cs
     mbce' <- case mbce of
                  Nothing -> return Nothing
                  Just ce -> do
                      ce' <- chkCmd env ce               -- env |- ce
-                     return (Just ce')
+                     return (Just ce') :: Identity (Maybe Command) -- NOTE: Type annotation to guide plugin (same reason as in library)
     return (CmdIf {ciCondThens = ecs', ciMbElse = mbce', cmdSrcPos = sp})
     where
         tcCondThen :: Env -> (A.Expression, A.Command)
@@ -154,7 +159,7 @@ chkDeclarations env envB
     e' <- chkTpExp env e t'                         -- env |- e : t
     case enterIntTermSym x (Src t') sp env of       -- env' = env, x : Src t
         Left old -> do
-            emitErrD sp (redeclaredMsg old)
+            emitErrD sp (redeclaredMsg old) :: D () -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
             chkDeclarations env envB ds
         Right (env', x') -> do                      
             wellinit (itmsLvl x') e'
@@ -170,7 +175,7 @@ chkDeclarations env envB
     t' <- chkDclType env t
     case enterIntTermSym x (Ref t') sp env of       -- env' = env, x : Ref t
         Left old -> do
-            emitErrD sp (redeclaredMsg old)
+            emitErrD sp (redeclaredMsg old) :: D () -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
             chkDeclarations env envB ds
         Right (env', x') -> do                      
             (ds', env'') <- chkDeclarations env'    -- env'; envB |- ds | env''
@@ -186,7 +191,7 @@ chkDeclarations env envB
     e' <- chkTpExp env e t'                         -- env |- e : t
     case enterIntTermSym x (Ref t') sp env of       -- env' = env, x : Ref t
         Left old -> do
-            emitErrD sp (redeclaredMsg old)
+            emitErrD sp (redeclaredMsg old) :: D () -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
             chkDeclarations env envB ds
         Right (env', x') -> do
             wellinit (itmsLvl x') e'
@@ -205,7 +210,7 @@ chkDeclarations env envB
     e'            <- chkTpExp envB' e (retType tf)      -- envB' |- e : t
     case enterSym f tf sp env of                        -- env' = env, f: tf
         Left old -> do
-            emitErrD sp (redeclaredMsg old)
+            emitErrD sp (redeclaredMsg old) :: D () -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
             chkDeclarations env envB ds
         Right (env', f') -> do                      
             (ds', env'') <- chkDeclarations env'    -- env'; envB |- ds | env''
@@ -226,7 +231,7 @@ chkDeclarations env envB
     tp            <- procType env as
     case enterSym p tp sp env of                    -- env' = env, f: tf
         Left old -> do
-            emitErrD sp (redeclaredMsg old)
+            emitErrD sp (redeclaredMsg old) :: D () -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
             chkDeclarations env envB ds
         Right (env', p') -> do                      
             (ds', env'') <- chkDeclarations env'    -- env'; envB |- ds | env''
@@ -254,7 +259,7 @@ chkArgDecls env
     t <- chkDclType env td
     case enterIntTermSym x (Src (amType am t)) sp env of -- env' = env, x: ...
         Left old -> do
-            emitErrD sp (redeclaredMsg old)
+            emitErrD sp (redeclaredMsg old) :: D () -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
             chkArgDecls env as
         Right (env', x') -> do                          
             (as', env'') <- chkArgDecls env' as         -- env' |- as | env''
@@ -308,7 +313,7 @@ chkDclType env (A.TDArray {A.tdaEltType = t, A.tdaSize = s,
 chkDclType env (A.TDRecord {A.tdrFldTypes = fts}) = do
     -- Note: Ensures record fields are sorted (invariant of Rcd)
     let (xs,ts) = unzip fts
-    ts' <- mapM (chkDclType env) ts
+    ts' <- mapM (chkDclType env) ts :: D [Type] -- NOTE: Type annotation to guide plugin (same reason as in library)
     return (Rcd (sortRcdFlds (zip xs ts')))
 
 
@@ -360,9 +365,9 @@ infTpExp env e@(A.ExpLitInt {A.eliVal = n, A.expSrcPos = sp}) = do
 infTpExp env (A.ExpVar {A.evVar = x, A.expSrcPos = sp}) = do
     tms <- case lookupTermSym x env of          -- env(x) = t, sources(t,t)
            Nothing -> do
-               emitErrD sp ("Variable \"" ++ x ++ "\" undefined")
+               emitErrD sp ("Variable \"" ++ x ++ "\" undefined") :: D () -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
                return (dummyTmS x)
-           Just tms -> return tms
+           Just tms -> return tms :: D TermSym -- NOTE: Type annotation to guide plugin (same reason as in library)
     return (tmsType tms, tmsToExp tms sp)
 -- T-APP
 infTpExp env (A.ExpApp {A.eaFun = f, A.eaArgs = es, A.expSrcPos = sp}) = do
@@ -387,7 +392,7 @@ infTpExp env (A.ExpAry {A.eaElts = [], A.expSrcPos = sp}) = do
     return (t, ExpAry {eaElts = [], expType = t, expSrcPos = sp})
 infTpExp env (A.ExpAry {A.eaElts = ees@(e:es), A.expSrcPos = sp}) = do
     (t, e') <- infNonRefTpExp env e             -- env |- e : t, not reftype(t)
-    es'     <- mapM (\e -> chkTpExp env e t) es -- env |- es : t
+    es'     <- mapM (\e -> chkTpExp env e t) es :: D [Expression] -- NOTE: Type annotation to guide plugin (same reason as in library)
     let ta = Ary t (fromIntegral (length ees))
     return (ta, ExpAry {eaElts = e':es', expType = ta, expSrcPos = sp})
 -- T-IX
@@ -400,7 +405,7 @@ infTpExp env (A.ExpIx {A.eiAry = a, A.eiIx = i, A.expSrcPos = sp}) = do
 infTpExp env (A.ExpRcd {A.erFldDefs = fds, A.expSrcPos = sp}) = do
     -- Note: Ensures record fields are sorted (invariant of ExpRcd and Rcd)
     let (xs, es) = unzip (sortRcdFlds fds)
-    tes' <- mapM (infNonRefTpExp env) es        -- env |- es : ts
+    tes' <- mapM (infNonRefTpExp env) es  :: D [(Type, Expression)] -- NOTE: Type annotation to guide plugin (same reason as in library)
     require (allDistinct xs) sp (repeatedMsg xs)
     let (ts, es') = unzip tes'
     let fds'      = zip xs es'
@@ -522,13 +527,13 @@ infArrTpExp env e ss = do
         Arr ts t -> do
             require (length ts == a) sp
                     ("Bad arity: expected " ++ show (length ts)
-                     ++ " arguments, got " ++ show a)
-            return (ensureArity a ts, t, e')
+                     ++ " arguments, got " ++ show a) 
+            return (ensureArity a ts, t, e') :: D ([Type], Type, Expression)  -- NOTE: Type annotation to guide plugin (same reason as in library)
         SomeType -> do
-            return (ensureArity a [], SomeType, e')
+            return (ensureArity a [], SomeType, e') -- NOTE: Putting a type annotation here will equally solve the problem.
         _ -> do
             emitErrD sp "Not a function or procedure"
-            return (ensureArity a [], SomeType, e')
+            return (ensureArity a [], SomeType, e') -- NOTE: Putting a type annotation here will equally solve the problem.
     where
         sp = srcPos e
         a  = length ss                          -- Expected arity
@@ -779,12 +784,12 @@ wellinit l (ExpApp {eaFun = f, eaArgs = es}) = do
                          ("Function \""
                           ++ n 
                           ++ "\" may not be called from initializers in the \
-                             \same block as in which it is defined.")
+                             \same block as in which it is defined.") :: D () -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
             | otherwise -> return ()
         e ->
             emitErrD (srcPos e)
                      "Only known functions may be called in initializers."
-    mapM_ (wellinit l) es
+    mapM_ (wellinit l) es :: D ()  -- NOTE: Type annotation to guide plugin (same reason as in library)
 wellinit l (ExpCond {ecCond = e1, ecTrue = e2, ecFalse = e3}) =
     wellinit l e1 >> wellinit l e2 >> wellinit l e3
 wellinit l (ExpAry {eaElts = es}) = mapM_ (wellinit l) es
@@ -809,7 +814,7 @@ require p sp m = unless p (emitErrD sp m)
 
 -- Generalisation of zipWithM
 
-zipWith3M :: Monad m => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m [d]
+zipWith3M :: (Bind m m m, Return m) => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m [d]
 zipWith3M f (a:as) (b:bs) (c:cs) = do
     d  <- f a b c
     ds <- zipWith3M f as bs cs
@@ -828,7 +833,7 @@ zipWith3M _ _ _ _ = return []
 testTypeChecker :: String -> [(Name,Type)] -> IO ()
 testTypeChecker s bs = do
     putStrLn "Diagnostics:"
-    mapM_ (putStrLn . ppDMsg) (snd result)
+    mapM_ (putStrLn . ppDMsg) (snd result) :: IO ()  -- NOTE: Type annotation to guide plugin (same reason as in library)
     putStrLn ""
     case fst result of
         Just mtir -> do
@@ -846,9 +851,10 @@ testTypeChecker s bs = do
                 Left _ -> error "Extending MT Standard Environment failed!"
                 Right (env', _) -> extend env' bs
 
+        parseCheck :: String -> Env -> DF MTIR -- NOTE: Type signature added, because the inferred one was to general and implied constraint that are unavailable.
         parseCheck s env = do
             ast <- parse s
-            failIfErrorsD
+            failIfErrorsD :: DF () -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
             c <- dToDF (chkCmd env (A.astCmd ast))
             return (MTIR {mtirCmd = c})
 

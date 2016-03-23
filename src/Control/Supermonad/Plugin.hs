@@ -25,6 +25,7 @@ import Control.Supermonad.Plugin.Constraint
   ( WantedCt
   , mkDerivedTypeEqCt
   , constraintClassTyArgs
+  , sortConstraintsByLine
   , isClassConstraint )
 import Control.Supermonad.Plugin.Detect
   ( areBindFunctorArguments, areBindApplyArguments )
@@ -90,7 +91,7 @@ supermonadSolve s given derived wanted = do
 -- | The actual plugin code.
 supermonadSolve' :: SupermonadState -> SupermonadPluginM ()
 supermonadSolve' _s = do
-  getWantedConstraints >>= printConstraints
+  getWantedConstraints >>= (printConstraints . sortConstraintsByLine)
   
   whenNoResults processWantedReturnConstraints
   

@@ -1,3 +1,6 @@
+{-# LANGUAGE RebindableSyntax #-}
+{-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
+
 {-
 ******************************************************************************
 *                                  H M T C                                   *
@@ -56,6 +59,8 @@ module Type (
     MTChr,              -- Haskell repr. of MiniTriangle character values
     isMTChr             -- :: Char -> Bool
 ) where
+
+import Control.Supermonad.Prelude
 
 import Data.Int (Int32)
 import Data.Char (isLatin1)

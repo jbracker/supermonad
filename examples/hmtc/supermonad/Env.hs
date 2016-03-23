@@ -1,3 +1,6 @@
+{-# LANGUAGE RebindableSyntax #-}
+{-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
+
 {-
 ******************************************************************************
 *                                  H M T C                                   *
@@ -38,6 +41,8 @@ module Env (
     lookupOvrldTermSym,   -- :: Name -> Env -> [TermSym]
     dummyTmS              -- :: Name -> TermSym
 ) where
+
+import Control.Supermonad.Prelude
 
 -- Standard library imports
 import Data.Maybe (isJust)

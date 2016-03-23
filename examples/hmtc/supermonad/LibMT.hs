@@ -1,3 +1,6 @@
+{-# LANGUAGE RebindableSyntax #-}
+{-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
+
 {-
 ******************************************************************************
 *                                  H M T C                                   *
@@ -16,6 +19,8 @@
 module LibMT (
     libMT       -- :: [TAMInst]
 ) where
+
+import Control.Supermonad.Prelude
 
 import Data.Char (ord)
 

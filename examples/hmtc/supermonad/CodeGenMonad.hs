@@ -1,3 +1,7 @@
+{-# LANGUAGE RebindableSyntax #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
+
 {-
 ******************************************************************************
 *                                  H M T C                                   *
@@ -37,6 +41,8 @@ module CodeGenMonad (
     newName,            -- :: CG i x Name
     runCG               -- :: CG i x a -> (a, [i], [x])
 ) where
+
+import Control.Supermonad.Prelude
 
 -- Standard library imports
 import Control.Applicative      -- Backwards compatibibility
@@ -99,7 +105,7 @@ instance Applicative (CG i x) where
         in
             (f a, cgs'')
 
-
+{-
 instance Monad (CG i x) where
     return = pure           -- Backwards compatibility
 
@@ -108,7 +114,17 @@ instance Monad (CG i x) where
             (a, cgs') = unCG cg cgs
         in
             unCG (f a) cgs'
-
+-}
+instance Bind (CG i x) (CG i x) (CG i x) where
+  cg >>= f = CG $ \cgs ->
+        let
+            (a, cgs') = unCG cg cgs
+        in
+            unCG (f a) cgs'
+instance Return (CG i x) where
+  return = pure
+instance Fail (CG i x) where
+  fail = error
 
 -- | Emit instruction
 emit :: i -> CG i x ()

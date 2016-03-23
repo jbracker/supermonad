@@ -1,3 +1,6 @@
+{-# LANGUAGE RebindableSyntax #-}
+{-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
+
 {-
 ******************************************************************************
 *                                  H M T C                                   *
@@ -14,5 +17,7 @@
 -- | Representation of names. Types, variables, procedures, operators ...
 
 module Name where
+
+import Control.Supermonad.Prelude
 
 type Name = String

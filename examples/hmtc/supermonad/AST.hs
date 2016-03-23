@@ -1,3 +1,6 @@
+{-# LANGUAGE RebindableSyntax #-}
+{-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
+
 {-
 ******************************************************************************
 *                                  H M T C                                   *
@@ -23,6 +26,8 @@ module AST (
     ArgDecl (..),       -- Not abstract. Instances: HasSrcPos.
     ArgMode (..)        -- Not abstract. Instances: Eq, Show.
 ) where
+
+import Control.Supermonad.Prelude
 
 -- HMTC module imports
 import Name

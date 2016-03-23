@@ -1,3 +1,6 @@
+{-# LANGUAGE RebindableSyntax #-}
+{-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
+
 {-
 ******************************************************************************
 *                                  H M T C                                   *
@@ -33,6 +36,8 @@ module Symbol (
     tmsName,            -- TermSym -> Name
     tmsType             -- TermSym -> Type
 ) where
+
+import Control.Supermonad.Prelude
 
 
 -- HMTC module imports

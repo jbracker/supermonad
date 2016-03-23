@@ -1,3 +1,6 @@
+{-# LANGUAGE RebindableSyntax #-}
+{-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
+
 {-
 ******************************************************************************
 *                                  H M T C                                   *
@@ -17,10 +20,11 @@ module TAMInterpreter (
     runTAM      -- :: Bool -> [TAMInst] -> IO ()
 ) where
 
+import Control.Supermonad.Prelude hiding ( take, drop, (!!) )
+import qualified Control.Supermonad.Prelude as P ( take, drop, (!!) )
+
 -- Standard library imports
-import Prelude hiding (take, drop, (!!))
-import qualified Prelude as P (take, drop, (!!))
-import Control.Monad (when)
+import Control.Supermonad.Functions (when)
 import Data.Char (isDigit)
 import Data.Array
 

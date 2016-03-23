@@ -1,3 +1,6 @@
+{-# LANGUAGE RebindableSyntax #-}
+{-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
+
 {-
 ******************************************************************************
 *                                  H M T C                                   *
@@ -14,6 +17,8 @@
 -- | Representation of tokens (lexical symbols).
 
 module Token where
+
+import Control.Supermonad.Prelude
 
 -- HMTC module imports
 import Name

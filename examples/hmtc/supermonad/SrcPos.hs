@@ -1,3 +1,6 @@
+{-# LANGUAGE RebindableSyntax #-}
+{-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
+
 {-
 ******************************************************************************
 *                                  H M T C                                   *
@@ -17,6 +20,8 @@ module SrcPos (
     SrcPos (..),        -- Not abstract. Instances: Eq, Ord, Show.
     HasSrcPos (..)
 ) where
+
+import Control.Supermonad.Prelude
 
 -- | Representation of source-code positions
 data SrcPos

@@ -1,3 +1,6 @@
+{-# LANGUAGE RebindableSyntax #-}
+{-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
+
 {-
 ******************************************************************************
 *                                  H M T C                                   *
@@ -14,6 +17,8 @@
 -- | Main MiniTriangle compiler driver.
 
 module Main (main) where
+
+import Control.Supermonad.Prelude
 
 -- Standard library imports
 import Data.Maybe (isJust, fromJust)

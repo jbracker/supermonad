@@ -19,9 +19,11 @@ module Control.Supermonad.Plugin.Constraint
   , constraintTcVars
   , constraintLocation
   , constraintSourceLocation
+  , sortConstraintsByLine
   , constraintTyVars
   ) where
 
+import Data.List ( sortBy )
 import Data.Set ( Set )
 import qualified Data.Set as S
 
@@ -140,3 +142,10 @@ constraintSourceLocation = tcl_loc . ctl_env . constraintLocation
 
 constraintTyVars :: Ct -> Set TyVar
 constraintTyVars = collectTyVars . ctev_pred . cc_ev
+
+-- | Sorts constraints by the line of their occurence.
+sortConstraintsByLine :: [Ct] -> [Ct]
+sortConstraintsByLine = sortBy cmpLine
+  where
+    cmpLine :: Ct -> Ct -> Ordering
+    cmpLine ct1 ct2 = compare (constraintSourceLocation ct1) (constraintSourceLocation ct2)

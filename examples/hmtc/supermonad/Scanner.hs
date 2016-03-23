@@ -1,3 +1,6 @@
+{-# LANGUAGE RebindableSyntax #-}
+{-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
+
 {-
 ******************************************************************************
 *                                  H M T C                                   *
@@ -28,6 +31,8 @@ module Scanner (
     scan,               -- String -> DF [(Token, SrcPos)]
     testScanner         -- String -> IO ()
 ) where
+
+import Control.Supermonad.Prelude
 
 -- Standard library imports
 import Data.Char (isDigit, isAlpha, isAlphaNum)
@@ -121,7 +126,7 @@ scanner cont = P $ scan
                                                     ("Lexical error: Illegal \
                                                      \character "
                                                      ++ show x
-                                                     ++ " (discarded)")
+                                                     ++ " (discarded)") :: DF () -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
                                            scan l (c + 1) s
 
         
@@ -133,7 +138,7 @@ scanner cont = P $ scan
                 Nothing -> do
                     emitErrD (SrcPos l c)
                              ("Lexical error: Illegal escaped character "
-                              ++ show x ++ " in character literal (discarded)")
+                              ++ show x ++ " in character literal (discarded)") :: DF () -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
                     scan l (c + 4) s
         scanLitChr l c (x : '\'' : s)
             | x >= ' ' && x <= '~' && x /= '\'' && x /= '\\' =
@@ -141,12 +146,12 @@ scanner cont = P $ scan
             | otherwise = do
                 emitErrD (SrcPos l c)
                          ("Lexical error: Illegal character "
-                          ++ show x ++ " in character literal (discarded)")
+                          ++ show x ++ " in character literal (discarded)") :: DF () -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
                 scan l (c + 3) s
         scanLitChr l c s = do
             emitErrD (SrcPos l c)
                      ("Lexical error: Malformed character literal \
-                      \(discarded)")
+                      \(discarded)") :: DF () -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
             scan l (c + 1) s
 
         encodeEsc 'n'  = Just '\n'
@@ -224,7 +229,7 @@ scan s = runP (scanner (acceptToken [])) s
 testScanner :: String -> IO ()
 testScanner s = do
     putStrLn "Diagnostics:"
-    mapM_ (putStrLn . ppDMsg) (snd result)
+    mapM_ (putStrLn . ppDMsg) (snd result) :: IO ()  -- NOTE: Type annotation to guide plugin (same reason as in library)
     putStrLn ""
     case fst result of
         Just tss -> do
