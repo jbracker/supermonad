@@ -2,7 +2,6 @@ name:                supermonad-plugin
 version:             0.1
 synopsis:            Plugin and base library to support super monads in Haskell
 category:            Type System, Plugin, Monad
-description:         Plugin and base library to support super monads in Haskell
 license:             BSD3
 license-file:        LICENSE
 author:              Jan Bracker <jan.bracker@googlemail.com>
