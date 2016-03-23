@@ -40,6 +40,9 @@ effect-example: install
 hmtc-orig-example: install
 	cabal install ./examples/hmtc/original
 
+hmtc-supermonad-example: install
+	cabal install ./examples/hmtc/supermonad
+
 %.tam: %.mt hmtc-orig-example
 	$(HMTC_BIN) $<
 	$(HMTC_BIN) $@
