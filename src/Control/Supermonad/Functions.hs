@@ -31,11 +31,11 @@ module Control.Supermonad.Functions
     -- ** Generalizations of list functions
   , join
   -- , msum, mfilter -- FIXME: Requires an alternative of 'MonadPlus'.
-  -- , filterM -- TODO: Plugin does not support
+  , filterM -- FIXME / TODO: Plugin does not support without type annotation
   , mapAndUnzipM
   , zipWithM, zipWithM_
   , foldM, foldM_
-  -- , replicateM, replicateM_
+  , replicateM, replicateM_ -- FIXME / TODO: Plugin does not support without type annotation
     -- ** Conditional execution of monadic expressions
   -- , guard -- FIXME: Requires an alternative of 'Alternative'
   , when, unless
@@ -138,8 +138,11 @@ sequence_ = void . sequence
 forever :: (Bind n m m) => n a -> m b
 forever na = na >> forever na
 
-{-
-
+{- FIXME / TODO
+  For this function the type checker plugin leads to something to specific.
+  Fixed by adding type annotation. Revisit this later and see if we can 
+  'fix' the plugin. 
+-}
 -- | Like @filter@ but with a monadic predicate and result.
 filterM :: forall m n a. ( Bind n m m --, Bind m m m
            , Return m, Bind m Identity m)
@@ -148,12 +151,12 @@ filterM _f [] = return []
 filterM f (x : xs) = do
   keep <- f x
   if keep
-    then filterM f xs >>= (return . (x :))
+    then (filterM f xs :: m [a]) >>= (return . (x :))
     else filterM f xs
 -- TODO: Can fix by replacing "filterM f xs >>= (return . (x :))" 
 -- with "(x :) P.<$> filterM f xs" or adding a type annotation: 
 -- "filterM f xs :: m [a]" (ScopedTypeVariables)
--}
+
 -- | Map a given monadic function on the list and the unzip the results.
 mapAndUnzipM :: (Return n, Bind m n n) => (a -> m (b, c)) -> [a] -> n ([b], [c])
 mapAndUnzipM f xs = liftM P.unzip (forM xs f)
@@ -175,20 +178,22 @@ foldM f e = P.foldl f' (return e)
 -- | Same as 'foldM', but ignores the result.
 foldM_ :: (P.Foldable t, Return m, Bind m n m) => (b -> a -> n b) -> b -> t a -> m ()
 foldM_ f e = void . foldM f e
-{-
+
+-- FIXME / TODO: Same issue as with filterM for both replicateM and replicateM_
+
 -- | Repeats the given monadic operation for the given amount of times and
 --   returns the accumulated results.
-replicateM :: (Return n, Bind m n n) => Int -> m a -> n [a]
+replicateM :: forall m n a. (Return n, Bind m n n) => Int -> m a -> n [a]
 replicateM n _ma | n <= 0 = return []
 replicateM n ma = do
   a <- ma
-  as <- replicateM (n - 1) ma
+  as <- replicateM (n - 1) ma :: n [a]
   return $ a : as
 
 -- | Same as 'replicateM', but ignores the results.
 replicateM_ :: (Return n, Bind m n n) => Int -> m a -> n ()
 replicateM_ n = void . replicateM n
--}
+
 -- | Make arguments and result of a pure function monadic.
 liftM :: (Functor m) => (a -> b) -> m a -> m b
 liftM f ma = ma >>= (return . f)
