@@ -1,0 +1,49 @@
+name:                hmtc-orig
+version:             0.1
+synopsis:            A small teaching compiler for an imperative toy language.
+category:            Type System, Plugin, Monad
+description:         A small teaching compiler for an imperative toy language.
+author:              Henrik Nilsson <nhn@cs.nott.ac.uk>
+maintainer:          Henrik Nilsson <nhn@cs.nott.ac.uk>
+stability:           experimental
+copyright:           Copyright (c) 2016, Henrik Nilsson
+build-type:          Simple
+cabal-version:       >=1.10
+
+executable hmtc-orig
+  build-depends: base       >= 4.8
+               , containers >= 0.5 && < 0.6
+               , array      >= 0.5 && < 0.6
+  main-is:       Main.hs
+  other-modules: AST
+               , CodeGenerator
+               , CodeGenMonad
+               , Diagnostics
+               , Env
+               , LibMT
+               , MTIR
+               , MTStdEnv
+               , Name
+               , ParseMonad
+               , Parser
+               , PPAST
+               , PPMTIR
+               , PPTAMCode
+               , PPUtilities
+               , Scanner
+               , ScopeLevel
+               , SrcPos
+               , Symbol
+               , TAMCode
+               , TAMCodeParser
+               , TAMInterpreter
+               , Token
+               , TypeChecker
+               , Type
+  hs-source-dirs:   .
+  default-language: Haskell2010
+  build-tools:      happy
+  ghc-options:      -Wall 
+                    -fno-warn-name-shadowing -fno-warn-missing-signatures 
+                    -fno-warn-unused-imports -fno-warn-unused-binds
+                    -fno-warn-unused-matches
