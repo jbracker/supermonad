@@ -1,7 +1,20 @@
 
 HMTC_BIN=./.cabal-sandbox/bin/hmtc-orig
 
-HMTC_TEST_FILES=\
+HMTC_ORIG_TEST_FILES=\
+	./examples/hmtc/original/MTTests/fac.tam \
+	./examples/hmtc/original/MTTests/incdec.tam \
+	./examples/hmtc/original/MTTests/matmult.tam \
+	./examples/hmtc/original/MTTests/overloading.tam \
+	./examples/hmtc/original/MTTests/records.tam \
+	./examples/hmtc/original/MTTests/sort.tam \
+	./examples/hmtc/original/MTTests/test1.tam \
+	./examples/hmtc/original/MTTests/test2.tam \
+	./examples/hmtc/original/MTTests/test3.tam \
+	./examples/hmtc/original/MTTests/test4.tam \
+	./examples/hmtc/original/MTTests/test6.tam
+
+HMTC_SM_TEST_FILES=\
 	./examples/hmtc/original/MTTests/fac.tam \
 	./examples/hmtc/original/MTTests/incdec.tam \
 	./examples/hmtc/original/MTTests/matmult.tam \
@@ -21,6 +34,8 @@ clean: init
 	cabal clean
 	rm -fR ./examples/session/dist
 	rm -fR ./examples/effect/dist
+	rm -fR ./examples/hmtc/original/dist
+	rm -fR ./examples/hmtc/supermonad/dist
 
 doc: init
 	cabal configure && cabal haddock
@@ -48,4 +63,6 @@ hmtc-supermonad-example: install
 	$(HMTC_BIN) $@
 	rm $@
 
-hmtc-orig-test-files: hmtc-orig-example $(HMTC_TEST_FILES)
+hmtc-orig-test-files: hmtc-orig-example $(HMTC_ORIG_TEST_FILES)
+
+hmtc-supermonad-test-files: hmtc-supermonad-example $(HMTC_SM_TEST_FILES)
