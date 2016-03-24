@@ -57,6 +57,9 @@ hmtc-orig-example: install
 
 hmtc-supermonad-example: install
 	cabal install ./examples/hmtc/supermonad
+	
+hmtc-monad-param-example: install
+	cabal install ./examples/hmtc/monad-param
 
 %.tam: %.mt hmtc-orig-example
 	$(HMTC_BIN) $<
