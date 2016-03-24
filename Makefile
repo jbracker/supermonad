@@ -1,31 +1,18 @@
 
 HMTC_BIN=./.cabal-sandbox/bin/hmtc-orig
 
-HMTC_ORIG_TEST_FILES=\
-	./examples/hmtc/original/MTTests/fac.tam \
-	./examples/hmtc/original/MTTests/incdec.tam \
-	./examples/hmtc/original/MTTests/matmult.tam \
-	./examples/hmtc/original/MTTests/overloading.tam \
-	./examples/hmtc/original/MTTests/records.tam \
-	./examples/hmtc/original/MTTests/sort.tam \
-	./examples/hmtc/original/MTTests/test1.tam \
-	./examples/hmtc/original/MTTests/test2.tam \
-	./examples/hmtc/original/MTTests/test3.tam \
-	./examples/hmtc/original/MTTests/test4.tam \
-	./examples/hmtc/original/MTTests/test6.tam
-
-HMTC_SM_TEST_FILES=\
-	./examples/hmtc/original/MTTests/fac.tam \
-	./examples/hmtc/original/MTTests/incdec.tam \
-	./examples/hmtc/original/MTTests/matmult.tam \
-	./examples/hmtc/original/MTTests/overloading.tam \
-	./examples/hmtc/original/MTTests/records.tam \
-	./examples/hmtc/original/MTTests/sort.tam \
-	./examples/hmtc/original/MTTests/test1.tam \
-	./examples/hmtc/original/MTTests/test2.tam \
-	./examples/hmtc/original/MTTests/test3.tam \
-	./examples/hmtc/original/MTTests/test4.tam \
-	./examples/hmtc/original/MTTests/test6.tam
+HMTC_TEST_FILES=\
+	./examples/hmtc/test-files/fac.tam \
+	./examples/hmtc/test-files/incdec.tam \
+	./examples/hmtc/test-files/matmult.tam \
+	./examples/hmtc/test-files/overloading.tam \
+	./examples/hmtc/test-files/records.tam \
+	./examples/hmtc/test-files/sort.tam \
+	./examples/hmtc/test-files/test1.tam \
+	./examples/hmtc/test-files/test2.tam \
+	./examples/hmtc/test-files/test3.tam \
+	./examples/hmtc/test-files/test4.tam \
+	./examples/hmtc/test-files/test6.tam
 
 install: init
 	cabal install
@@ -66,6 +53,6 @@ hmtc-monad-param-example: install
 	$(HMTC_BIN) $@
 	rm $@
 
-hmtc-orig-test-files: hmtc-orig-example $(HMTC_ORIG_TEST_FILES)
+hmtc-orig-test-files: hmtc-orig-example $(HMTC_TEST_FILES)
 
-hmtc-supermonad-test-files: hmtc-supermonad-example $(HMTC_SM_TEST_FILES)
+hmtc-supermonad-test-files: hmtc-supermonad-example $(HMTC_TEST_FILES)
