@@ -44,7 +44,8 @@ hs_sources = \
     TAMInterpreter.hs \
     Token.hs \
     TypeChecker.hs \
-    Type.hs
+    Type.hs \
+    TestTAM.hs
 
 
 #-----------------------------------------------------------------------------

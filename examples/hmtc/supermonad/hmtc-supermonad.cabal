@@ -41,6 +41,7 @@ executable hmtc-supermonad
                , Token
                , TypeChecker
                , Type
+               , TestTAM
   hs-source-dirs:   .
   default-language: Haskell2010
   build-tools:      happy
