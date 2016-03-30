@@ -23,6 +23,7 @@ clean: init
 	rm -fR ./examples/effect/dist
 	rm -fR ./examples/hmtc/original/dist
 	rm -fR ./examples/hmtc/supermonad/dist
+	rm -fR ./examples/hmtc/monad-param/dist
 
 doc: init
 	cabal configure && cabal haddock
@@ -39,13 +40,13 @@ session-example: install
 effect-example: install
 	cabal install ./examples/effect
 
-hmtc-orig-example: install
+hmtc-orig-example:
 	cabal install ./examples/hmtc/original
 
 hmtc-supermonad-example: install
 	cabal install ./examples/hmtc/supermonad
 	
-hmtc-monad-param-example: install
+hmtc-monad-param-example:
 	cabal install ./examples/hmtc/monad-param
 
 %.tam: %.mt hmtc-orig-example
