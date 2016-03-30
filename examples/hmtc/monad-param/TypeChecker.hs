@@ -374,7 +374,7 @@ infTpExp env e@(A.ExpLitInt {A.eliVal = n, A.expSrcPos = sp}) = do
 infTpExp env (A.ExpVar {A.evVar = x, A.expSrcPos = sp}) = do
     tms <- case lookupTermSym x env of          -- env(x) = t, sources(t,t)
            Nothing -> do
-               emitErrD sp ("Variable \"" ++ x ++ "\" undefined") :: D () -- NOTE: Type annitation to select correct Diagnostics instance
+               emitErrD sp ("Variable \"" ++ x ++ "\" undefined") :: D () -- NOTE: Type annotation to select correct Diagnostics instance
                return (dummyTmS x)
            Just tms -> returnM tms :: D TermSym -- NOTE: Needs manual selection of polymorphic return to match first case
     return (tmsType tms, tmsToExp tms sp)
