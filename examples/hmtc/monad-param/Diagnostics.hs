@@ -23,6 +23,8 @@
 -- Updated 2015 in view of revised monad class hierarchy.
 
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Diagnostics (
     -- * Diagnostic messages
@@ -52,6 +54,10 @@ module Diagnostics (
     assertM             -- :: Monad m =>
                         --        Bool -> String -> String -> String -> m ()
 ) where
+
+import Prelude hiding ( Monad(..) )
+import qualified Prelude as P
+import Control.Monad.Parameterized
 
 -- Standard library imports
 import Data.List (sortBy)
@@ -174,13 +180,13 @@ ppDMsg (DMsg {dmLvl = lvl, dmSrcPos = sp, dmTxt = msg}) =
 --     lift m = DFT $ m >>= \a -> return (Just a)
 
 class MonadTransformer t where
-    lift :: Monad m => m a -> t m a
+    lift :: P.Monad m => m a -> t m a
 
 
 -- | Class for diagnostic computations. Diagnostic computations accumulate
 -- diagnostic messages.
 -- Context "Applicative d" for backwards compatibility
-class (Applicative d, Monad d) => Diagnostic d where
+class (Applicative d, P.Monad d) => Diagnostic d where
 
     -- | Emits a diagnostic message
     emitD :: DMsg -> d ()
@@ -276,7 +282,7 @@ instance Applicative D where
             (f a, dms'')
 
 
-instance Monad D where
+instance P.Monad D where
     return = pure               -- Backwards compatibility
 
     d >>= f = D $ \dms ->
@@ -284,7 +290,6 @@ instance Monad D where
             (a, dms') = unD d dms
         in
             unD (f a) dms'
-
 
 instance MonadFix D where
     mfix f = D $ \dms ->
@@ -321,6 +326,16 @@ runD d = (a, sortBy dmCmpLvlPos dms)
         (a, dms) = unD d []
 
 
+-- NOTE: Add instances to support use of D with monad-param package in 
+-- TypeChecker module.
+instance Return D where
+  returnM = P.return
+instance Fail D where
+  fail = P.fail
+instance Bind D D D where
+  (>>=) = (P.>>=)
+  (>>)  = (P.>>)
+
 ------------------------------------------------------------------------------
 -- Transformer to diagnostic computation with failure
 ------------------------------------------------------------------------------
@@ -345,18 +360,18 @@ instance Applicative m => Applicative (DFT m) where
 
 
 -- Context "Applicative m" for backwards compatibility.
-instance (Applicative m, Monad m) => Monad (DFT m) where
+instance (Applicative m, P.Monad m) => P.Monad (DFT m) where
     return = pure       -- Backwards compatibility
 
     m >>= f = DFT $
-        unDFT m >>= \ma ->
+        unDFT m P.>>= \ma ->
         case ma of
-            Nothing -> return Nothing
+            Nothing -> P.return Nothing
             Just a  -> unDFT (f a)
 
 
 instance MonadTransformer DFT where
-    lift m = DFT $ m >>= \a -> return (Just a)
+    lift m = DFT $ m P.>>= \a -> P.return (Just a)
 
 
 instance Diagnostic d => Diagnostic (DFT d) where
@@ -368,28 +383,29 @@ instance Diagnostic d => Diagnostic (DFT d) where
 
 
 instance Diagnostic d => DiagnosticFail (DFT d) where
-    failD sp msg = DFT $ emitErrD sp msg >> return Nothing
+    failD sp msg = DFT $ emitErrD sp msg P.>> P.return Nothing
     
     failNoReasonD = DFT $ emitErrD NoSrcPos "Failure, unknown reason"
-                          >> return Nothing
+                          P.>> P.return Nothing
 
     failIfErrorsD = DFT $
-        getDMsgsD >>= \dms ->
+        getDMsgsD P.>>= \dms ->
         if any dmIsErr dms then
-            return Nothing
+            P.return Nothing
         else
-            return (Just ())
+            P.return (Just ())
     
-    stopD = DFT $ return Nothing
+    stopD = DFT $ P.return Nothing
 
 
 ------------------------------------------------------------------------------
 -- Diagnostic computation with failure
 ------------------------------------------------------------------------------
 
-newtype DF a = DF (DFT D a) deriving (Functor, Applicative, Monad,
-                                      Diagnostic, DiagnosticFail)
-
+newtype DF a = DF (DFT D a) deriving (Functor, Applicative, Diagnostic, DiagnosticFail)
+instance P.Monad DF where
+  return = DF . P.return
+  (DF m) >>= f = DF $ m P.>>= \a -> let DF m' = f a in m'
 
 unDF :: DF a -> DFT D a
 unDF (DF dfta) = dfta
@@ -401,6 +417,15 @@ dToDF = DF . lift
 runDF :: DF a -> (Maybe a, [DMsg])
 runDF = runD . unDFT . unDF
 
+-- NOTE: Add instances to support use of D with monad-param package in 
+-- TypeChecker module.
+instance Return DF where
+  returnM = P.return
+instance Fail DF where
+  fail = P.fail
+instance Bind DF DF DF where
+  (>>=) = (P.>>=)
+  (>>)  = (P.>>)
 
 ------------------------------------------------------------------------------
 -- Internal error reporting
@@ -429,5 +454,5 @@ assert c m f msg v | c         = v
 -- otherwise. Call with condition, module name, name of function, error
 -- message.
 
-assertM :: Monad m => Bool -> String -> String -> String -> m ()
-assertM c m f msg = assert c m f msg (return ())
+assertM :: P.Monad m => Bool -> String -> String -> String -> m ()
+assertM c m f msg = assert c m f msg (P.return ())

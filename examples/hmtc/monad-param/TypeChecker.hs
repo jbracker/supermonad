@@ -1,3 +1,9 @@
+
+{-# LANGUAGE RebindableSyntax #-}
+
+-- NOTE: Required for 'zipWith3M'
+{-# LANGUAGE ScopedTypeVariables #-}
+
 {-
 ******************************************************************************
 *                                  H M T C                                   *
@@ -19,6 +25,9 @@ module TypeChecker (
     typeCheck,          -- :: A.AST -> D MTIR
     testTypeChecker     -- :: String -> [(Name,Type)] -> IO ()
 ) where
+
+import Prelude hiding ( Monad(..) )
+import Control.Monad.Parameterized
 
 
 -- Standard library imports
@@ -42,6 +51,11 @@ import qualified AST as A
 import MTIR
 import PPMTIR
 import Parser (parse)
+
+-- NOTE: Required because of RebindableSyntax ==> NoImplicitPrelude
+ifThenElse :: Bool -> a -> a -> a
+ifThenElse True  t _ = t
+ifThenElse False _ f = f
 
 -- | Type checks a complete MiniTriangle program in the standard environment 
 -- and reports any errors. Hence a computation in the diagnostics monad 'D'.
@@ -93,15 +107,15 @@ chkCmd env (A.CmdCall {A.ccProc = p, A.ccArgs = es, A.cmdSrcPos = sp}) = do
         notProcMsg t = "Not a procedure; return type is " ++ show t
 -- T-SEQ (generalized to sequence of any length)
 chkCmd env (A.CmdSeq {A.csCmds = cs, A.cmdSrcPos = sp}) = do
-    cs' <- mapM (chkCmd env) cs                         -- env |- cs
+    cs' <- mapM (chkCmd env) cs -- NOTE: Type annotation not necessary, because the classic mapM is actually used
     return (CmdSeq {csCmds = cs', cmdSrcPos = sp})
 -- T-IF
 chkCmd env (A.CmdIf {A.ciCondThens = ecs, A.ciMbElse = mbce,
                      A.cmdSrcPos=sp}) = do
-    ecs'  <- mapM (tcCondThen env) ecs                  -- env |- es : Boolean
+    ecs'  <- mapM (tcCondThen env) ecs -- NOTE: Type annotation not necessary, because the classic mapM is actually used
                                                         -- env |- cs
     mbce' <- case mbce of
-                 Nothing -> return Nothing
+                 Nothing -> returnM Nothing -- NOTE: Needs manual selection of polymorphic return to match second case
                  Just ce -> do
                      ce' <- chkCmd env ce               -- env |- ce
                      return (Just ce')
@@ -144,7 +158,7 @@ chkCmd env (A.CmdLet {A.clDecls = ds, A.clBody = c, A.cmdSrcPos = sp}) = do
 
 chkDeclarations :: Env -> Env -> [A.Declaration] -> D ([Declaration], Env)
 -- T-DECLEMPTY
-chkDeclarations env envB [] = return ([], env)
+chkDeclarations env envB [] = returnM ([], env) -- NOTE: Need manual selection of polymorphic return.
 -- T-DECLCONST
 chkDeclarations env envB 
                 (A.DeclConst {A.dcConst = x, A.dcVal = e, A.dcType = t,
@@ -154,7 +168,7 @@ chkDeclarations env envB
     e' <- chkTpExp env e t'                         -- env |- e : t
     case enterIntTermSym x (Src t') sp env of       -- env' = env, x : Src t
         Left old -> do
-            emitErrD sp (redeclaredMsg old)
+            emitErrD sp (redeclaredMsg old) :: D () -- NOTE: Type annotation to select correct Diagnostics instance
             chkDeclarations env envB ds
         Right (env', x') -> do                      
             wellinit (itmsLvl x') e'
@@ -170,7 +184,7 @@ chkDeclarations env envB
     t' <- chkDclType env t
     case enterIntTermSym x (Ref t') sp env of       -- env' = env, x : Ref t
         Left old -> do
-            emitErrD sp (redeclaredMsg old)
+            emitErrD sp (redeclaredMsg old) :: D () -- NOTE: Type annotation to select correct Diagnostics instance
             chkDeclarations env envB ds
         Right (env', x') -> do                      
             (ds', env'') <- chkDeclarations env'    -- env'; envB |- ds | env''
@@ -186,7 +200,7 @@ chkDeclarations env envB
     e' <- chkTpExp env e t'                         -- env |- e : t
     case enterIntTermSym x (Ref t') sp env of       -- env' = env, x : Ref t
         Left old -> do
-            emitErrD sp (redeclaredMsg old)
+            emitErrD sp (redeclaredMsg old) :: D () -- NOTE: Type annotation to select correct Diagnostics instance
             chkDeclarations env envB ds
         Right (env', x') -> do
             wellinit (itmsLvl x') e'
@@ -205,7 +219,7 @@ chkDeclarations env envB
     e'            <- chkTpExp envB' e (retType tf)      -- envB' |- e : t
     case enterSym f tf sp env of                        -- env' = env, f: tf
         Left old -> do
-            emitErrD sp (redeclaredMsg old)
+            emitErrD sp (redeclaredMsg old) :: D () -- NOTE: Type annotation to select correct Diagnostics instance
             chkDeclarations env envB ds
         Right (env', f') -> do                      
             (ds', env'') <- chkDeclarations env'    -- env'; envB |- ds | env''
@@ -226,7 +240,7 @@ chkDeclarations env envB
     tp            <- procType env as
     case enterSym p tp sp env of                    -- env' = env, f: tf
         Left old -> do
-            emitErrD sp (redeclaredMsg old)
+            emitErrD sp (redeclaredMsg old) :: D () -- NOTE: Type annotation to select correct Diagnostics instance
             chkDeclarations env envB ds
         Right (env', p') -> do                      
             (ds', env'') <- chkDeclarations env'    -- env'; envB |- ds | env''
@@ -245,7 +259,7 @@ chkDeclarations env envB
 
 chkArgDecls :: Env -> [A.ArgDecl] -> D ([IntTermSym], Env)
 -- T-DECLARGEMPTY
-chkArgDecls env [] = return ([], env)
+chkArgDecls env [] = returnM ([], env) -- NOTE: Need manual selection of polymorphic return.
 -- T-DECLARG, T-DECLINARG, T-DECLOUTARG, T-DECLVARARG
 chkArgDecls env  
             (A.ArgDecl {A.adArg = x, A.adArgMode = am, A.adType = td,
@@ -254,7 +268,7 @@ chkArgDecls env
     t <- chkDclType env td
     case enterIntTermSym x (Src (amType am t)) sp env of -- env' = env, x: ...
         Left old -> do
-            emitErrD sp (redeclaredMsg old)
+            emitErrD sp (redeclaredMsg old) :: D () -- NOTE: Type annotation to select correct Diagnostics instance
             chkArgDecls env as
         Right (env', x') -> do                          
             (as', env'') <- chkArgDecls env' as         -- env' |- as | env''
@@ -283,7 +297,7 @@ funType env as td = do
 
 
 chkArgTypes :: Env -> [A.ArgDecl] -> D [Type]
-chkArgTypes env []                                                 = return []
+chkArgTypes env []                                                 = returnM [] -- NOTE: Need manual selection of polymorphic return.
 chkArgTypes env (A.ArgDecl {A.adArgMode = am, A.adType = td} : as) = do
     t  <- chkDclType env td
     ts <- chkArgTypes env as
@@ -296,10 +310,10 @@ chkDclType :: Env -> A.TypeDenoter -> D Type
 chkDclType env (A.TDBaseType {A.tdbtName = t, A.tdSrcPos = sp}) =
     case lookupTypeSym t env of
         Nothing -> do
-            emitErrD sp ("Undefined type \"" ++ t ++ "\"")
+            emitErrD sp ("Undefined type \"" ++ t ++ "\"") :: D () -- NOTE: Type annotation to select correct Diagnostics instance
             return SomeType
         Just tps ->
-            return (tpsType tps)
+            returnM (tpsType tps) -- NOTE: Need manual selection of polymorphic return to match first case
 chkDclType env (A.TDArray {A.tdaEltType = t, A.tdaSize = s,
                 A.tdSrcPos = sp}) = do
     t' <- chkDclType env t
@@ -308,7 +322,7 @@ chkDclType env (A.TDArray {A.tdaEltType = t, A.tdaSize = s,
 chkDclType env (A.TDRecord {A.tdrFldTypes = fts}) = do
     -- Note: Ensures record fields are sorted (invariant of Rcd)
     let (xs,ts) = unzip fts
-    ts' <- mapM (chkDclType env) ts
+    ts' <- mapM (chkDclType env) ts -- NOTE: Type annotation not necessary, because the classic mapM is actually used
     return (Rcd (sortRcdFlds (zip xs ts')))
 
 
@@ -360,9 +374,9 @@ infTpExp env e@(A.ExpLitInt {A.eliVal = n, A.expSrcPos = sp}) = do
 infTpExp env (A.ExpVar {A.evVar = x, A.expSrcPos = sp}) = do
     tms <- case lookupTermSym x env of          -- env(x) = t, sources(t,t)
            Nothing -> do
-               emitErrD sp ("Variable \"" ++ x ++ "\" undefined")
+               emitErrD sp ("Variable \"" ++ x ++ "\" undefined") :: D () -- NOTE: Type annitation to select correct Diagnostics instance
                return (dummyTmS x)
-           Just tms -> return tms
+           Just tms -> returnM tms :: D TermSym -- NOTE: Needs manual selection of polymorphic return to match first case
     return (tmsType tms, tmsToExp tms sp)
 -- T-APP
 infTpExp env (A.ExpApp {A.eaFun = f, A.eaArgs = es, A.expSrcPos = sp}) = do
@@ -384,10 +398,10 @@ infTpExp env (A.ExpCond {A.ecCond = e1, A.ecTrue = e2,
 -- T-ARY, empty case handled specially
 infTpExp env (A.ExpAry {A.eaElts = [], A.expSrcPos = sp}) = do
     let t = Ary SomeType 0
-    return (t, ExpAry {eaElts = [], expType = t, expSrcPos = sp})
+    returnM (t, ExpAry {eaElts = [], expType = t, expSrcPos = sp}) -- NOTE: Needs manual selection of polymorphic return.
 infTpExp env (A.ExpAry {A.eaElts = ees@(e:es), A.expSrcPos = sp}) = do
     (t, e') <- infNonRefTpExp env e             -- env |- e : t, not reftype(t)
-    es'     <- mapM (\e -> chkTpExp env e t) es -- env |- es : t
+    es'     <- mapM (\e -> chkTpExp env e t) es -- NOTE: Type annotation not necessary, because the classic mapM is actually used
     let ta = Ary t (fromIntegral (length ees))
     return (ta, ExpAry {eaElts = e':es', expType = ta, expSrcPos = sp})
 -- T-IX
@@ -400,7 +414,7 @@ infTpExp env (A.ExpIx {A.eiAry = a, A.eiIx = i, A.expSrcPos = sp}) = do
 infTpExp env (A.ExpRcd {A.erFldDefs = fds, A.expSrcPos = sp}) = do
     -- Note: Ensures record fields are sorted (invariant of ExpRcd and Rcd)
     let (xs, es) = unzip (sortRcdFlds fds)
-    tes' <- mapM (infNonRefTpExp env) es        -- env |- es : ts
+    tes' <- mapM (infNonRefTpExp env) es -- NOTE: Type annotation not necessary, because the classic mapM is actually used
     require (allDistinct xs) sp (repeatedMsg xs)
     let (ts, es') = unzip tes'
     let fds'      = zip xs es'
@@ -476,7 +490,7 @@ infArrTpExp env e@(A.ExpVar {A.evVar = x}) ss
                         tmsToExp (dummyTmS x) sp)
             [tms] ->
                 case tmsType tms of
-                    Arr ts t -> return (ts, t, tmsToExp tms sp)
+                    Arr ts t -> returnM (ts, t, tmsToExp tms sp) -- NOTE: Needs manual selection of polymorphic return.
                     _        -> tcErr "infArrTpExp" "Expected arrow type"
             _ ->
                 case tmssCS of
@@ -489,7 +503,7 @@ infArrTpExp env e@(A.ExpVar {A.evVar = x}) ss
                                 tmsToExp (dummyTmS x) sp)
                     [tms] ->
                         case tmsType tms of
-                            Arr ts t -> return (ts, t, tmsToExp tms sp)
+                            Arr ts t -> returnM (ts, t, tmsToExp tms sp) -- NOTE: Needs manual selection of polymorphic return.
                             _        -> tcErr "infArrTpExp"
                                               "Expected arrow type"
                     (tms : _) -> do
@@ -525,7 +539,7 @@ infArrTpExp env e ss = do
                      ++ " arguments, got " ++ show a)
             return (ensureArity a ts, t, e')
         SomeType -> do
-            return (ensureArity a [], SomeType, e')
+            returnM (ensureArity a [], SomeType, e') -- NOTE: Needs manual selection of polymorphic return to match first case
         _ -> do
             emitErrD sp "Not a function or procedure"
             return (ensureArity a [], SomeType, e')
@@ -582,7 +596,7 @@ infRefRcdTpExp env e = do
 toMTInt :: Integer -> SrcPos -> D MTInt
 toMTInt n sp =
    if isMTInt n then
-       return (fromInteger n)
+       returnM (fromInteger n) -- NOTE: Needs manual selection of polymorphic return.
    else do
        emitErrD sp ("Integer literal " ++ show n ++ " outside the range of "
                      ++ "representable MiniTriangle integers")
@@ -595,7 +609,8 @@ toMTInt n sp =
 toMTChr :: Char -> SrcPos -> D MTChr
 toMTChr c sp =
    if isMTChr c then
-       return c         -- MTChr is currently just a type synonym
+       returnM c         -- MTChr is currently just a type synonym
+                         -- NOTE: Needs manual selection of polymorphic return.
    else do
        emitErrD sp ("Character literal " ++ show c ++ " outside the range of "
                      ++ "representable MiniTriangle characters")
@@ -638,7 +653,7 @@ tmsToExp (Right itms@(IntTermSym  {itmsType = t})) sp =
 -- the appropriate number of dereferencing operations.
 
 sources :: Type -> Type -> Expression -> D Expression
-sources s       t       e | s <: t = return e
+sources s       t       e | s <: t = returnM e -- NOTE: Needs manual selection of polymorphic return.
 sources (Ref s) t       e          = sources s t (deref e)
 sources (Src s) t       e          = sources s t (deref e)
 sources s       t       e          = do
@@ -685,7 +700,7 @@ sources s       t       e          = do
 
 sources_pred :: (Type -> Bool) -> String -> Type -> Expression
                 -> D (Type, Expression)
-sources_pred p et t       e | p t = return (t, e)
+sources_pred p et t       e | p t = returnM (t, e) -- NOTE: Needs manual selection of polymorphic return.
 sources_pred p et (Ref t) e       = sources_pred p et t (deref e)
 sources_pred p et (Src t) e       = sources_pred p et t (deref e)
 sources_pred p et t       e       = do
@@ -705,7 +720,7 @@ sources_pred p et t       e       = do
 
 sinks_nonreftype :: Type -> Expression -> D (Type, Expression)
 sinks_nonreftype (Snk t) e
-    | not (refType t) = return (t, e)
+    | not (refType t) = returnM (t, e) -- NOTE: Needs manual selection of polymorphic return.
     | otherwise       = do
         emitErrD (srcPos e)
                  "Cannot assign value of non-reference type to this variable"
@@ -713,10 +728,10 @@ sinks_nonreftype (Snk t) e
 sinks_nonreftype (Src t) e = 
     sinks_nonreftype t (deref e)
 sinks_nonreftype (Ref t) e
-    | not (refType t) = return (t, e)
+    | not (refType t) = returnM (t, e) -- NOTE: Needs manual selection of polymorphic return.
     | otherwise       = sinks_nonreftype t (deref e)
 sinks_nonreftype SomeType e =
-    return (SomeType, e)
+    returnM (SomeType, e) -- NOTE: Needs manual selection of polymorphic return.
 sinks_nonreftype _ e = do
     emitErrD (srcPos e) "Does not denote an assignable variable"
     return (SomeType, e)
@@ -760,18 +775,22 @@ deref e =
 -- strategies.]
 
 wellinit :: ScopeLvl -> Expression -> D ()
-wellinit _ (ExpLitBool {})        = return ()
-wellinit _ (ExpLitInt {})         = return ()
-wellinit _ (ExpLitChr {})         = return ()
-wellinit _ (ExpExtRef {})         = return ()
-wellinit _ (ExpVar {})            = return ()
+wellinit _ (ExpLitBool {})        = returnM () -- NOTE: Needs manual selection of polymorphic return.
+wellinit _ (ExpLitInt {})         = returnM () -- NOTE: Needs manual selection of polymorphic return.
+wellinit _ (ExpLitChr {})         = returnM () -- NOTE: Needs manual selection of polymorphic return.
+wellinit _ (ExpExtRef {})         = returnM () -- NOTE: Needs manual selection of polymorphic return.
+wellinit _ (ExpVar {})            = returnM () -- NOTE: Needs manual selection of polymorphic return.
 wellinit l (ExpDeref {edArg = e}) = wellinit l e
 wellinit l (ExpApp {eaFun = f, eaArgs = es}) = do
     case f of
-        ExpLitBool {} -> return ()      -- Type error, will have been caught
-        ExpLitInt {}  -> return ()      -- Type error, will have been caught
-        ExpLitChr {}  -> return ()      -- Type error, will have been caught
-        ExpExtRef {}  -> return ()      -- Defined outside present scope
+        ExpLitBool {} -> returnM ()      -- Type error, will have been caught
+                                         -- NOTE: Needs manual selection of polymorphic return to match fifth case
+        ExpLitInt {}  -> returnM ()      -- Type error, will have been caught
+                                         -- NOTE: Needs manual selection of polymorphic return to match fifth case
+        ExpLitChr {}  -> returnM ()      -- Type error, will have been caught
+                                         -- NOTE: Needs manual selection of polymorphic return to match fifth case
+        ExpExtRef {}  -> returnM ()      -- Defined outside present scope
+                                         -- NOTE: Needs manual selection of polymorphic return to match fifth case
         ExpVar {evVar = IntTermSym {itmsLvl = l', itmsName = n},
                 expSrcPos = sp}
             | l' == l ->
@@ -779,12 +798,12 @@ wellinit l (ExpApp {eaFun = f, eaArgs = es}) = do
                          ("Function \""
                           ++ n 
                           ++ "\" may not be called from initializers in the \
-                             \same block as in which it is defined.")
-            | otherwise -> return ()
+                             \same block as in which it is defined.") :: D () -- NOTE: Type annotation to select correct Diagnostics instance
+            | otherwise -> returnM () -- NOTE: Needs manual selection of polymorphic return to match fifth case
         e ->
             emitErrD (srcPos e)
                      "Only known functions may be called in initializers."
-    mapM_ (wellinit l) es
+    mapM_ (wellinit l) es -- NOTE: Type annotation not necessary, because the classic mapM is actually used
 wellinit l (ExpCond {ecCond = e1, ecTrue = e2, ecFalse = e3}) =
     wellinit l e1 >> wellinit l e2 >> wellinit l e3
 wellinit l (ExpAry {eaElts = es}) = mapM_ (wellinit l) es
@@ -809,12 +828,36 @@ require p sp m = unless p (emitErrD sp m)
 
 -- Generalisation of zipWithM
 
-zipWith3M :: Monad m => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m [d]
+-- NOTE: Problem with typing polymorphic functions, because backwards reasoning is missing.
+-- NOTE: Overlapping instances issue arises here:
+{-
+Overlapping instances for Bind m Identity m
+  arising from a do statement
+Matching instances:
+  instance [overlap ok] Functor a => Bind a Identity a
+    -- Defined in ‘Control.Monad.Parameterized’
+  instance [overlap ok] Bind Identity Identity Identity
+    -- Defined in ‘Control.Monad.Parameterized’
+  instance [overlap ok] Functor a => Bind Identity a a
+    -- Defined in ‘Control.Monad.Parameterized’
+  instance [overlap ok] Bind MZero Identity MZero
+    -- Defined in ‘Control.Monad.Parameterized’
+  instance [overlap ok] Functor a => Bind MZero a MZero
+    -- Defined in ‘Control.Monad.Parameterized’
+(The choice depends on the instantiation of ‘m’
+  To pick the first instance above, use IncoherentInstances
+  when compiling the other instance declarations)
+In a stmt of a 'do' block: ds <- zipWith3M f as bs cs
+-}
+-- NOTE: Problem can be solved by adding type signatures and making all polymorphic code monomorphic to 'm'.
+-- NOTE: This requires 'ScopedTypeVariables'.
+--zipWith3M :: (Bind m m m, Return m) => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m [d]
+zipWith3M :: forall m a b c d. (Bind m m m, Return m) => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m [d]
 zipWith3M f (a:as) (b:bs) (c:cs) = do
     d  <- f a b c
-    ds <- zipWith3M f as bs cs
-    return (d:ds)
-zipWith3M _ _ _ _ = return []
+    ds <- zipWith3M f as bs cs :: m [d]
+    returnM (d:ds) :: m [d]
+zipWith3M _ _ _ _ = returnM [] -- NOTE: Needs manual selection of polymorphic return.
 
 
 ------------------------------------------------------------------------------
@@ -828,7 +871,7 @@ zipWith3M _ _ _ _ = return []
 testTypeChecker :: String -> [(Name,Type)] -> IO ()
 testTypeChecker s bs = do
     putStrLn "Diagnostics:"
-    mapM_ (putStrLn . ppDMsg) (snd result)
+    mapM_ (putStrLn . ppDMsg) (snd result) -- NOTE: Type annotation not necessary, because the classic mapM is actually used
     putStrLn ""
     case fst result of
         Just mtir -> do
@@ -848,7 +891,7 @@ testTypeChecker s bs = do
 
         parseCheck s env = do
             ast <- parse s
-            failIfErrorsD
+            failIfErrorsD :: DF () -- NOTE: Type annotation to select correct Diagnostics instance
             c <- dToDF (chkCmd env (A.astCmd ast))
             return (MTIR {mtirCmd = c})
 
