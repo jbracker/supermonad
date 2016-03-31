@@ -4,6 +4,7 @@ module Control.Supermonad.Plugin.Utils (
   -- * Type inspection
     collectTopTyCons
   , collectTopTcVars
+  , collectTopTcVarsWithArity
   , collectTyVars
   , mkTcVarSubst
   -- * General Utilities
@@ -32,6 +33,8 @@ import qualified Data.Set as S
 import Control.Monad ( forM )
 import Control.Arrow ( second )
 
+import BasicTypes ( Arity )
+import Id ( idArity )
 import Name ( nameOccName )
 import OccName ( occNameString )
 import Type
@@ -78,7 +81,28 @@ collectTopTyCons tys = S.fromList $ catMaybes $ fmap tyConAppTyCon_maybe tys
 -- >>> collectTopTcVars [m a b, Identity c, n]
 -- { m, n }
 collectTopTcVars :: [Type] -> Set TyVar
-collectTopTcVars tys = S.fromList $ catMaybes $ fmap (getTyVar_maybe . fst . splitAppTys) tys
+collectTopTcVars = S.map fst . collectTopTcVarsWithArity
+
+-- | Retrieve the type constructor variables at the top level involved in the
+--   given types. If there are nested type variables they are ignored.
+--   There is no actual check if the returned type variables are actually type
+--   constructor variables. Also associates the appearant arity of the given
+--   type variables by looking at how many arguments it was applied to.
+--
+--   /Example/:
+--
+-- >>> collectTopTcVars [m a b, Identity c, n]
+-- { (m, 2), (n, 0) }
+collectTopTcVarsWithArity :: [Type] -> Set (TyVar, Arity)
+collectTopTcVarsWithArity tys = S.fromList $ catMaybes $ fmap getTyVarAndArity tys
+  where
+    getTyVarAndArity :: Type -> Maybe (TyVar, Arity)
+    getTyVarAndArity t = do
+      let (tf, args) = splitAppTys t
+      tv <- getTyVar_maybe tf
+      if idArity tv /= length args 
+         then error "Arity Mismatch!" else 
+         return (tv, length args)
 
 -- | Try to collect all type variables in a given expression.
 --   Does not work for Pi or ForAll types.
