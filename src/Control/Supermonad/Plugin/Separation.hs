@@ -17,6 +17,7 @@ import Data.Graph.Inductive.Query.DFS ( components )
 import TcRnTypes ( Ct )
 import TyCon ( TyCon )
 import Type ( Type, TyVar )
+import TcType ( isAmbiguousTyVar )
 
 import Control.Supermonad.Plugin.Constraint
   ( WantedCt, constraintClassTyArgs )
@@ -47,10 +48,10 @@ collect f cts = S.toList $ S.unions $ fmap collectLocal cts
                     $ constraintClassTyArgs ct
 
 -- | Creates a graph of the constraints and how they are 
---   conntected by their top level type constructors and variables 
---   (ignoring 'Identity'). Returns the connected components 
---   of that graph. These components represent the groups of constraints
---   that are used within the same part of code.
+--   conntected by their top-level ambiguous type constructor variables. 
+--   Returns the connected components of that graph. 
+--   These components represent the groups of constraints that are in need of 
+--   solving and have to be handeled together.
 separateContraints :: [WantedCt] -> [[WantedCt]]
 separateContraints wantedCts = (fmap (\n -> fromJust $ lookup n nodes)) <$> components g
   where
@@ -76,10 +77,8 @@ separateContraints wantedCts = (fmap (\n -> fromJust $ lookup n nodes)) <$> comp
       cbArgs <- lookup nb nodes >>= constraintClassTyArgs
       -- Collect all top level type constructors and type constructor variables
       -- in the type arguments.
-      let ta = S.union (S.map Left  $ collectTopTyCons caArgs)
-                       (S.map Right $ collectTopTcVars caArgs)
-      let tb = S.union (S.map Left  $ collectTopTyCons cbArgs)
-                       (S.map Right $ collectTopTcVars cbArgs)
+      let ta = S.filter isAmbiguousTyVar $ collectTopTcVars caArgs
+      let tb = S.filter isAmbiguousTyVar $ collectTopTcVars cbArgs
       -- If there is an element in the intersection of these sets 
       return $ not $ S.null $ S.intersection ta tb
     
