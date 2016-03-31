@@ -6,8 +6,6 @@ module Control.Supermonad.Plugin.Utils (
   , collectTopTcVars
   , collectTyVars
   , mkTcVarSubst
-  , splitTyConApps
-  , isGroundUnaryTyCon
   -- * General Utilities
   , skolemVarsBindFun
   , eqTyVar, eqTyVar'
@@ -48,7 +46,7 @@ import Type
   , eqType )
 import TyCon 
   ( TyCon
-  , tyConArity, tyConKind, tyConName )
+  , tyConKind, tyConName )
 import Var ( tyVarKind )
 import TcType ( isAmbiguousTyVar )
 import Kind ( Kind, splitKindFunTys )
@@ -103,18 +101,6 @@ collectTyVars t =
 --   associated type constructors.
 mkTcVarSubst :: [(TyVar, TyCon)] -> TvSubst
 mkTcVarSubst substs = mkTopTvSubst $ fmap (second mkTyConTy) substs
-
--- | Split type constructor applications into their type constructor and arguments. Only
---   keeps those in the result list where this split actually worked.
-splitTyConApps :: [Type] -> [(TyCon, [Type])]
-splitTyConApps = catMaybes . fmap splitTyConApp_maybe
-
--- | Check if the given type is a type constructor that is partially applied
---   such that it now is a unary type constructor.
-isGroundUnaryTyCon :: Type -> Bool
-isGroundUnaryTyCon t = case splitTyConApp_maybe t of
-  Just (tc, args) -> tyConArity tc == length args + 1
-  Nothing -> False
 
 -- -----------------------------------------------------------------------------
 -- General utilities
