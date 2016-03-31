@@ -35,14 +35,16 @@ library
                , Control.Supermonad.Plugin.Instance
                , Control.Supermonad.Plugin.Evidence
                , Control.Supermonad.Plugin.Environment
+               , Control.Supermonad.Plugin.Separation
   other-extensions:
-  build-depends:  base         >=4.8 && <5,
-                  safe         >=0.3 && <0.4,
-                  ghc          >=7.9 && <7.12,
-                  containers   >=0.5 && <0.6,
-                  mtl          >=2.2 && <3,
-                  transformers >=0.4 && <0.6
-                  -- ^ Should match mtl dependency
+  build-depends: base         >=4.8 && <5
+               , safe         >=0.3 && <0.4
+               , ghc          >=7.9 && <7.12
+               , containers   >=0.5 && <0.6
+               , mtl          >=2.2 && <3
+               , transformers >=0.4 && <0.6
+               -- ^ Should match mtl dependency
+               , fgl >= 5.5 && <6.0
   hs-source-dirs:      src
   default-language:    Haskell2010
   ghc-options:         -Wall -dynamic -dcore-lint
