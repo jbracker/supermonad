@@ -36,6 +36,7 @@ library
                , Control.Supermonad.Plugin.Evidence
                , Control.Supermonad.Plugin.Environment
                , Control.Supermonad.Plugin.Separation
+               , Control.Supermonad.Plugin.Solving
   other-extensions:
   build-depends: base         >=4.8 && <5
                , safe         >=0.3 && <0.4
