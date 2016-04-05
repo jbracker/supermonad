@@ -3,14 +3,14 @@ module Control.Supermonad.Plugin.Debug
   ( containsAnyOf
   , containsAllOf
   , containsNoneOf
-  , pprToStr
+  , pprToStr, sDocToStr
   , hasEvTermPattern
   ) where
 
 import Data.List ( isInfixOf )
 
 import Outputable
-  ( Outputable(..)
+  ( Outputable(..), SDoc
   , showSDocUnsafe )
 import Coercion ( Coercion(..) )
 import TcEvidence 
@@ -19,7 +19,10 @@ import TcEvidence
 
 -- | Convert some generic outputable to a string (Unsafe).
 pprToStr :: Outputable o => o -> String
-pprToStr = showSDocUnsafe . ppr
+pprToStr = sDocToStr . ppr
+
+sDocToStr :: SDoc -> String
+sDocToStr = showSDocUnsafe
 
 containsAnyOf :: (Outputable o) => o -> [String] -> Bool
 containsAnyOf obj = any (`isInfixOf` pprToStr obj)
