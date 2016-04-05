@@ -9,6 +9,7 @@ module Control.Supermonad.Plugin.Log
   , printTrace, printObjTrace, trace
   -- * Debugging and priniting from within TcPluginM
   , printObj, printMsg, printErr
+  , pluginAssert
   ) where
 
 import Data.List ( groupBy, intercalate )
@@ -20,14 +21,15 @@ import SrcLoc
   , srcSpanFileName_maybe
   , srcSpanStartLine, srcSpanEndLine
   , srcSpanStartCol, srcSpanEndCol )
-import Outputable ( Outputable )
+import Outputable ( Outputable, SDoc )
 import FastString ( unpackFS )
 import TcRnTypes
   ( Ct(..), CtFlavour(..)--, CtLoc(..)
   , ctFlavour, ctPred )
-import TcPluginM ( TcPluginM, tcPluginIO )
+import TcPluginM ( TcPluginM, tcPluginIO, unsafeTcPluginTcM )
+import IOEnv ( failWithM )
 
-import Control.Supermonad.Plugin.Debug ( pprToStr )
+import Control.Supermonad.Plugin.Debug ( pprToStr, sDocToStr )
 import Control.Supermonad.Plugin.Utils ( removeDup )
 import Control.Supermonad.Plugin.Constraint ( constraintSourceLocation )
 
@@ -37,7 +39,7 @@ prefixMsg prefix = unlines . fmap (prefix ++) . lines
 
 -- | Message prefix of the polymonad plugin.
 pluginMsgPrefix :: String
-pluginMsgPrefix = "[PM]"
+pluginMsgPrefix = "[SM]"
 
 -- | Prefix a message with the error prefix.
 pmErrMsg :: String -> String
@@ -148,3 +150,14 @@ printErr = internalPrint . pmErrMsg
 -- | Print an object using the polymonad plugin formatting.
 printObj :: Outputable o => o -> TcPluginM ()
 printObj = internalPrint . pmObjMsg . pprToStr
+
+-- | If the given condition is false this will fail the compiler with the given error message.
+pluginAssert :: Bool -> SDoc -> TcPluginM ()
+pluginAssert True _ = return ()
+pluginAssert False msg = do
+  printMsg $ sDocToStr msg
+  unsafeTcPluginTcM $ failWithM (sDocToStr msg)
+
+
+
+
