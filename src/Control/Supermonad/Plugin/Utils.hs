@@ -192,20 +192,15 @@ getTyConWithArgKinds t = case getTyVar_maybe tcTy of
     Nothing -> error "getTyConWithArity: Type does not contain a type constructor or variable."
   where (tcTy, _args) = splitAppTys t
 
--- | Applies the given type constructor or type constructor variable to enough
---   correctly kinded variables to make it a partially applied unary type
---   constructor. The partially applied unary type constructor is returned
---   together with the variables that were applied to it.
---
---   Will return 'Nothing' if there are to few kind arguments. It's supposed to be
---   used in conjunction with the first part of 'getCurrentPolymonad'.
-applyTyCon :: (Either TyCon TyVar, [Kind]) -> TcPluginM (Maybe (Type, [TyVar]))
-applyTyCon (_    , []) = return Nothing
+-- | Applies the given type constructor or type constructor variable to 
+--   new correctly kinded variables to make it a (partially) applied type. 
+--   The (partially) applied type is returned together with the variables 
+--   that were applied to the type constructor.
+applyTyCon :: (Either TyCon TyVar, [Kind]) -> TcPluginM (Type, [TyVar])
 applyTyCon (eTcTv, ks) = do
-  let ks' = init ks
-  tyVarArgs <- forM ks' newFlexiTyVar
+  tyVarArgs <- forM ks newFlexiTyVar
   let t = either mkTyConTy mkTyVarTy eTcTv
-  return $ Just (mkAppTys t $ fmap mkTyVarTy tyVarArgs, tyVarArgs)
+  return $ (mkAppTys t $ fmap mkTyVarTy tyVarArgs, tyVarArgs)
 
 -- | Takes a list of keys and all of their possible values and returns a list
 --   of all possible associations between keys and values
