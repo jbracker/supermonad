@@ -37,9 +37,10 @@ import CoAxiom ( Role(..) )
 import InstEnv
   ( ClsInst(..)
   , instanceSig
+  , lookupInstEnv
   , lookupUniqueInstEnv )
 import Unify ( tcUnifyTys )
-import TcRnTypes ( isGivenCt, ctPred, ctEvidence, ctEvTerm )
+import TcRnTypes ( Ct, isGivenCt, ctPred, ctEvidence, ctEvTerm )
 import TcType ( isAmbiguousTyVar )
 import TcEvidence ( EvTerm(..), TcCoercion(..) )
 import TcPluginM
@@ -49,7 +50,9 @@ import FamInstEnv ( normaliseType )
 import Outputable ( ($$), SDoc )
 import qualified Outputable as O
 
-import Control.Supermonad.Plugin.Constraint ( GivenCt, constraintClassTyArgs )
+import Control.Supermonad.Plugin.Constraint 
+  ( GivenCt
+  , constraintClassTyArgs, constraintClassType )
 import Control.Supermonad.Plugin.Log ( pluginAssert )
 import Control.Supermonad.Plugin.Utils
   ( fromLeft, fromRight
@@ -305,13 +308,12 @@ isPotentiallyInstantiatedCtType givenCts (ctCls, ctArgs) assocs = do
   -- Substitute variables in the constraint arguments with the type constructors.
   let ctSubstArgs = substTys ctSubst ctArgs
       
-  -- Calculate set of ambiguous and generated type variables in constraints
-  let ctSubstArgVars = S.unions $ fmap collectTyVars ctSubstArgs
+  -- Calculate set of generated type variables in constraints
   let ctGenVars = S.unions $ fmap (\(tv, tcTy, vars) -> S.fromList vars) appliedAssocs
   
   -- If there are no ambiguous or generated type variables in the substituted arguments of our constraint
   -- we can simply check if there is evidence.
-  if not (containsGivenOrAmbiguousTyVar ctGenVars ctSubstArgVars)
+  if all (not . containsGivenOrAmbiguousTyVar ctGenVars) ctSubstArgs
     then do 
       --  :: [GivenCt] -> Type -> TcPluginM (Either SDoc EvTerm)
       eEv <- produceEvidenceForCt givenCts $ mkAppTys (mkTyConTy $ classTyCon ctCls) ctSubstArgs 
@@ -351,7 +353,7 @@ isPotentiallyInstantiatedCtType givenCts (ctCls, ctArgs) assocs = do
   where
     -- Checks if the given type constains any ambiguous variables or if 
     -- it contains any of the given type variables.
-    containsGivenOrAmbiguousTyVar :: [TyVar] -> Type -> Bool
+    containsGivenOrAmbiguousTyVar :: S.Set TyVar -> Type -> Bool
     containsGivenOrAmbiguousTyVar givenTvs ty = 
       let tyVars = collectTyVars ty
       in any isAmbiguousTyVar tyVars || not (S.null (S.intersection givenTvs tyVars))
