@@ -31,6 +31,8 @@ import Control.Supermonad.Plugin.Detect
   ( areBindFunctorArguments, areBindApplyArguments )
 import Control.Supermonad.Plugin.Evidence
   ( produceEvidenceFor, matchInstanceTyVars )
+import Control.Supermonad.Plugin.Solving
+  ( solveConstraints )
 import Control.Supermonad.Plugin.Environment
   ( SupermonadPluginM, runSupermonadPlugin
   , getIdentityTyCon
@@ -91,13 +93,13 @@ supermonadSolve s given derived wanted = do
 -- | The actual plugin code.
 supermonadSolve' :: SupermonadState -> SupermonadPluginM ()
 supermonadSolve' _s = do
-  getWantedConstraints >>= (printConstraints . sortConstraintsByLine)
+  --getWantedConstraints >>= (printConstraints . sortConstraintsByLine)
   
-  whenNoResults processWantedReturnConstraints
+  getWantedConstraints >>= solveConstraints 
   
-  whenNoResults processWantedFunctorBindConstraints
-  
-  whenNoResults processWantedBindConstraintsWithOnlyOneMatchingInstance
+  --whenNoResults processWantedReturnConstraints
+  --whenNoResults processWantedFunctorBindConstraints
+  --whenNoResults processWantedBindConstraintsWithOnlyOneMatchingInstance
   
   -- End of plugin code.
   return ()

@@ -5,6 +5,7 @@
 --   necessary.
 module Control.Supermonad.Plugin.Evidence
   ( matchInstanceTyVars
+  , matchInstanceTyVars'
   , isPotentiallyInstantiatedCt
   , produceEvidenceFor
   ) where
@@ -75,7 +76,7 @@ evaluateType r t = do
 --   If the given arguments match the class arguments, a list with a type for
 --   each free variable in the instance is returned. This list is in the same
 --   order as the list of free variables that can be retrieved from the instance.
---
+--   
 --   This function is meant for use in conjunction with 'isInstanceOf',
 --   'isInstantiatedBy' and 'produceEvidenceFor'.
 --   
@@ -83,13 +84,27 @@ evaluateType r t = do
 --   the given list type arguments would be bound by the instance.
 matchInstanceTyVars :: ClsInst -> [Type] -> Maybe ([Type], [(TyVar, Type)])
 matchInstanceTyVars inst instArgs = do
+  let ambVars = S.toList $ S.filter isAmbiguousTyVar $ S.unions $ fmap collectTyVars instArgs
+  matchInstanceTyVars' ambVars inst instArgs
+
+-- | Trys to see if the given arguments match the class instance
+--   arguments by unification. This only works if the number of arguments
+--   given is equal to the arguments taken by the class the instance is of.
+--   If the given arguments match the class arguments, a list with a type for
+--   each free variable in the instance is returned. This list is in the same
+--   order as the list of free variables that can be retrieved from the instance.
+--   
+--   The first argument gives those variables that should be bound and their substitution 
+--   be returned.
+--   
+--   The second element of the pair shows how each given type variable in 
+--   the list type arguments would be bound by the instance.
+matchInstanceTyVars' :: [TyVar] -> ClsInst -> [Type] -> Maybe ([Type], [(TyVar, Type)])
+matchInstanceTyVars' varsToBind inst instArgs = do
   let (instVars, _cts, _cls, tyArgs) = instanceSig inst
-  -- Old Version:
-  -- let instVarSet = printObjTrace $ mkVarSet instVars
-  -- subst <- printObjTrace $ tcMatchTys instVarSet tyArgs instArgs
-  let (ctVars, ambVars) = partition (not . isAmbiguousTyVar) $ S.toList $ S.unions $ fmap collectTyVars instArgs
-  subst <- tcUnifyTys (skolemVarsBindFun ctVars) tyArgs instArgs
-  return $ (substTy subst . mkTyVarTy <$> instVars, fmap (\v -> (v, substTy subst $ mkTyVarTy v)) ambVars)
+  let constVars = S.toList $ (S.unions $ fmap collectTyVars instArgs) S.\\ (S.fromList varsToBind)
+  subst <- tcUnifyTys (skolemVarsBindFun constVars) tyArgs instArgs
+  return $ (substTy subst . mkTyVarTy <$> instVars, fmap (\v -> (v, substTy subst $ mkTyVarTy v)) varsToBind)
 
 -- | Apply the given instance dictionary to the given type arguments
 --   and try to produce evidence for the application.
