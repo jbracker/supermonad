@@ -21,7 +21,7 @@ module Control.Supermonad.Plugin.Environment
   , processAndRemoveWantedConstraints
   , processEachWantedConstraint
   , whenNoResults
-  , throwPluginError
+  , throwPluginError, catchPluginError
     -- * Debug and Error Output
   , assert, assertM
   , printErr, printMsg, printObj
@@ -35,7 +35,7 @@ import Control.Arrow ( (***) )
 import Control.Monad ( unless, forM, forM_ )
 import Control.Monad.Reader ( ReaderT, runReaderT, asks )
 import Control.Monad.State  ( StateT , runStateT , gets, get, put, modify )
-import Control.Monad.Except ( ExceptT, runExceptT, throwError )
+import Control.Monad.Except ( ExceptT, runExceptT, throwError, catchError )
 import Control.Monad.Trans.Class ( lift )
 
 import Class ( Class )
@@ -70,10 +70,12 @@ import Control.Supermonad.Plugin.Detect
 -- Plugin Monad
 -- -----------------------------------------------------------------------------
 
+type SupermonadError = String
+
 -- | The plugin monad.
 type SupermonadPluginM = ReaderT SupermonadPluginEnv 
                        ( StateT  SupermonadPluginState 
-                       ( ExceptT String TcPluginM
+                       ( ExceptT SupermonadError TcPluginM
                        ) )
 
 -- | The read-only environent of the plugin.
@@ -310,6 +312,10 @@ assertM condM msg = do
 --   This will abort all further actions.
 throwPluginError :: String -> SupermonadPluginM a
 throwPluginError = throwError
+
+-- | Catch an error that was thrown by the plugin.
+catchPluginError :: SupermonadPluginM a -> (SupermonadError -> SupermonadPluginM a) -> SupermonadPluginM a
+catchPluginError = catchError
 
 -- | Print some generic outputable object from the plugin (Unsafe).
 printObj :: Outputable o => o -> SupermonadPluginM ()
