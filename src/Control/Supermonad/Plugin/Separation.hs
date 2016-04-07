@@ -28,19 +28,19 @@ type SCNode = LNode WantedCt
 
 -- | Collect all top-level type constructors for the given list of 
 --   wanted constraints. See 'collectTopTyCons'.
-componentTopTyCons :: [WantedCt] -> [TyCon]
+componentTopTyCons :: [WantedCt] -> S.Set TyCon
 componentTopTyCons = collect collectTopTyCons
 
 -- | Collect all top-level type constructors variables for the given list of 
 --   wanted constraints. See 'collectTopTyCons'.
-componentTopTcVars :: [WantedCt] -> [TyVar]
+componentTopTcVars :: [WantedCt] -> S.Set TyVar
 componentTopTcVars = collect collectTopTcVars
 
 -- | Utility function that applies the given collection functions to all
 --   type arguments of the given constraints and returns a list of the
 --   collected results. Duplicates are removed from the result list.
-collect :: (Ord a) => ([Type] -> S.Set a) -> [Ct] -> [a]
-collect f cts = S.toList $ S.unions $ fmap collectLocal cts
+collect :: (Ord a) => ([Type] -> S.Set a) -> [Ct] -> S.Set a
+collect f cts = S.unions $ fmap collectLocal cts
   where 
     -- collectLocal :: WantedCt -> S.Set a
     collectLocal ct = maybe S.empty id 

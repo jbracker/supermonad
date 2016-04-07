@@ -62,6 +62,9 @@ import Control.Supermonad.Plugin.Utils
   , splitKindFunTyConTyVar
   , allM
   , skolemVarsBindFun )
+import qualified Control.Supermonad.Plugin.Log as L
+import qualified Control.Supermonad.Plugin.Debug as D
+
 
 
 -- | Try to evaluate the given type as far as possible by evaluating contained
@@ -323,7 +326,6 @@ isPotentiallyInstantiatedCtType givenCts (ctCls, ctArgs) assocs = do
   let ctSubst = mkTopTvSubst $ fmap (\(tv, t, _) -> (tv, t)) appliedAssocs
   -- Substitute variables in the constraint arguments with the type constructors.
   let ctSubstArgs = substTys ctSubst ctArgs
-      
   -- Calculate set of generated type variables in constraints
   let ctGenVars = S.unions $ fmap (\(tv, tcTy, vars) -> S.fromList vars) appliedAssocs
   
@@ -331,10 +333,13 @@ isPotentiallyInstantiatedCtType givenCts (ctCls, ctArgs) assocs = do
   -- we can simply check if there is evidence.
   if all (not . containsGivenOrAmbiguousTyVar ctGenVars) ctSubstArgs
     then do 
+      L.printMsg $ "Produce Evidence"
       --  :: [GivenCt] -> Type -> TcPluginM (Either SDoc EvTerm)
-      eEv <- produceEvidenceForCt givenCts $ mkAppTys (mkTyConTy $ classTyCon ctCls) ctSubstArgs 
+      eEv <- produceEvidenceForCt givenCts $ mkAppTys (mkTyConTy $ classTyCon ctCls) ctSubstArgs
+      either (L.printMsg . D.sDocToStr) (const $ return ()) eEv
       return $ either (const False) (const True) eEv
     else do
+      L.printMsg $ "Approx Evidence"
       instEnvs <- getInstEnvs
       let (instMatches, unificationMatches, _) = lookupInstEnv instEnvs ctCls ctSubstArgs
       -- FIXME: for now we only accept our constraint as potentially 

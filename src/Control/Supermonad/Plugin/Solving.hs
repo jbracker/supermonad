@@ -7,7 +7,7 @@ import Data.Maybe ( catMaybes, fromJust )
 import Data.List ( partition )
 import qualified Data.Set as S
 
-import Control.Monad ( when, forM, forM_ )
+import Control.Monad ( when, forM, forM_, filterM )
 
 import TcRnTypes ( Ct )
 import TyCon ( TyCon, tyConKind )
@@ -151,6 +151,37 @@ solveConstraints wantedCts = do
             printObj tyArgs
       -}
 
+-- | Only keep supermonad constraints ('Bind' and 'Return').
+filterSupermonadCts :: [Ct] -> SupermonadPluginM [Ct]
+filterSupermonadCts cts = do
+  returnCls <- getReturnClass
+  bindCls <- getBindClass
+  return $ filter (\ct -> isClassConstraint returnCls ct || isClassConstraint bindCls ct) cts
+
+filterSupermonadCtsWith :: [Ct] -> S.Set (Either TyCon TyVar) -> SupermonadPluginM [Ct]
+filterSupermonadCtsWith allCts baseTyCons = do
+  cts <- filterSupermonadCts allCts
+  filterM predicate cts
+  where 
+    predicate :: Ct -> SupermonadPluginM Bool
+    predicate ct = do
+      ctBase <- getTyConBaseFrom [ct]
+      return $ not $ S.null $ S.intersection ctBase baseTyCons
+
+-- | Calculate the type constructor base for the given constraint.
+getTyConBaseFrom :: [Ct] -> SupermonadPluginM (S.Set (Either TyCon TyVar))
+getTyConBaseFrom cts = do
+  checkedCts <- filterSupermonadCts cts
+  let baseTvs :: S.Set (Either TyCon TyVar)
+      baseTvs = S.map Right $ S.filter (not . isAmbiguousTyVar) $ componentTopTcVars checkedCts
+  let baseTcs :: S.Set (Either TyCon TyVar)
+      baseTcs = S.map Left $ componentTopTyCons checkedCts
+  return $ S.union baseTvs baseTcs
+
+getTyConVarsFrom :: [Ct] -> SupermonadPluginM (S.Set TyVar)
+getTyConVarsFrom cts = do
+  checkedCts <- filterSupermonadCts cts
+  return $ S.filter isAmbiguousTyVar $ componentTopTcVars checkedCts
 
 solveConstraintGroup :: [WantedCt] -> SupermonadPluginM ([WantedCt], [(TyVar, Either TyCon TyVar)])
 solveConstraintGroup [] = throwPluginError "Solving received an empty constraint group!"
@@ -158,11 +189,26 @@ solveConstraintGroup ctGroup = do
   -- Get the all of the given constraints.
   givenCts <- getGivenConstraints
   
-  let (tyConVars, tyConBaseVars) = partition isAmbiguousTyVar $ componentTopTcVars ctGroup :: ([TyVar], [TyVar])
+  smCtGroup <- filterSupermonadCts ctGroup
+  
+  -- Collect the ambiguous variables that require solving withing this 
+  -- group of constraints.
+  -- :: [TyVar]
+  tyConVars <- S.toList <$> getTyConVarsFrom smCtGroup
+  
+  -- Calculate the type constructor base used for solving. That means
+  -- calculate the set of supermonad type constructors that are involved 
+  -- with this group of constraints.
+  -- :: S.Set (Either TyCon TyVar)
+  wantedTyConBase <- getTyConBaseFrom smCtGroup
+  -- :: S.Set (Either TyCon TyVar)
+  givenTyConBase <- getTyConBaseFrom =<< filterSupermonadCtsWith givenCts wantedTyConBase
   
   let tyConBase :: [Either TyCon TyVar]
-      tyConBase = fmap Left (componentTopTyCons ctGroup) ++ fmap Right tyConBaseVars
+      tyConBase = S.toList $ S.union wantedTyConBase givenTyConBase
   
+  -- All possible associations of ambiguous variables with their possible 
+  -- type constructors from the base.
   let assocs :: [[(TyVar, Either TyCon TyVar)]]
       assocs = associations $ fmap (\tv -> (tv, tyConBase)) tyConVars
   
@@ -172,6 +218,11 @@ solveConstraintGroup ctGroup = do
            ++ "Vars = " ++ show (length tyConVars) ++ "; "
            ++ "Base Size = " ++ show (length tyConBase) ++ "; "
            ++ "Associations = " ++ show (length assocs) ++ ";"
+  printMsg "Base:"
+  printObj tyConBase
+  when (length assocs <= 5) $ do
+    printMsg "Assocs:"
+    forM_ assocs printObj
   
   -- For each association check if all constraints are potentially instantiable 
   -- with that association.

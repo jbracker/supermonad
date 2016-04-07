@@ -93,7 +93,8 @@ supermonadSolve s given derived wanted = do
 -- | The actual plugin code.
 supermonadSolve' :: SupermonadState -> SupermonadPluginM ()
 supermonadSolve' _s = do
-  --getWantedConstraints >>= (printConstraints . sortConstraintsByLine)
+  getWantedConstraints >>= (printConstraints . sortConstraintsByLine)
+  getGivenConstraints >>= (printConstraints . sortConstraintsByLine)
   
   getWantedConstraints >>= solveConstraints 
   
