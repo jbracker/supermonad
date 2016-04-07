@@ -15,6 +15,7 @@ module Control.Supermonad.Plugin.Utils (
   , isAmbiguousType
   , getTyConWithArgKinds
   , applyTyCon
+  , splitKindFunTyConTyVar
   , atIndex
   , associations
   , subsets
@@ -203,6 +204,14 @@ applyTyCon (eTcTv, ks) = do
   tyVarArgs <- forM ks newFlexiTyVar
   let t = either mkTyConTy mkTyVarTy eTcTv
   return $ (mkAppTys t $ fmap mkTyVarTy tyVarArgs, tyVarArgs)
+
+-- | Retrieves the kind of the given type constructor or variables
+--   and splits it into its arguments and result. If the kind is not 
+--   a function kind then the arguments will be empty.
+splitKindFunTyConTyVar :: Either TyCon TyVar -> ([Kind], Kind)
+splitKindFunTyConTyVar tc = case tc of 
+  Left tc -> splitKindFunTys $ tyConKind tc
+  Right tc -> splitKindFunTys $ tyVarKind tc
 
 -- | Takes a list of keys and all of their possible values and returns a list
 --   of all possible associations between keys and values
