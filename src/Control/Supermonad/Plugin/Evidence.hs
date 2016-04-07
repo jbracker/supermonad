@@ -59,6 +59,7 @@ import Control.Supermonad.Plugin.Utils
   ( fromLeft, fromRight
   , collectTyVars
   , applyTyCon
+  , splitKindFunTyConTyVar
   , allM
   , skolemVarsBindFun )
 
@@ -292,7 +293,7 @@ produceEvidenceForCt givenCts ct =
 --   
 --   Note: This function only handle class constraints. It will always deliver 
 --   'False' when another constraint type is given.
-isPotentiallyInstantiatedCt :: [GivenCt] -> Ct -> [(TyVar, TyCon)] -> TcPluginM Bool
+isPotentiallyInstantiatedCt :: [GivenCt] -> Ct -> [(TyVar, Either TyCon TyVar)] -> TcPluginM Bool
 isPotentiallyInstantiatedCt givenCts ct assocs = 
   case constraintClassType ct of
     -- If we have a class constraint...
@@ -300,13 +301,13 @@ isPotentiallyInstantiatedCt givenCts ct assocs =
     Nothing -> return False
 
 -- | Utility helper for 'isPotentiallyInstantiatedCt' that checks class constraints.
-isPotentiallyInstantiatedCtType :: [GivenCt] -> (Class, [Type]) -> [(TyVar, TyCon)] -> TcPluginM Bool
+isPotentiallyInstantiatedCtType :: [GivenCt] -> (Class, [Type]) -> [(TyVar, Either TyCon TyVar)] -> TcPluginM Bool
 isPotentiallyInstantiatedCtType givenCts (ctCls, ctArgs) assocs = do
   -- Get the type constructors partially applied to some new variables as
   -- is necessary.
   appliedAssocs <- forM assocs $ \(tv, tc) -> do
     let (tvKindArgs, tvKindRes) = splitKindFunTys $ tyVarKind tv
-    let (tcKindArgs, tcKindRes) = splitKindFunTys $ tyConKind tc
+    let (tcKindArgs, tcKindRes) = splitKindFunTyConTyVar tc
     pluginAssert (length tcKindArgs >= length tvKindArgs) 
            $ O.text "Kind mismatch between type constructor and type variable: " 
            $$ O.ppr tcKindArgs $$ O.text " | " $$ O.ppr tvKindArgs
@@ -315,7 +316,7 @@ isPotentiallyInstantiatedCtType givenCts (ctCls, ctArgs) assocs = do
            $$ O.ppr tc $$ O.text " | " $$ O.ppr tv
     -- Apply as many new type variables to the type constructor as are 
     -- necessary for its kind to match that of the type variable.
-    (appliedTcTy, argVars) <- applyTyCon (Left tc, take (length tcKindArgs - length tvKindArgs) tcKindArgs)
+    (appliedTcTy, argVars) <- applyTyCon (tc, take (length tcKindArgs - length tvKindArgs) tcKindArgs)
     return ((tv, appliedTcTy, argVars) :: (TyVar, Type, [TyVar]))
   
   -- Create the substitution for the given associations.

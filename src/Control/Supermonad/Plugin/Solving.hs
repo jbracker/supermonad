@@ -4,6 +4,7 @@ module Control.Supermonad.Plugin.Solving
   ) where
 
 import Data.Maybe ( catMaybes, fromJust )
+import Data.List ( partition )
 import qualified Data.Set as S
 
 import Control.Monad ( when, forM, forM_ )
@@ -16,6 +17,7 @@ import Type
   , substTys )
 import Var ( tyVarKind )
 import TcPluginM ( TcPluginM )
+import TcType ( isAmbiguousTyVar )
 import Class ( Class )
 import Kind ( splitKindFunTys ) 
 import InstEnv ( lookupInstEnv, instanceSig )
@@ -45,7 +47,10 @@ import Control.Supermonad.Plugin.Evidence
   ( isPotentiallyInstantiatedCt
   , matchInstanceTyVars' )
 import Control.Supermonad.Plugin.Utils 
-  ( collectTyVars, applyTyCon, associations, allM )
+  ( collectTyVars
+  , applyTyCon
+  , splitKindFunTyConTyVar
+  , associations, allM )
 
 solveConstraints :: [WantedCt] -> SupermonadPluginM ()
 solveConstraints wantedCts = do
@@ -71,7 +76,7 @@ solveConstraints wantedCts = do
   appliedSolvedGroups <- forM solvedGroups $ \(ctGroup, assoc) -> do
     appliedAssoc <- forM assoc $ \(tv, tc) -> do
       let (tvKindArgs, tvKindRes) = splitKindFunTys $ tyVarKind tv
-      let (tcKindArgs, tcKindRes) = splitKindFunTys $ tyConKind tc
+      let (tcKindArgs, tcKindRes) = splitKindFunTyConTyVar tc
       assertM (return $ length tcKindArgs >= length tvKindArgs) 
               $ sDocToStr
               $ O.text "solveConstraints: Kind mismatch between type constructor and type variable: " 
@@ -82,7 +87,7 @@ solveConstraints wantedCts = do
               $$ O.ppr tc $$ O.text " | " $$ O.ppr tv
       -- Apply as many new type variables to the type constructor as are 
       -- necessary for its kind to match that of the type variable.
-      (appliedTcTy, argVars) <- runTcPlugin $ applyTyCon (Left tc, take (length tcKindArgs - length tvKindArgs) tcKindArgs)
+      (appliedTcTy, argVars) <- runTcPlugin $ applyTyCon (tc, take (length tcKindArgs - length tvKindArgs) tcKindArgs)
       return ((tv, appliedTcTy, argVars) :: (TyVar, Type, [TyVar]))
     return (ctGroup, appliedAssoc)
   
@@ -147,20 +152,18 @@ solveConstraints wantedCts = do
       -}
 
 
-solveConstraintGroup :: [WantedCt] -> SupermonadPluginM ([WantedCt], [(TyVar, TyCon)])
+solveConstraintGroup :: [WantedCt] -> SupermonadPluginM ([WantedCt], [(TyVar, Either TyCon TyVar)])
 solveConstraintGroup [] = throwPluginError "Solving received an empty constraint group!"
 solveConstraintGroup ctGroup = do
   -- Get the all of the given constraints.
   givenCts <- getGivenConstraints
   
-  let tyConVars :: [TyVar]
-      tyConVars = componentTopTcVars ctGroup
+  let (tyConVars, tyConBaseVars) = partition isAmbiguousTyVar $ componentTopTcVars ctGroup :: ([TyVar], [TyVar])
   
-  let tyConBase :: [TyCon]
-      tyConBase = componentTopTyCons ctGroup
-      -- TODO / FIXME: Also collect type variables that are in given constraints.
+  let tyConBase :: [Either TyCon TyVar]
+      tyConBase = fmap Left (componentTopTyCons ctGroup) ++ fmap Right tyConBaseVars
   
-  let assocs :: [[(TyVar, TyCon)]]
+  let assocs :: [[(TyVar, Either TyCon TyVar)]]
       assocs = associations $ fmap (\tv -> (tv, tyConBase)) tyConVars
   
   -- Debugging output
