@@ -98,11 +98,9 @@ collectTopTcVarsWithArity tys = S.fromList $ catMaybes $ fmap getTyVarAndArity t
   where
     getTyVarAndArity :: Type -> Maybe (TyVar, Arity)
     getTyVarAndArity t = do
-      let (tf, args) = splitAppTys t
+      let (tf, _args) = splitAppTys t
       tv <- getTyVar_maybe tf
-      if idArity tv /= length args 
-         then error "Arity Mismatch!" else 
-         return (tv, length args)
+      return (tv, tyVarArity tv)
 
 -- | Try to collect all type variables in a given expression.
 --   Does not work for Pi or ForAll types.
@@ -152,6 +150,10 @@ eqTyVar' :: TyVar -> Type -> Bool
 eqTyVar' tv ty = case getTyVar_maybe ty of
   Just tv' -> tv == tv'
   Nothing  -> False
+
+-- | Returns the arity of a given type variable.
+tyVarArity :: TyVar -> Arity
+tyVarArity = length . fst . splitKindFunTys . tyVarKind
 
 -- | Checks if the given type constructors equals the given type.
 -- TODO: Test!
