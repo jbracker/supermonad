@@ -15,6 +15,7 @@ module Control.Supermonad.Plugin.Constraint
   , constraintClassType
   , constraintClassTyArgs
   , constraintClassTyCon
+  , constraintPredicateType
   , constraintTyCons
   , constraintTcVars
   , constraintLocation
@@ -131,6 +132,10 @@ constraintTcVars ct = maybe S.empty collectTopTcVars $ constraintClassTyArgs ct
 -- | Retrieve the source location the given constraint originated from.
 constraintLocation :: Ct -> CtLoc
 constraintLocation ct = ctev_loc $ cc_ev ct
+
+-- | Retrieves the type that represents the constraint.
+constraintPredicateType :: Ct -> Type
+constraintPredicateType ct = ctev_pred $ cc_ev ct
 
 -- | Returns the source code location of the given constraint.
 constraintSourceLocation :: Ct -> SrcSpan
