@@ -8,6 +8,7 @@ module Control.Supermonad.Plugin.Evidence
   , matchInstanceTyVars'
   , isPotentiallyInstantiatedCt
   , produceEvidenceFor
+  , produceEvidenceForCt
   ) where
 
 import Data.Either ( isLeft )
@@ -53,7 +54,8 @@ import qualified Outputable as O
 
 import Control.Supermonad.Plugin.Constraint 
   ( GivenCt
-  , constraintClassTyArgs, constraintClassType )
+  , constraintClassTyArgs, constraintClassType
+  , constraintPredicateType )
 import Control.Supermonad.Plugin.Log ( pluginAssert )
 import Control.Supermonad.Plugin.Utils
   ( fromLeft, fromRight
@@ -102,7 +104,7 @@ matchInstanceTyVars inst instArgs = do
 --   be returned.
 --   
 --   The second element of the pair shows how each given type variable in 
---   the list type arguments would be bound by the instance.
+--   the list type argumproduceEvidenceForCtents would be bound by the instance.
 matchInstanceTyVars' :: [TyVar] -> ClsInst -> [Type] -> Maybe ([Type], [(TyVar, Type)])
 matchInstanceTyVars' varsToBind inst instArgs = do
   let (instVars, _cts, _cls, tyArgs) = instanceSig inst
@@ -135,7 +137,7 @@ produceEvidenceFor givenCts inst instArgs = do
   let varSubst = mkTopTvSubst $ zip tyVars instArgs
   -- Now go over each constraint and find a suitable instance and evidence.
   -- Don't forget to substitute all variables for their actual values,
-  ctEvTerms <- forM (substTys varSubst instCts) $ produceEvidenceForCt givenCts
+  ctEvTerms <- forM (substTys varSubst instCts) $ produceEvidenceForCtType givenCts
   -- If we found a good instance and evidence for every constraint,
   -- we can create the evidence for this instance.
   return $ if any isLeft ctEvTerms
@@ -146,13 +148,19 @@ produceEvidenceFor givenCts inst instArgs = do
       $$ O.vcat (fromLeft <$> filter isLeft ctEvTerms)
     else Right $ EvDFunApp (is_dfun inst) instArgs (fromRight <$> ctEvTerms)
 
-produceEvidenceForCt :: [GivenCt] -> Type -> TcPluginM (Either SDoc EvTerm)
-produceEvidenceForCt givenCts ct =
+-- | Try to find evidence that proves the given constraint.
+produceEvidenceForCt :: [GivenCt] -> Ct -> TcPluginM (Either SDoc EvTerm)
+produceEvidenceForCt givenCts ct = produceEvidenceForCtType givenCts $ constraintPredicateType ct
+
+
+
+produceEvidenceForCtType :: [GivenCt] -> Type -> TcPluginM (Either SDoc EvTerm)
+produceEvidenceForCtType givenCts ct =
   case splitTyConApp_maybe ct of
     -- Do we have a tuple of constraints?
     Just (tc, tcArgs) | isTupleTyCon tc -> do
       -- Produce evidence for each element of the tuple
-      tupleEvs <- mapM (produceEvidenceForCt checkedGivenCts) tcArgs
+      tupleEvs <- mapM (produceEvidenceForCtType checkedGivenCts) tcArgs
       return $ if any isLeft tupleEvs
         then Left
           $ O.text "Can't find evidence for this tuple constraint:"
@@ -166,7 +174,7 @@ produceEvidenceForCt givenCts ct =
       -- Evaluate it...
       (coer, evalCt) <- evaluateType Representational ct
       -- Produce evidence for the evaluated term
-      eEvEvalCt <- produceEvidenceForCt checkedGivenCts evalCt
+      eEvEvalCt <- produceEvidenceForCtType checkedGivenCts evalCt
       -- Add the appropriate cast to the produced evidence
       return $ (\ev -> EvCast ev (TcSymCo $ TcCoercion coer)) <$> eEvEvalCt
     -- Do we have a type equality constraint?
@@ -335,7 +343,7 @@ isPotentiallyInstantiatedCtType givenCts (ctCls, ctArgs) assocs = do
     then do 
       L.printMsg $ "Produce Evidence"
       --  :: [GivenCt] -> Type -> TcPluginM (Either SDoc EvTerm)
-      eEv <- produceEvidenceForCt givenCts $ mkAppTys (mkTyConTy $ classTyCon ctCls) ctSubstArgs
+      eEv <- produceEvidenceForCtType givenCts $ mkAppTys (mkTyConTy $ classTyCon ctCls) ctSubstArgs
       either (L.printMsg . D.sDocToStr) (const $ return ()) eEv
       return $ either (const False) (const True) eEv
     else do
@@ -361,7 +369,7 @@ isPotentiallyInstantiatedCtType givenCts (ctCls, ctArgs) assocs = do
                     -- ambiguous type variable, which means we can actually 
                     -- check its satisfiability.
                     then do
-                      eEv <- produceEvidenceForCt givenCts substCtTy 
+                      eEv <- produceEvidenceForCtType givenCts substCtTy 
                       return $ either (const False) (const True) eEv
                     -- The implied constraint contains generated or ambiguous
                     -- type variables, which means we can't check it, but it
