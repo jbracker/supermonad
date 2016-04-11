@@ -93,6 +93,7 @@ supermonadSolve s given derived wanted = do
 -- | The actual plugin code.
 supermonadSolve' :: SupermonadState -> SupermonadPluginM ()
 supermonadSolve' _s = do
+  
   getWantedConstraints >>= (printConstraints . sortConstraintsByLine)
   getGivenConstraints >>= (printConstraints . sortConstraintsByLine)
   
@@ -132,13 +133,15 @@ processWantedFunctorBindConstraints :: SupermonadPluginM ()
 processWantedFunctorBindConstraints = do
   
   processAndRemoveWantedConstraints (isBindConstraintWith areBindFunctorArguments) $ \bindCt -> do
-    let Just [t, _, _] = constraintClassTyArgs bindCt
+    let Just [_, _, t] = constraintClassTyArgs bindCt
     if isAmbiguousType t then do
       return ([], [])
     else do
+      bindCls <- getBindClass
+      instApply <- getBindApplyInstance
       instFunctor <- getBindFunctorInstance
       givenCts <- getGivenConstraints
-      eEvidence <- runTcPlugin $ produceEvidenceFor givenCts instFunctor [t]
+      eEvidence <- runTcPlugin $ produceEvidenceFor bindCls instFunctor instApply givenCts instFunctor [t]
       -- This assumes that the functor instance has the following head 
       -- "(Functor m) => Bind m Identity m" and therefore there is only one variable.
       -- produceEvidenceFor :: [GivenCt] -> ClsInst -> [Type] -> TcPluginM (Either SDoc EvTerm)
@@ -151,13 +154,15 @@ processWantedFunctorBindConstraints = do
           return ([], [])
   
   processAndRemoveWantedConstraints (isBindConstraintWith areBindApplyArguments) $ \bindCt -> do
-    let Just [t, _, _] = constraintClassTyArgs bindCt
+    let Just [_, _, t] = constraintClassTyArgs bindCt
     if isAmbiguousType t then do
       return ([], [])
     else do
+      bindCls <- getBindClass
       instApply <- getBindApplyInstance
+      instFunctor <- getBindFunctorInstance
       givenCts <- getGivenConstraints
-      eEvidence <- runTcPlugin $ produceEvidenceFor givenCts instApply [t]
+      eEvidence <- runTcPlugin $ produceEvidenceFor bindCls instFunctor instApply givenCts instApply [t]
       -- This assumes that the functor instance has the following head 
       -- "(Functor m) => Bind Identity m m" and therefore there is only one variable.
       -- produceEvidenceFor :: [GivenCt] -> ClsInst -> [Type] -> TcPluginM (Either SDoc EvTerm)
@@ -193,8 +198,11 @@ selectOnlyMatchingBindInstance wantedCt =
       mFoundInstEvs <- forM bindInsts $ \bindInst -> 
         case matchInstanceTyVars bindInst tyArgs of
           Just (instVariableArgs, ambEqs) -> do
+            bindCls <- getBindClass
+            instFunctor <- getBindFunctorInstance
+            instApply <- getBindApplyInstance
             givenCts <- getGivenConstraints
-            eResult <- runTcPlugin $ produceEvidenceFor givenCts bindInst instVariableArgs -- TcPluginM (Either SDoc EvTerm)
+            eResult <- runTcPlugin $ produceEvidenceFor bindCls instFunctor instApply givenCts bindInst instVariableArgs -- TcPluginM (Either SDoc EvTerm)
             -- mkDerivedTypeEqCt :: Ct -> TyVar -> Type -> Ct
             return $ case eResult of
               Left _err -> Nothing

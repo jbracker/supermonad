@@ -31,6 +31,7 @@ import Control.Supermonad.Plugin.Environment
   , getInstEnvs
   , getReturnClass, getBindClass
   , getIdentityTyCon
+  , getBindFunctorInstance, getBindApplyInstance
   , addDerivedResult, addEvidenceResult
   , runTcPlugin
   , printMsg, printConstraints, printObj
@@ -90,15 +91,19 @@ solveConstraints wantedCts = do
       return ((tv, appliedTcTy, argVars) :: (TyVar, Type, [TyVar]))
     return (ctGroup, appliedAssocs)
   
-  -- Get the given constraints in case we need to produce evidence.
+  -- Get everyting we need to produce evidence for constraints.
   givenCts <- getGivenConstraints
+  bindCls <- getBindClass
+  functorInst <- getBindFunctorInstance
+  applyInst <- getBindApplyInstance
+  let produceEvidence = runTcPlugin . produceEvidenceForCt bindCls functorInst applyInst givenCts
   
   -- For each group, try to produde evidence for each involved constraint.
   forM_ appliedSolvedGroups $ \(ctGroup, appliedAssocs) -> do
     -- Look through the group and see if we can find constraints that do not 
     -- contain ambiguous variables and try to produce evidence for them.
     clearedCtGroup <- fmap catMaybes $ forM ctGroup $ \ct -> do
-      eEv <- runTcPlugin $ produceEvidenceForCt givenCts ct -- :: [GivenCt] -> Ct -> TcPluginM (Either SDoc EvTerm)
+      eEv <- produceEvidence ct
       case eEv of
         Left _err -> return $ Just ct
         Right ev -> do
@@ -264,11 +269,15 @@ determineValidConstraintGroupAssocs ctGroup = do
   printMsg "Given Cts:"
   printConstraints givenCts
   
+  bindCls <- getBindClass
+  instFunctor <- getBindFunctorInstance
+  instApply <- getBindApplyInstance
+  
   -- For each association check if all constraints are potentially instantiable 
   -- with that association.
   checkedAssocs <- forM assocs $ \assoc -> do
     -- isPotentiallyInstantiatedCt :: [GivenCt] -> Ct -> [(TyVar, TyCon)] -> TcPluginM Bool
-    validAssoc <- allM (\ct -> runTcPlugin $ isPotentiallyInstantiatedCt givenCts ct assoc) ctGroup
+    validAssoc <- allM (\ct -> runTcPlugin $ isPotentiallyInstantiatedCt bindCls instFunctor instApply givenCts ct assoc) ctGroup
     return (assoc, validAssoc)
   
   -- Only keep those associations that could be satisfiable. 
