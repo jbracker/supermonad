@@ -30,7 +30,8 @@ import Control.Supermonad.Plugin.Environment
   , getGivenConstraints
   , getInstEnvs
   , getReturnClass, getBindClass
-  , addDerivedResult
+  , getIdentityTyCon
+  , addDerivedResult, addEvidenceResult
   , runTcPlugin
   , printMsg, printConstraints, printObj
   , throwPluginError, catchPluginError
@@ -45,6 +46,7 @@ import Control.Supermonad.Plugin.Separation
   , componentTopTyCons, componentTopTcVars )
 import Control.Supermonad.Plugin.Evidence 
   ( isPotentiallyInstantiatedCt
+  , produceEvidenceForCt
   , matchInstanceTyVars' )
 import Control.Supermonad.Plugin.Utils 
   ( collectTyVars
@@ -65,16 +67,13 @@ solveConstraints wantedCts = do
   -- TODO: Filter out constraint groups that do not contain return or bind constraints.
   -- We can't solve these so we won't handle them.
   
-  -- Find a possible association for each of the constraint groups.
-  solvedGroups <- fmap catMaybes $ forM ctGroups $ \ctGroup -> do 
-    catchPluginError (Just <$> solveConstraintGroup ctGroup) $ \err -> do
-      printMsg err
-      return Nothing
+  -- Find a valid associations for each of the constraint groups.
+  validAssocsForGroup <- forM ctGroups $ determineValidConstraintGroupAssocs
   
   -- Partially apply type constructors in associations to fit the kind of 
   -- the type variable they are associated with.
-  appliedSolvedGroups <- forM solvedGroups $ \(ctGroup, assoc) -> do
-    appliedAssoc <- forM assoc $ \(tv, tc) -> do
+  appliedSolvedGroups <- forM validAssocsForGroup $ \(ctGroup, assocs) -> do
+    appliedAssocs <- forM assocs $ \assoc -> forM assoc $ \(tv, tc) -> do
       let (tvKindArgs, tvKindRes) = splitKindFunTys $ tyVarKind tv
       let (tcKindArgs, tcKindRes) = splitKindFunTyConTyVar tc
       assertM (return $ length tcKindArgs >= length tvKindArgs) 
@@ -89,16 +88,52 @@ solveConstraints wantedCts = do
       -- necessary for its kind to match that of the type variable.
       (appliedTcTy, argVars) <- runTcPlugin $ applyTyCon (tc, take (length tcKindArgs - length tvKindArgs) tcKindArgs)
       return ((tv, appliedTcTy, argVars) :: (TyVar, Type, [TyVar]))
-    return (ctGroup, appliedAssoc)
+    return (ctGroup, appliedAssocs)
   
-  -- For each solved group, try to produde evidence for each involved constraint.
-  forM_ appliedSolvedGroups $ \(ctGroup, appliedAssoc) -> do
-    forM_ appliedAssoc $ \(tv, ty, _flexVars) -> do
-      addDerivedResult $ mkDerivedTypeEqCt (head ctGroup) tv ty
-    -- FIXME: Required when we want to handle flexi vars that were introduced while 
-    -- applying type constructors partially.
-    --produceEvidenceForCts ctGroup appliedAssoc returnCls
-    --produceEvidenceForCts ctGroup appliedAssoc bindCls
+  -- Get the given constraints in case we need to produce evidence.
+  givenCts <- getGivenConstraints
+  
+  -- For each group, try to produde evidence for each involved constraint.
+  forM_ appliedSolvedGroups $ \(ctGroup, appliedAssocs) -> do
+    -- Look through the group and see if we can find constraints that do not 
+    -- contain ambiguous variables and try to produce evidence for them.
+    clearedCtGroup <- fmap catMaybes $ forM ctGroup $ \ct -> do
+      eEv <- runTcPlugin $ produceEvidenceForCt givenCts ct -- :: [GivenCt] -> Ct -> TcPluginM (Either SDoc EvTerm)
+      case eEv of
+        Left _err -> return $ Just ct
+        Right ev -> do
+          addEvidenceResult (ev, ct) -- :: (EvTerm, WantedCt) -> SupermonadPluginM ()
+          return Nothing
+    
+    -- Now check if there are constraint that left that require solving.
+    case (clearedCtGroup, appliedAssocs) of
+      
+      -- No constraints left, we are done.
+      ([], _) -> return ()
+      
+      -- There are constraints, but there are no associations...
+      (ctGroup, []) -> do
+        printConstraints ctGroup
+        throwPluginError "There are no possible associations for the current constraint group!"
+      
+      -- There are constraints and exactly one association...
+      (ctGroup, [appliedAssoc]) -> do
+        printMsg "Derived Results:"
+        forM_ appliedAssoc $ \(tv, ty, _flexVars) -> do
+          let derivedRes = mkDerivedTypeEqCt (head ctGroup) tv ty
+          printObj derivedRes
+          addDerivedResult derivedRes
+        -- FIXME: Required when we want to handle flexi vars that were introduced while 
+        -- applying type constructors partially.
+        --produceEvidenceForCts ctGroup appliedAssoc returnCls
+        --produceEvidenceForCts ctGroup appliedAssoc bindCls
+      
+      -- There are constraints and more then one association...
+      (ctGroup, appliedAssocs) -> do     
+        printConstraints ctGroup
+        printMsg "Possible Assocs:"
+        forM_ appliedAssocs printObj
+        throwPluginError "There is more then one possible association for the current constraint group!"
     
     return ()
   
@@ -176,16 +211,17 @@ getTyConBaseFrom cts = do
       baseTvs = S.map Right $ S.filter (not . isAmbiguousTyVar) $ componentTopTcVars checkedCts
   let baseTcs :: S.Set (Either TyCon TyVar)
       baseTcs = S.map Left $ componentTopTyCons checkedCts
-  return $ S.union baseTvs baseTcs
+  idTyCon <- getIdentityTyCon
+  return $ S.insert (Left idTyCon) $ S.union baseTvs baseTcs
 
 getTyConVarsFrom :: [Ct] -> SupermonadPluginM (S.Set TyVar)
 getTyConVarsFrom cts = do
   checkedCts <- filterSupermonadCts cts
   return $ S.filter isAmbiguousTyVar $ componentTopTcVars checkedCts
 
-solveConstraintGroup :: [WantedCt] -> SupermonadPluginM ([WantedCt], [(TyVar, Either TyCon TyVar)])
-solveConstraintGroup [] = throwPluginError "Solving received an empty constraint group!"
-solveConstraintGroup ctGroup = do
+determineValidConstraintGroupAssocs :: [WantedCt] -> SupermonadPluginM ([WantedCt], [[(TyVar, Either TyCon TyVar)]])
+determineValidConstraintGroupAssocs [] = throwPluginError "Solving received an empty constraint group!"
+determineValidConstraintGroupAssocs ctGroup = do
   -- Get the all of the given constraints.
   givenCts <- getGivenConstraints
   
@@ -209,8 +245,9 @@ solveConstraintGroup ctGroup = do
   
   -- All possible associations of ambiguous variables with their possible 
   -- type constructors from the base.
+  -- Also remove the empty association if it is there.
   let assocs :: [[(TyVar, Either TyCon TyVar)]]
-      assocs = associations $ fmap (\tv -> (tv, tyConBase)) tyConVars
+      assocs = filter (not . null) $ associations $ fmap (\tv -> (tv, tyConBase)) tyConVars
   
   -- Debugging output
   printMsg $ "Solving Group..."
@@ -220,9 +257,12 @@ solveConstraintGroup ctGroup = do
            ++ "Associations = " ++ show (length assocs) ++ ";"
   printMsg "Base:"
   printObj tyConBase
-  when (length assocs <= 5) $ do
+  when (length assocs <= 5 && not (null assocs)) $ do
     printMsg "Assocs:"
     forM_ assocs printObj
+  
+  printMsg "Given Cts:"
+  printConstraints givenCts
   
   -- For each association check if all constraints are potentially instantiable 
   -- with that association.
@@ -241,14 +281,4 @@ solveConstraintGroup ctGroup = do
     printMsg "Satisfiable associations:"
     forM_ validAssocs printObj
   
-  case validAssocs of
-    -- If there is only one possible association pick it.
-    [assoc] -> return (ctGroup, assoc)
-    -- If there are several possible associations this code is ambiguous, stop!
-    (a:as) -> do
-      printConstraints ctGroup
-      throwPluginError "There is more then one possible association for the current constraint group!"
-    -- If there is no possible association the code can not be compiled, stop!
-    [] -> do
-      printConstraints ctGroup
-      throwPluginError "There are no possible associations for the current constraint group!"
+  return (ctGroup, validAssocs)
