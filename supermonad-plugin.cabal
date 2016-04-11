@@ -35,6 +35,7 @@ library
                , Control.Supermonad.Plugin.Instance
                , Control.Supermonad.Plugin.Evidence
                , Control.Supermonad.Plugin.Environment
+               , Control.Supermonad.Plugin.Environment.Lift
                , Control.Supermonad.Plugin.Separation
                , Control.Supermonad.Plugin.Solving
   other-extensions:

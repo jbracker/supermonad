@@ -30,7 +30,7 @@ import Control.Supermonad.Plugin.Constraint
 import Control.Supermonad.Plugin.Detect
   ( areBindFunctorArguments, areBindApplyArguments )
 import Control.Supermonad.Plugin.Evidence
-  ( produceEvidenceFor, matchInstanceTyVars )
+  ( matchInstanceTyVars )
 import Control.Supermonad.Plugin.Solving
   ( solveConstraints )
 import Control.Supermonad.Plugin.Environment
@@ -47,6 +47,8 @@ import Control.Supermonad.Plugin.Environment
   , whenNoResults
   , runTcPlugin
   , printMsg, printObj, printConstraints )
+import Control.Supermonad.Plugin.Environment.Lift
+  ( produceEvidenceFor )
 
 -- -----------------------------------------------------------------------------
 -- The Plugin
@@ -137,15 +139,10 @@ processWantedFunctorBindConstraints = do
     if isAmbiguousType t then do
       return ([], [])
     else do
-      bindCls <- getBindClass
-      instApply <- getBindApplyInstance
       instFunctor <- getBindFunctorInstance
-      givenCts <- getGivenConstraints
-      idTyCon <- getIdentityTyCon
-      eEvidence <- runTcPlugin $ produceEvidenceFor bindCls instFunctor instApply idTyCon givenCts instFunctor [t]
       -- This assumes that the functor instance has the following head 
       -- "(Functor m) => Bind m Identity m" and therefore there is only one variable.
-      -- produceEvidenceFor :: [GivenCt] -> ClsInst -> [Type] -> TcPluginM (Either SDoc EvTerm)
+      eEvidence <- produceEvidenceFor instFunctor [t]
       case eEvidence of
         Right evidence -> return ([(evidence, bindCt)], [])
         Left err -> do
@@ -159,15 +156,10 @@ processWantedFunctorBindConstraints = do
     if isAmbiguousType t then do
       return ([], [])
     else do
-      bindCls <- getBindClass
       instApply <- getBindApplyInstance
-      instFunctor <- getBindFunctorInstance
-      givenCts <- getGivenConstraints
-      idTyCon <- getIdentityTyCon
-      eEvidence <- runTcPlugin $ produceEvidenceFor bindCls instFunctor instApply idTyCon givenCts instApply [t]
       -- This assumes that the functor instance has the following head 
       -- "(Functor m) => Bind Identity m m" and therefore there is only one variable.
-      -- produceEvidenceFor :: [GivenCt] -> ClsInst -> [Type] -> TcPluginM (Either SDoc EvTerm)
+      eEvidence <- produceEvidenceFor instApply [t]
       case eEvidence of
         Right evidence -> return ([(evidence, bindCt)], [])
         Left err -> do
@@ -200,12 +192,7 @@ selectOnlyMatchingBindInstance wantedCt =
       mFoundInstEvs <- forM bindInsts $ \bindInst -> 
         case matchInstanceTyVars bindInst tyArgs of
           Just (instVariableArgs, ambEqs) -> do
-            bindCls <- getBindClass
-            instFunctor <- getBindFunctorInstance
-            instApply <- getBindApplyInstance
-            givenCts <- getGivenConstraints
-            idTyCon <- getIdentityTyCon
-            eResult <- runTcPlugin $ produceEvidenceFor bindCls instFunctor instApply idTyCon givenCts bindInst instVariableArgs -- TcPluginM (Either SDoc EvTerm)
+            eResult <- produceEvidenceFor bindInst instVariableArgs -- SupermonadPluginM (Either SDoc EvTerm)
             -- mkDerivedTypeEqCt :: Ct -> TyVar -> Type -> Ct
             return $ case eResult of
               Left _err -> Nothing

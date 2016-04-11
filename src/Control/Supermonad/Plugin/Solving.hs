@@ -38,6 +38,9 @@ import Control.Supermonad.Plugin.Environment
   , printMsg, printConstraints, printObj
   , throwPluginError, catchPluginError
   , assertM )
+import Control.Supermonad.Plugin.Environment.Lift
+  ( produceEvidenceForCt
+  , isPotentiallyInstantiatedCt )
 import Control.Supermonad.Plugin.Constraint 
   ( WantedCt
   , mkDerivedTypeEqCt
@@ -47,9 +50,7 @@ import Control.Supermonad.Plugin.Separation
   ( separateContraints
   , componentTopTyCons, componentTopTcVars )
 import Control.Supermonad.Plugin.Evidence 
-  ( isPotentiallyInstantiatedCt
-  , produceEvidenceForCt
-  , matchInstanceTyVars' )
+  ( matchInstanceTyVars' )
 import Control.Supermonad.Plugin.Utils 
   ( collectTyVars
   , applyTyCon
@@ -92,21 +93,12 @@ solveConstraints wantedCts = do
       return ((tv, appliedTcTy, argVars) :: (TyVar, Type, [TyVar]))
     return (ctGroup, appliedAssocs)
   
-  -- Get everyting we need to produce evidence for constraints.
-  givenCts <- getGivenConstraints
-  bindCls <- getBindClass
-  functorInst <- getBindFunctorInstance
-  applyInst <- getBindApplyInstance
-  idTyCon <- getIdentityTyCon
-  let produceEvidence :: Ct -> SupermonadPluginM (Either O.SDoc EvTerm)
-      produceEvidence = runTcPlugin . produceEvidenceForCt bindCls functorInst applyInst idTyCon givenCts
-  
   -- For each group, try to produde evidence for each involved constraint.
   forM_ appliedSolvedGroups $ \(ctGroup, appliedAssocs) -> do
     -- Look through the group and see if we can find constraints that do not 
     -- contain ambiguous variables and try to produce evidence for them.
     clearedCtGroup <- fmap catMaybes $ forM ctGroup $ \ct -> do
-      eEv <- produceEvidence ct
+      eEv <- produceEvidenceForCt ct
       case eEv of
         Left _err -> return $ Just ct
         Right ev -> do
@@ -278,7 +270,7 @@ determineValidConstraintGroupAssocs ctGroup = do
   -- with that association.
   checkedAssocs <- forM assocs $ \assoc -> do
     -- isPotentiallyInstantiatedCt :: [GivenCt] -> Ct -> [(TyVar, TyCon)] -> TcPluginM Bool
-    validAssoc <- allM (\ct -> runTcPlugin $ isPotentiallyInstantiatedCt bindCls instFunctor instApply idTyCon givenCts ct assoc) ctGroup
+    validAssoc <- allM (\ct -> isPotentiallyInstantiatedCt ct assoc) ctGroup
     return (assoc, validAssoc)
   
   -- Only keep those associations that could be satisfiable. 
