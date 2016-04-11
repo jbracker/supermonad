@@ -136,8 +136,13 @@ matchInstanceTyVars' varsToBind inst instArgs = do
 --   Handles 'Bind' constraints that can be resolved with the functor or 
 --   apply instance specially. This leads to 'Bind Identity Identity Identity'
 --   being solved although there is no unique matching instance for it.
-produceEvidenceFor :: Class -> ClsInst -> ClsInst -> [GivenCt] -> ClsInst -> [Type] -> TcPluginM (Either SDoc EvTerm)
-produceEvidenceFor bindCls instFunctor instApply givenCts inst instArgs = do
+produceEvidenceFor :: Class -- ^ The 'Bind' class.
+                   -> ClsInst -- ^ The functor 'Bind' instance.
+                   -> ClsInst -- ^ The apply 'Bind' instance.
+                   -> TyCon -- ^ The 'Identity' type constructor.
+                   -> [GivenCt] -- ^ The given constraints to be used when producing evidence.
+                   -> ClsInst -> [Type] -> TcPluginM (Either SDoc EvTerm)
+produceEvidenceFor bindCls instFunctor instApply idTyCon givenCts inst instArgs = do
   -- Get the instance type variables and constraints (by that we know the
   -- number of type arguments and dictionart arguments for the EvDFunApp)
   let (tyVars, instCts, _cls, _tyArgs) = instanceSig inst -- ([TyVar], [Type], Class, [Type])
@@ -145,7 +150,7 @@ produceEvidenceFor bindCls instFunctor instApply givenCts inst instArgs = do
   let varSubst = mkTopTvSubst $ zip tyVars instArgs
   -- Now go over each constraint and find a suitable instance and evidence.
   -- Don't forget to substitute all variables for their actual values,
-  ctEvTerms <- forM (substTys varSubst instCts) $ produceEvidenceForCtType bindCls instFunctor instApply givenCts
+  ctEvTerms <- forM (substTys varSubst instCts) $ produceEvidenceForCtType bindCls instFunctor instApply idTyCon givenCts
   -- If we found a good instance and evidence for every constraint,
   -- we can create the evidence for this instance.
   return $ if any isLeft ctEvTerms
@@ -160,15 +165,18 @@ produceEvidenceFor bindCls instFunctor instApply givenCts inst instArgs = do
 --   properly if there is only one instance matching the given constraint
 --   and if the constraint does not contain ambiguous variables.
 --   
---   The first argument is the 'Bind' class. The second and thrid argument
---   is the functor and apply 'Bind' instance respectivly.
---   
 --   Handles 'Bind' constraints that can be resolved with the functor or 
 --   apply instance specially. This leads to 'Bind Identity Identity Identity'
 --   being solved although there is no unique matching instance for it.
-produceEvidenceForCt :: Class -> ClsInst -> ClsInst -> [GivenCt] -> Ct -> TcPluginM (Either SDoc EvTerm)
-produceEvidenceForCt bindCls instFunctor instApply givenCts ct =
-  produceEvidenceForCtType bindCls instFunctor instApply givenCts $ constraintPredicateType ct
+produceEvidenceForCt :: Class -- ^ The 'Bind' class.
+                     -> ClsInst -- ^ The functor 'Bind' instance.
+                     -> ClsInst -- ^ The apply 'Bind' instance.
+                     -> TyCon -- ^ The 'Identity' type constructor.
+                     -> [GivenCt] -- ^ The given constraints to be used when producing evidence.
+                     -> Ct -- ^ The constraint to produce evidence for.
+                     -> TcPluginM (Either SDoc EvTerm)
+produceEvidenceForCt bindCls instFunctor instApply idTyCon givenCts ct =
+  produceEvidenceForCtType bindCls instFunctor instApply idTyCon givenCts $ constraintPredicateType ct
 
 
 -- | Try to find evidence that proves the given constraint given by the type 
@@ -176,21 +184,22 @@ produceEvidenceForCt bindCls instFunctor instApply givenCts ct =
 --   properly if there is only one instance matching the given constraint
 --   and if the constraint does not contain ambiguous variables.
 --   
---   The first argument is the 'Bind' class. The second and thrid argument
---   is the functor and apply 'Bind' instance respectivly.
---   
 --   Handles 'Bind' constraints that can be resolved with the functor or 
 --   apply instance specially. This leads to 'Bind Identity Identity Identity'
 --   being solved although there is no unique matching instance for it.
-produceEvidenceForCtType :: Class -> ClsInst -> ClsInst -> [GivenCt] -> Type -> TcPluginM (Either SDoc EvTerm)
-produceEvidenceForCtType bindCls instFunctor instApply givenCts ct = do
-  let produceEvidence :: Type -> TcPluginM (Either SDoc EvTerm)
-      produceEvidence = produceEvidenceForCtType bindCls instFunctor instApply checkedGivenCts
+produceEvidenceForCtType :: Class -- ^ The 'Bind' class.
+                         -> ClsInst -- ^ The functor 'Bind' instance.
+                         -> ClsInst -- ^ The apply 'Bind' instance.
+                         -> TyCon -- ^ The 'Identity' type constructor.
+                         -> [GivenCt] -- ^ The given constraints to be used when producing evidence.
+                         -> Type -- ^ The constraint to produce evidence for.
+                         -> TcPluginM (Either SDoc EvTerm)
+produceEvidenceForCtType bindCls instFunctor instApply idTyCon givenCts ct =
   case splitTyConApp_maybe ct of
     -- Do we have a tuple of constraints?
     Just (tc, tcArgs) | isTupleTyCon tc -> do
       -- Produce evidence for each element of the tuple
-      tupleEvs <- mapM produceEvidence tcArgs
+      tupleEvs <- mapM produceEvidenceForCtType' tcArgs
       return $ if any isLeft tupleEvs
         then Left
           $ O.text "Can't find evidence for this tuple constraint:"
@@ -204,7 +213,7 @@ produceEvidenceForCtType bindCls instFunctor instApply givenCts ct = do
       -- Evaluate it...
       (coer, evalCt) <- evaluateType Representational ct
       -- Produce evidence for the evaluated term
-      eEvEvalCt <- produceEvidence evalCt
+      eEvEvalCt <- produceEvidenceForCtType' evalCt
       -- Add the appropriate cast to the produced evidence
       return $ (\ev -> EvCast ev (TcSymCo $ TcCoercion coer)) <$> eEvEvalCt
     -- Do we have a type equality constraint?
@@ -239,15 +248,15 @@ produceEvidenceForCtType bindCls instFunctor instApply givenCts ct = do
                 Right _ -> return newRes
                 Left _ -> return res
         -- The class constraint is a functor 'Bind' constraint...
-        Just (cls, tyArgs) | isFunctorBind cls tyArgs -> do
+        Just (cls, ctArgs) | isFunctorBind cls ctArgs -> do
           -- This assumes that the functor instance has the following head 
           -- "(Functor m) => Bind m Identity m" and therefore there is only one variable.
-          produceEvidenceFor bindCls instFunctor instApply checkedGivenCts instFunctor [last tyArgs]
+          produceEvidenceFor' instFunctor [last ctArgs]
         -- The class constraint is an apply 'Bind' constraint...
-        Just (cls, tyArgs) | isApplyBind cls tyArgs -> do
+        Just (cls, ctArgs) | isApplyBind cls ctArgs -> do
           -- This assumes that the functor instance has the following head 
           -- "(Functor m) => Bind Identity m m" and therefore there is only one variable.
-          produceEvidenceFor bindCls instFunctor instApply checkedGivenCts instApply [last tyArgs]
+          produceEvidenceFor' instApply [last ctArgs]
         -- It is a normal class constraint...
         Just (ctCls, ctArgs) -> do
           res <- produceClassCtEv ctCls ctArgs
@@ -268,6 +277,12 @@ produceEvidenceForCtType bindCls instFunctor instApply givenCts ct = do
         -- In any other case, lets try if one of the given constraints can help...
         _ -> return $ produceGivenCtEv ct
   where
+    produceEvidenceForCtType' :: Type -> TcPluginM (Either SDoc EvTerm)
+    produceEvidenceForCtType' = produceEvidenceForCtType bindCls instFunctor instApply idTyCon checkedGivenCts
+    
+    produceEvidenceFor' :: ClsInst -> [Type] -> TcPluginM (Either SDoc EvTerm)
+    produceEvidenceFor' = produceEvidenceFor bindCls instFunctor instApply idTyCon checkedGivenCts
+    
     -- Ensure there are only given constraints there.
     checkedGivenCts = filter isGivenCt givenCts
 
@@ -296,7 +311,7 @@ produceEvidenceForCtType bindCls instFunctor instApply givenCts ct = do
             $$ O.text "Lookup error:"
             $$ err
         -- We found one: Now we can produce evidence for the found instance.
-        Right (clsInst, instArgs) -> produceEvidenceFor bindCls instFunctor instApply checkedGivenCts clsInst instArgs
+        Right (clsInst, instArgs) -> produceEvidenceFor' clsInst instArgs
 
     -- Try to find a given constraint that matches and use its evidence.
     produceGivenCtEv :: Type -> Either SDoc EvTerm
@@ -336,12 +351,12 @@ produceEvidenceForCtType bindCls instFunctor instApply givenCts ct = do
     
     isFunctorBind :: Class -> [Type] -> Bool
     isFunctorBind cls [t0, t1, t2] 
-      = cls == bindCls && areBindFunctorArguments (classTyCon cls) t0 t1 t2
+      = cls == bindCls && areBindFunctorArguments idTyCon t0 t1 t2
     isFunctorBind _ _ = False
 
     isApplyBind :: Class -> [Type] -> Bool
     isApplyBind cls [t0, t1, t2] 
-      = cls == bindCls && areBindApplyArguments (classTyCon cls) t0 t1 t2
+      = cls == bindCls && areBindApplyArguments idTyCon t0 t1 t2
     isApplyBind _ _ = False
 
 -- | Check if a given class constraint can 
@@ -356,18 +371,32 @@ produceEvidenceForCtType bindCls instFunctor instApply givenCts ct = do
 --   
 --   Note: This function only handle class constraints. It will always deliver 
 --   'False' when another constraint type is given.
-isPotentiallyInstantiatedCt :: Class -> ClsInst -> ClsInst -> [GivenCt] -> Ct -> [(TyVar, Either TyCon TyVar)] -> TcPluginM Bool
-isPotentiallyInstantiatedCt bindCls instFunctor instApply givenCts ct assocs = 
+isPotentiallyInstantiatedCt :: Class -- ^ The 'Bind' class.
+                            -> ClsInst -- ^ The functor 'Bind' instance.
+                            -> ClsInst -- ^ The apply 'Bind' instance.
+                            -> TyCon -- ^ The 'Identity' type constructor.
+                            -> [GivenCt] -- ^ The given constraints to be used when producing evidence.
+                            -> Ct 
+                            -> [(TyVar, Either TyCon TyVar)] 
+                            -> TcPluginM Bool
+isPotentiallyInstantiatedCt bindCls instFunctor instApply idTyCon givenCts ct assocs = 
   case constraintClassType ct of
     -- If we have a class constraint...
-    Just splitCt -> isPotentiallyInstantiatedCtType bindCls instFunctor instApply givenCts splitCt assocs
+    Just splitCt -> isPotentiallyInstantiatedCtType bindCls instFunctor instApply idTyCon givenCts splitCt assocs
     Nothing -> return False
 
 -- | Utility helper for 'isPotentiallyInstantiatedCt' that checks class constraints.
-isPotentiallyInstantiatedCtType :: Class -> ClsInst -> ClsInst -> [GivenCt] -> (Class, [Type]) -> [(TyVar, Either TyCon TyVar)] -> TcPluginM Bool
-isPotentiallyInstantiatedCtType bindCls instFunctor instApply givenCts (ctCls, ctArgs) assocs = do
+isPotentiallyInstantiatedCtType :: Class -- ^ The 'Bind' class.
+                                -> ClsInst -- ^ The functor 'Bind' instance.
+                                -> ClsInst -- ^ The apply 'Bind' instance.
+                                -> TyCon -- ^ The 'Identity' type constructor.
+                                -> [GivenCt] -- ^ The given constraints to be used when producing evidence.
+                                -> (Class, [Type]) 
+                                -> [(TyVar, Either TyCon TyVar)] 
+                                -> TcPluginM Bool
+isPotentiallyInstantiatedCtType bindCls instFunctor instApply idTyCon givenCts (ctCls, ctArgs) assocs = do
   let produceEvidence :: Type -> TcPluginM (Either SDoc EvTerm)
-      produceEvidence = produceEvidenceForCtType bindCls instFunctor instApply givenCts
+      produceEvidence = produceEvidenceForCtType bindCls instFunctor instApply idTyCon givenCts
   
   -- Get the type constructors partially applied to some new variables as
   -- is necessary.
@@ -395,7 +424,7 @@ isPotentiallyInstantiatedCtType bindCls instFunctor instApply givenCts (ctCls, c
   -- If there are no ambiguous or generated type variables in the substituted arguments of our constraint
   -- we can simply check if there is evidence.
   if all (not . containsGivenOrAmbiguousTyVar ctGenVars) ctSubstArgs
-    then do 
+    then do
       eEv <- produceEvidence $ mkAppTys (mkTyConTy $ classTyCon ctCls) ctSubstArgs
       return $ either (const False) (const True) eEv
     else do

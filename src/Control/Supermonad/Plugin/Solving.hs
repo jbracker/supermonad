@@ -18,6 +18,7 @@ import Type
 import Var ( tyVarKind )
 import TcPluginM ( TcPluginM )
 import TcType ( isAmbiguousTyVar )
+import TcEvidence ( EvTerm )
 import Class ( Class )
 import Kind ( splitKindFunTys ) 
 import InstEnv ( lookupInstEnv, instanceSig )
@@ -96,7 +97,9 @@ solveConstraints wantedCts = do
   bindCls <- getBindClass
   functorInst <- getBindFunctorInstance
   applyInst <- getBindApplyInstance
-  let produceEvidence = runTcPlugin . produceEvidenceForCt bindCls functorInst applyInst givenCts
+  idTyCon <- getIdentityTyCon
+  let produceEvidence :: Ct -> SupermonadPluginM (Either O.SDoc EvTerm)
+      produceEvidence = runTcPlugin . produceEvidenceForCt bindCls functorInst applyInst idTyCon givenCts
   
   -- For each group, try to produde evidence for each involved constraint.
   forM_ appliedSolvedGroups $ \(ctGroup, appliedAssocs) -> do
@@ -266,18 +269,16 @@ determineValidConstraintGroupAssocs ctGroup = do
     printMsg "Assocs:"
     forM_ assocs printObj
   
-  printMsg "Given Cts:"
-  printConstraints givenCts
-  
   bindCls <- getBindClass
   instFunctor <- getBindFunctorInstance
   instApply <- getBindApplyInstance
+  idTyCon <- getIdentityTyCon
   
   -- For each association check if all constraints are potentially instantiable 
   -- with that association.
   checkedAssocs <- forM assocs $ \assoc -> do
     -- isPotentiallyInstantiatedCt :: [GivenCt] -> Ct -> [(TyVar, TyCon)] -> TcPluginM Bool
-    validAssoc <- allM (\ct -> runTcPlugin $ isPotentiallyInstantiatedCt bindCls instFunctor instApply givenCts ct assoc) ctGroup
+    validAssoc <- allM (\ct -> runTcPlugin $ isPotentiallyInstantiatedCt bindCls instFunctor instApply idTyCon givenCts ct assoc) ctGroup
     return (assoc, validAssoc)
   
   -- Only keep those associations that could be satisfiable. 

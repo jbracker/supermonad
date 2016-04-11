@@ -141,7 +141,8 @@ processWantedFunctorBindConstraints = do
       instApply <- getBindApplyInstance
       instFunctor <- getBindFunctorInstance
       givenCts <- getGivenConstraints
-      eEvidence <- runTcPlugin $ produceEvidenceFor bindCls instFunctor instApply givenCts instFunctor [t]
+      idTyCon <- getIdentityTyCon
+      eEvidence <- runTcPlugin $ produceEvidenceFor bindCls instFunctor instApply idTyCon givenCts instFunctor [t]
       -- This assumes that the functor instance has the following head 
       -- "(Functor m) => Bind m Identity m" and therefore there is only one variable.
       -- produceEvidenceFor :: [GivenCt] -> ClsInst -> [Type] -> TcPluginM (Either SDoc EvTerm)
@@ -162,7 +163,8 @@ processWantedFunctorBindConstraints = do
       instApply <- getBindApplyInstance
       instFunctor <- getBindFunctorInstance
       givenCts <- getGivenConstraints
-      eEvidence <- runTcPlugin $ produceEvidenceFor bindCls instFunctor instApply givenCts instApply [t]
+      idTyCon <- getIdentityTyCon
+      eEvidence <- runTcPlugin $ produceEvidenceFor bindCls instFunctor instApply idTyCon givenCts instApply [t]
       -- This assumes that the functor instance has the following head 
       -- "(Functor m) => Bind Identity m m" and therefore there is only one variable.
       -- produceEvidenceFor :: [GivenCt] -> ClsInst -> [Type] -> TcPluginM (Either SDoc EvTerm)
@@ -202,7 +204,8 @@ selectOnlyMatchingBindInstance wantedCt =
             instFunctor <- getBindFunctorInstance
             instApply <- getBindApplyInstance
             givenCts <- getGivenConstraints
-            eResult <- runTcPlugin $ produceEvidenceFor bindCls instFunctor instApply givenCts bindInst instVariableArgs -- TcPluginM (Either SDoc EvTerm)
+            idTyCon <- getIdentityTyCon
+            eResult <- runTcPlugin $ produceEvidenceFor bindCls instFunctor instApply idTyCon givenCts bindInst instVariableArgs -- TcPluginM (Either SDoc EvTerm)
             -- mkDerivedTypeEqCt :: Ct -> TyVar -> Type -> Ct
             return $ case eResult of
               Left _err -> Nothing
