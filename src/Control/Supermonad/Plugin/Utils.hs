@@ -130,7 +130,7 @@ mkTcVarSubst substs = mkTopTvSubst $ fmap (second mkTyConTy) substs
 -- -----------------------------------------------------------------------------
 
 -- | Override the standard bind flag of a given list of variables to 'Skolem'.
---   The standard bind flad is determined using 'instanceBindFun'.
+--   The standard bind flag is determined using 'instanceBindFun'.
 --   This can be used to keep 'tcUnifyTys' from unifying the given variables
 --   and to view them as constants.
 skolemVarsBindFun :: [TyVar] -> TyVar -> BindFlag

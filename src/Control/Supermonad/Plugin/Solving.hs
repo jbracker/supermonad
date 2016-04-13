@@ -7,7 +7,7 @@ import Data.Maybe ( catMaybes, fromJust )
 import Data.List ( partition )
 import qualified Data.Set as S
 
-import Control.Monad ( when, forM, forM_, filterM )
+import Control.Monad ( when, forM, forM_, filterM, liftM2 )
 
 import TcRnTypes ( Ct )
 import TyCon ( TyCon, tyConKind )
@@ -40,7 +40,8 @@ import Control.Supermonad.Plugin.Environment
   , assertM )
 import Control.Supermonad.Plugin.Environment.Lift
   ( produceEvidenceForCt
-  , isPotentiallyInstantiatedCt )
+  , isPotentiallyInstantiatedCt
+  , isBindConstraint, isReturnConstraint )
 import Control.Supermonad.Plugin.Constraint 
   ( WantedCt
   , mkDerivedTypeEqCt
@@ -53,6 +54,7 @@ import Control.Supermonad.Plugin.Evidence
   ( matchInstanceTyVars' )
 import Control.Supermonad.Plugin.Utils 
   ( collectTyVars
+  , collectTopTcVars
   , applyTyCon
   , splitKindFunTyConTyVar
   , associations, allM )
@@ -61,7 +63,7 @@ solveConstraints :: [WantedCt] -> SupermonadPluginM ()
 solveConstraints wantedCts = do
   -- Calculate the different groups of constraints that belong 
   -- together for solving purposes.
-  let ctGroups = separateContraints wantedCts
+  ctGroups <- separateContraints wantedCts
   
   -- Get classes to filter constraints.
   returnCls <- getReturnClass
@@ -112,9 +114,23 @@ solveConstraints wantedCts = do
       ([], _) -> return ()
       
       -- There are constraints, but there are no associations...
+      -- There are two possible reasons for this to happen:
+      -- 1. The group does not have type constructor variables. 
+      --    Which means there is nothing to solve and therefore 
+      --    we are done with solving. 
+      -- 2. There are no associations, because we can't find a solution
+      --    to the variables in the group. If this is the case the group 
+      --    is unsolvable.
       (ctGroup, []) -> do
-        printConstraints ctGroup
-        throwPluginError "There are no possible associations for the current constraint group!"
+        topTcVars <- concat <$> mapM collectBindReturnTopTcVars ctGroup
+        -- The first case:
+        if null topTcVars then do
+          printMsg "Group does not require solving:"
+          printConstraints ctGroup
+        -- The second case:
+        else do
+          printConstraints ctGroup
+          throwPluginError "There are no possible associations for the current constraint group!"
       
       -- There are constraints and exactly one association...
       (ctGroup, [appliedAssoc]) -> do
@@ -130,11 +146,15 @@ solveConstraints wantedCts = do
         printMsg "Possible Assocs:"
         forM_ appliedAssocs printObj
         throwPluginError "There is more then one possible association for the current constraint group!"
-    
-    return ()
   
-  -- Unnecessary, just there to mark end of do-block
-  return ()
+  where
+    collectBindReturnTopTcVars :: Ct -> SupermonadPluginM [TyVar]
+    collectBindReturnTopTcVars ct = do
+      isBindOrReturn <- liftM2 (||) (isBindConstraint ct) (isReturnConstraint ct)
+      case (isBindOrReturn, constraintClassType ct) of
+        (True, Just (cls, tyArgs)) -> return $ S.toList $ collectTopTcVars tyArgs
+        _ -> return []
+
 
 -- | Only keep supermonad constraints ('Bind' and 'Return').
 filterSupermonadCts :: [Ct] -> SupermonadPluginM [Ct]
@@ -210,11 +230,6 @@ determineValidConstraintGroupAssocs ctGroup = do
   when (length assocs <= 5 && not (null assocs)) $ do
     printMsg "Assocs:"
     forM_ assocs printObj
-  
-  bindCls <- getBindClass
-  instFunctor <- getBindFunctorInstance
-  instApply <- getBindApplyInstance
-  idTyCon <- getIdentityTyCon
   
   -- For each association check if all constraints are potentially instantiable 
   -- with that association.

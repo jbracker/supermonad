@@ -4,7 +4,9 @@
 module Control.Supermonad.Plugin.Environment.Lift
   ( produceEvidenceForCt
   , produceEvidenceFor
-  , isPotentiallyInstantiatedCt ) where
+  , isPotentiallyInstantiatedCt
+  
+  , isBindConstraint, isReturnConstraint ) where
 
 import TcRnTypes ( Ct )
 import TcEvidence ( EvTerm )
@@ -26,6 +28,7 @@ import Control.Supermonad.Plugin.Environment
   , getBindInstances )
 
 import qualified Control.Supermonad.Plugin.Evidence as E
+import Control.Supermonad.Plugin.Constraint ( isClassConstraint )
 
 produceEvidenceForCt :: Ct -> SupermonadPluginM (Either SDoc EvTerm)
 produceEvidenceForCt ct = do
@@ -53,3 +56,17 @@ isPotentiallyInstantiatedCt ct assoc = do
   idTyCon <- getIdentityTyCon
   givenCts <- getGivenConstraints
   runTcPlugin $ E.isPotentiallyInstantiatedCt bindCls instFunctor instApply idTyCon givenCts ct assoc
+
+isBindConstraint :: Ct -> SupermonadPluginM Bool
+isBindConstraint ct = do
+  bindCls <- getBindClass
+  return $ isClassConstraint bindCls ct
+
+isReturnConstraint :: Ct -> SupermonadPluginM Bool
+isReturnConstraint ct = do
+  returnCls <- getReturnClass
+  return $ isClassConstraint returnCls ct
+
+
+
+

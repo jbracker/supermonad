@@ -16,8 +16,8 @@ module Control.Supermonad.Plugin.Constraint
   , constraintClassTyArgs
   , constraintClassTyCon
   , constraintPredicateType
-  , constraintTyCons
-  , constraintTcVars
+  , constraintTopTyCons
+  , constraintTopTcVars
   , constraintLocation
   , constraintSourceLocation
   , sortConstraintsByLine
@@ -89,11 +89,8 @@ mkDerivedClassCt loc cls ts = mkNonCanonical CtDerived
 -- | Check if the given constraint is a class constraint of the given class.
 isClassConstraint :: Class -> Ct -> Bool
 isClassConstraint wantedClass ct =
-  case ct of
-    CDictCan { cc_class = cls } -> cls == wantedClass
-    CNonCanonical { cc_ev = ev } -> case getClassPredTys_maybe (ctev_pred ev) of
-      Just (cls, _args) -> cls == wantedClass
-      _ -> False
+  case constraintClassType ct of
+    Just (cls, _args) -> cls == wantedClass
     _ -> False
 
 -- | Retrieves the class and type arguments of the given
@@ -120,14 +117,14 @@ constraintClassTyCon = fmap (classTyCon . fst) . constraintClassType
 -- | Collects the type constructors in the arguments of the constraint.
 --   Only works if the given constraint is a type class constraint.
 --   Only collects those on the top level (See 'collectTopTyCons').
-constraintTyCons :: Ct -> Set TyCon
-constraintTyCons ct = maybe S.empty collectTopTyCons $ constraintClassTyArgs ct
+constraintTopTyCons :: Ct -> Set TyCon
+constraintTopTyCons ct = maybe S.empty collectTopTyCons $ constraintClassTyArgs ct
 
 -- | Collects the type variables in the arguments of the constraint.
 --   Only works if the given constraint is a type class constraint.
 --   Only collects those on the top level (See 'collectTopTcVars').
-constraintTcVars :: Ct -> Set TyVar
-constraintTcVars ct = maybe S.empty collectTopTcVars $ constraintClassTyArgs ct
+constraintTopTcVars :: Ct -> Set TyVar
+constraintTopTcVars ct = maybe S.empty collectTopTcVars $ constraintClassTyArgs ct
 
 -- | Retrieve the source location the given constraint originated from.
 constraintLocation :: Ct -> CtLoc

@@ -8,6 +8,8 @@ module Control.Supermonad.Plugin.Separation
 import Data.Maybe ( fromJust )
 import qualified Data.Set as S
 
+import Control.Monad ( filterM, liftM2 )
+
 import Data.Graph.Inductive.Graph 
   ( LNode, Edge
   , mkGraph, toLEdge )
@@ -22,7 +24,11 @@ import TcType ( isAmbiguousTyVar )
 import Control.Supermonad.Plugin.Constraint
   ( WantedCt, constraintClassTyArgs )
 import Control.Supermonad.Plugin.Utils
-  ( collectTopTyCons, collectTopTcVars )
+  ( collectTopTyCons, collectTopTcVars, anyM )
+import Control.Supermonad.Plugin.Environment
+  (  SupermonadPluginM )
+import Control.Supermonad.Plugin.Environment.Lift
+  ( isReturnConstraint, isBindConstraint )
 
 type SCNode = LNode WantedCt
 
@@ -52,9 +58,17 @@ collect f cts = S.unions $ fmap collectLocal cts
 --   Returns the connected components of that graph. 
 --   These components represent the groups of constraints that are in need of 
 --   solving and have to be handeled together.
-separateContraints :: [WantedCt] -> [[WantedCt]]
-separateContraints wantedCts = (fmap (\n -> fromJust $ lookup n nodes)) <$> components g
+separateContraints :: [WantedCt] -> SupermonadPluginM [[WantedCt]]
+separateContraints wantedCts = filterM containsBindOrReturn comps
   where
+    -- | Checks if the given constraint group contains any 'Bind' or 'Return'
+    --   constraints.
+    containsBindOrReturn :: [WantedCt] -> SupermonadPluginM Bool
+    containsBindOrReturn = anyM $ \ct -> liftM2 (||) (isBindConstraint ct) (isReturnConstraint ct)
+    
+    comps :: [[WantedCt]]
+    comps = fmap (\n -> fromJust $ lookup n nodes) <$> components g
+    
     g :: Gr WantedCt ()
     g = mkGraph nodes (fmap (\e -> toLEdge e ()) edges)
     
