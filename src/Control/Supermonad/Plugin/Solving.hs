@@ -123,10 +123,6 @@ solveConstraints wantedCts = do
           let derivedRes = mkDerivedTypeEqCt (head ctGroup) tv ty
           printObj derivedRes
           addDerivedResult derivedRes
-        -- FIXME: Required when we want to handle flexi vars that were introduced while 
-        -- applying type constructors partially.
-        --produceEvidenceForCts ctGroup appliedAssoc returnCls
-        --produceEvidenceForCts ctGroup appliedAssoc bindCls
       
       -- There are constraints and more then one association...
       (ctGroup, appliedAssocs) -> do     
@@ -139,52 +135,6 @@ solveConstraints wantedCts = do
   
   -- Unnecessary, just there to mark end of do-block
   return ()
-  
-  where
-    -- | Takes a constraint group together with the association between type 
-    --   variables and (partially applied) type constructors and the class of
-    --   the constraints to provide evidence for.
-    produceEvidenceForCts :: [WantedCt] -> [(TyVar, Type, [TyVar])] -> Class -> SupermonadPluginM TvSubst
-    produceEvidenceForCts ctGroup appliedAssocs cls = do
-      undefined
-      {-
-      -- FIXME: For now we do not handle flexivars that were introduced.
-      
-      -- Create the substitution for the applied associations.
-      let assocSubst = mkTopTvSubst $ fmap (\(tv, t, _) -> (tv, t)) appliedAssocs
-      
-      let allFlexiVars :: S.Set TyVar
-          allFlexiVars = S.unions $ fmap (S.fromList . (\(_, _, flexis) -> flexis)) appliedAssocs
-      
-      -- Find all constraint to provide evidence for
-      let cts = filter (isClassConstraint cls) ctGroup
-      
-      -- Try to provide evidence for each one.
-      _ <- forM cts $ \ct -> do
-        instEnvs <- getInstEnvs
-        -- Instantiate the variables in the constraint with their (partially applied)
-        -- type constructor.
-        let (_cls, ctArgs) = fromJust $ constraintClassType ct
-        let tyArgs = substTys assocSubst ctArgs
-        
-        let localFlexiVars = S.toList $ S.intersection allFlexiVars $ S.unions $ fmap collectTyVars tyArgs
-        -- Lookup an instance for the current constraint.
-        -- Although we require to find a unique instance we do not use 
-        -- 'lookupUniqueInstEnv', because it does not allow looking up instances
-        -- while using flexi vars.
-        case lookupInstEnv instEnvs cls tyArgs of
-          ([(inst, instArgs)], [], _) -> do
-            undefined
-          ([], [inst], _) -> do
-            let (_instVarTys, flexiVarAssocs) = fromJust $ matchInstanceTyVars' localFlexiVars inst tyArgs
-            
-            
-            undefined
-          _ -> do
-            printMsg "Found to many instance matches for the following class application:"
-            printObj cls
-            printObj tyArgs
-      -}
 
 -- | Only keep supermonad constraints ('Bind' and 'Return').
 filterSupermonadCts :: [Ct] -> SupermonadPluginM [Ct]
