@@ -3,27 +3,15 @@ module Control.Supermonad.Plugin.Solving
   ( solveConstraints
   ) where
 
-import Data.Maybe ( catMaybes, fromJust )
-import Data.List ( partition )
+import Data.Maybe ( catMaybes )
 import qualified Data.Set as S
 
 import Control.Monad ( when, forM, forM_, filterM, liftM2 )
 
 import TcRnTypes ( Ct )
-import TyCon ( TyCon, tyConKind )
-import Type 
-  ( Type, TyVar, TvSubst
-  , mkTopTvSubst
-  , substTys )
-import Var ( tyVarKind )
-import TcPluginM ( TcPluginM )
+import TyCon ( TyCon )
+import Type ( TyVar )
 import TcType ( isAmbiguousTyVar )
-import TcEvidence ( EvTerm )
-import Class ( Class )
-import Kind ( splitKindFunTys ) 
-import InstEnv ( lookupInstEnv, instanceSig )
-import Outputable ( ($$) )
-import qualified Outputable as O
 
 import Control.Supermonad.Plugin.Debug ( sDocToStr )
 import Control.Supermonad.Plugin.Environment 
@@ -36,12 +24,13 @@ import Control.Supermonad.Plugin.Environment
   , addDerivedResult, addEvidenceResult
   , runTcPlugin
   , printMsg, printConstraints, printObj
-  , throwPluginError, catchPluginError
+  , throwPluginError, throwPluginErrorSDoc, catchPluginError
   , assertM )
 import Control.Supermonad.Plugin.Environment.Lift
   ( produceEvidenceForCt
   , isPotentiallyInstantiatedCt
-  , isBindConstraint, isReturnConstraint )
+  , isBindConstraint, isReturnConstraint
+  , partiallyApplyTyCons )
 import Control.Supermonad.Plugin.Constraint 
   ( WantedCt
   , mkDerivedTypeEqCt
@@ -56,7 +45,7 @@ import Control.Supermonad.Plugin.Utils
   ( collectTyVars
   , collectTopTcVars
   , applyTyCon
-  , splitKindFunTyConTyVar
+  --, splitKindFunTyConTyVar
   , associations, allM )
 
 solveConstraints :: [WantedCt] -> SupermonadPluginM ()
@@ -78,7 +67,10 @@ solveConstraints wantedCts = do
   -- Partially apply type constructors in associations to fit the kind of 
   -- the type variable they are associated with.
   appliedSolvedGroups <- forM validAssocsForGroup $ \(ctGroup, assocs) -> do
-    appliedAssocs <- forM assocs $ \assoc -> forM assoc $ \(tv, tc) -> do
+    
+    appliedAssocs <- forM assocs $ \assoc -> either throwPluginErrorSDoc return =<< partiallyApplyTyCons assoc
+    
+      {- forM assoc $ \(tv, tc) -> do
       let (tvKindArgs, tvKindRes) = splitKindFunTys $ tyVarKind tv
       let (tcKindArgs, tcKindRes) = splitKindFunTyConTyVar tc
       assertM (return $ length tcKindArgs >= length tvKindArgs) 
@@ -93,8 +85,8 @@ solveConstraints wantedCts = do
       -- necessary for its kind to match that of the type variable.
       (appliedTcTy, argVars) <- runTcPlugin $ applyTyCon (tc, take (length tcKindArgs - length tvKindArgs) tcKindArgs)
       return ((tv, appliedTcTy, argVars) :: (TyVar, Type, [TyVar]))
+      -}
     return (ctGroup, appliedAssocs)
-  
   -- For each group, try to produde evidence for each involved constraint.
   forM_ appliedSolvedGroups $ \(ctGroup, appliedAssocs) -> do
     -- Look through the group and see if we can find constraints that do not 

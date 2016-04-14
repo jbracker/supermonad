@@ -26,8 +26,6 @@ import Type
   , getEqPredTys_maybe, getEqPredTys, getEqPredRole
   , getTyVar_maybe
   , splitTyConApp_maybe, splitFunTy_maybe, splitAppTy_maybe )
-import Kind ( splitKindFunTys )
-import Var ( tyVarKind )
 import Class ( classTyCon )
 import TyCon
   ( TyCon
@@ -55,18 +53,18 @@ import Control.Supermonad.Plugin.Constraint
   ( GivenCt
   , constraintClassType
   , constraintPredicateType )
-import Control.Supermonad.Plugin.Log ( pluginAssert )
+import Control.Supermonad.Plugin.Log ( pluginFailSDoc )
 import Control.Supermonad.Plugin.Utils
   ( fromLeft, fromRight
   , collectTyVars
-  , applyTyCon
-  , splitKindFunTyConTyVar
+  --, applyTyCon
+  , partiallyApplyTyCons
   , allM
   , skolemVarsBindFun )
 import Control.Supermonad.Plugin.Detect 
   ( areBindApplyArguments, areBindFunctorArguments )
-import qualified Control.Supermonad.Plugin.Log as L
-import qualified Control.Supermonad.Plugin.Debug as D
+--import qualified Control.Supermonad.Plugin.Log as L
+--import qualified Control.Supermonad.Plugin.Debug as D
 
 
 
@@ -400,6 +398,7 @@ isPotentiallyInstantiatedCtType bindCls instFunctor instApply idTyCon givenCts (
   
   -- Get the type constructors partially applied to some new variables as
   -- is necessary.
+  {-
   appliedAssocs <- forM assocs $ \(tv, tc) -> do
     let (tvKindArgs, tvKindRes) = splitKindFunTys $ tyVarKind tv
     let (tcKindArgs, tcKindRes) = splitKindFunTyConTyVar tc
@@ -413,6 +412,9 @@ isPotentiallyInstantiatedCtType bindCls instFunctor instApply idTyCon givenCts (
     -- necessary for its kind to match that of the type variable.
     (appliedTcTy, argVars) <- applyTyCon (tc, take (length tcKindArgs - length tvKindArgs) tcKindArgs)
     return ((tv, appliedTcTy, argVars) :: (TyVar, Type, [TyVar]))
+  -}
+  eAppliedAssocs <- partiallyApplyTyCons assocs
+  appliedAssocs <- either pluginFailSDoc return eAppliedAssocs
   
   -- Create the substitution for the given associations.
   let ctSubst = mkTopTvSubst $ fmap (\(tv, t, _) -> (tv, t)) appliedAssocs

@@ -13,9 +13,9 @@ module Control.Supermonad.Plugin.Utils (
   , eqTyCon
   , getTyConName
   , isAmbiguousType
-  , getTyConWithArgKinds
+  , partiallyApplyTyCons
   , applyTyCon
-  , splitKindFunTyConTyVar
+  , splitKindFunOfTcTv
   , atIndex
   , associations
   , subsets
@@ -35,7 +35,6 @@ import Control.Monad ( forM )
 import Control.Arrow ( second )
 
 import BasicTypes ( Arity )
-import Id ( idArity )
 import Name ( nameOccName )
 import OccName ( occNameString )
 import Type
@@ -57,6 +56,8 @@ import Kind ( Kind, splitKindFunTys )
 import Unify ( BindFlag(..) )
 import InstEnv ( instanceBindFun )
 import TcPluginM ( TcPluginM, newFlexiTyVar )
+import Outputable ( ($$) )
+import qualified Outputable as O
 
 -- -----------------------------------------------------------------------------
 -- Constraint and type inspection
@@ -173,27 +174,45 @@ atIndex xs i = listToMaybe $ drop i xs
 isAmbiguousType :: Type -> Bool
 isAmbiguousType ty = maybe False isAmbiguousTyVar $ getTyVar_maybe ty
 
--- | Takes a type that is considered to be a unary type constructor.
---   Tries to get the base type constructor within this, for example:
---
--- >>> getTyConWithArgKinds (StateT String)
--- (Left StateT, [*, *])
---
--- >>> getTyConWithArgKinds m
--- (Right m, [*])
---
--- >>> getTyConWithArgKinds (p s)
--- (Right p, [*, *]) -- Assuming the kind of s is *. case getEqPredTys_maybe t of
---
--- >>> getTyConWithArgKinds Identity
--- (Left Identity, [*])
-getTyConWithArgKinds :: Type -> (Either TyCon TyVar, [Kind])
-getTyConWithArgKinds t = case getTyVar_maybe tcTy of
-  Just tv -> (Right tv, fst $ splitKindFunTys $ tyVarKind tv)
-  Nothing -> case tyConAppTyCon_maybe tcTy of
-    Just tc -> (Left tc, fst $ splitKindFunTys $ tyConKind tc)
-    Nothing -> error "getTyConWithArity: Type does not contain a type constructor or variable."
-  where (tcTy, _args) = splitAppTys t
+-- | Takes a list of type variables that are associated with certain type 
+--   constructors or type constructor variables and partially applies them
+--   to match the kind of the type variable. Example:
+--   
+-- >>> partiallyApplyTyCons [(n :: *, Left (Maybe :: * -> *))]
+-- Right [(n :: *, Maybe i :: *, [i :: *])]
+-- 
+-- >>> partiallyApplyTyCons [(n :: * -> *, Right (k :: * -> Int -> * -> *))]
+-- Right [(n :: * -> *, k i j :: * -> *, [i :: *, j :: Int])]
+-- 
+-- >>> partiallyApplyTyCons [(n :: * -> *, Left (Int :: *)]
+-- Left ...
+-- 
+-- >>> partiallyApplyTyCons [(n :: * -> *, Left (Maybe :: * -> *)]
+-- Right [(n :: * -> *, Maybe :: * -> *, [])]
+-- 
+-- The variables generated for the partial application are flexi vars (see 'newFlexiTyVar' and 'applyTyCon').
+partiallyApplyTyCons :: [(TyVar, Either TyCon TyVar)] -> TcPluginM (Either O.SDoc [(TyVar, Type, [TyVar])])
+partiallyApplyTyCons [] = return $ Right []
+partiallyApplyTyCons ((tv, tc) : assocs) = do
+    let (tvKindArgs, tvKindRes) = splitKindFunOfTcTv $ Right tv
+    let (tcKindArgs, tcKindRes) = splitKindFunOfTcTv tc
+    
+    let checkKindLength = length tcKindArgs >= length tvKindArgs
+    let checkKindMatch = and (uncurry (==) <$> zip (reverse tvKindArgs) (reverse tcKindArgs)) && tcKindRes == tvKindRes
+    case (checkKindLength, checkKindMatch) of
+      (False, _) -> return $ Left $ O.text "Kind mismatch between type constructor and type variable: " 
+                                 $$ O.ppr tcKindArgs $$ O.ppr tvKindArgs
+      (_, False) -> return $ Left $ O.text "Kind mismatch between type constructor and type variable: " 
+                                 $$ O.ppr tc $$ O.ppr tv
+      _ -> do 
+        eAppliedAssocs <- partiallyApplyTyCons assocs
+        case eAppliedAssocs of
+          Left err -> return $ Left err
+          Right appliedAssocs -> do
+            -- Apply as many new type variables to the type constructor as are 
+            -- necessary for its kind to match that of the type variable.
+            (appliedTcTy, argVars) <- applyTyCon (tc, take (length tcKindArgs - length tvKindArgs) tcKindArgs)
+            return $ Right $ (tv, appliedTcTy, argVars) : appliedAssocs
 
 -- | Applies the given type constructor or type constructor variable to 
 --   new correctly kinded variables to make it a (partially) applied type. 
@@ -208,10 +227,10 @@ applyTyCon (eTcTv, ks) = do
 -- | Retrieves the kind of the given type constructor or variables
 --   and splits it into its arguments and result. If the kind is not 
 --   a function kind then the arguments will be empty.
-splitKindFunTyConTyVar :: Either TyCon TyVar -> ([Kind], Kind)
-splitKindFunTyConTyVar tc = case tc of 
-  Left tc -> splitKindFunTys $ tyConKind tc
-  Right tc -> splitKindFunTys $ tyVarKind tc
+splitKindFunOfTcTv :: Either TyCon TyVar -> ([Kind], Kind)
+splitKindFunOfTcTv tc = case tc of 
+  Left tyCon -> splitKindFunTys $ tyConKind tyCon
+  Right tyVar -> splitKindFunTys $ tyVarKind tyVar
 
 -- | Takes a list of keys and all of their possible values and returns a list
 --   of all possible associations between keys and values
