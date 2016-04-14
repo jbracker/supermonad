@@ -26,7 +26,7 @@ clean: init
 	rm -fR ./examples/hmtc/monad-param/dist
 
 doc: init
-	cabal configure && cabal haddock
+	cabal configure && cabal haddock --internal --executables
 
 opendoc:
 	xdg-open ./dist/doc/html/supermonad-plugin/index.html 
