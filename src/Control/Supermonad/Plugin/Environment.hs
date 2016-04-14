@@ -1,5 +1,5 @@
 
--- | Provides the polymonad plugin monadic envionment,
+-- | Provides the plugins monadic envionment,
 --   access to the environment and message printing capabilities.
 module Control.Supermonad.Plugin.Environment
   ( -- * Polymonad Plugin Monad
@@ -55,7 +55,7 @@ import qualified Control.Supermonad.Plugin.Log as L
 import Control.Supermonad.Plugin.Utils
   ( partitionM )
 import Control.Supermonad.Plugin.Constraint
-  ( GivenCt, WantedCt
+  ( GivenCt, WantedCt, DerivedCt
   , constraintSourceLocation )
 import Control.Supermonad.Plugin.Detect
   ( findSupermonadModule
@@ -71,6 +71,7 @@ import Control.Supermonad.Plugin.Detect
 -- Plugin Monad
 -- -----------------------------------------------------------------------------
 
+-- | The error type used as result if the plugin fails.
 type SupermonadError = O.SDoc
 
 -- | The plugin monad.
@@ -241,6 +242,7 @@ getBindApplyInstance = asks smEnvBindApplyInstance
 getBindInstances :: SupermonadPluginM [ClsInst]
 getBindInstances = asks smEnvBindInstances
 
+-- | Updates the wanted constraints that still require solving.
 setWantedConstraints :: [WantedCt] -> SupermonadPluginM ()
 setWantedConstraints wantedCts = do 
   state <- get
@@ -250,22 +252,33 @@ setWantedConstraints wantedCts = do
 getInstEnvs :: SupermonadPluginM InstEnvs
 getInstEnvs = runTcPlugin TcPluginM.getInstEnvs
 
-getCurrentResults :: SupermonadPluginM ([(EvTerm, WantedCt)], [Ct])
+-- | Returns all collected results of the plugin so far.
+getCurrentResults :: SupermonadPluginM ([(EvTerm, WantedCt)], [DerivedCt])
 getCurrentResults = (\res -> (smResultEvidence res, smResultDerived res)) <$> gets smStateResult
 
+-- | Add the given evidence to the list of results.
 addEvidenceResult :: (EvTerm, WantedCt) -> SupermonadPluginM ()
 addEvidenceResult evidence = addEvidenceResults [evidence]
 
+-- | Add the given evidence to the list of results.
 addEvidenceResults :: [(EvTerm, WantedCt)] -> SupermonadPluginM ()
 addEvidenceResults evidence = modify $ \s -> s { smStateResult = smStateResult s <> (SupermonadPluginResult evidence []) } 
 
-addDerivedResult :: Ct -> SupermonadPluginM ()
+-- | Add the given derived result to the list of results.
+addDerivedResult :: DerivedCt -> SupermonadPluginM ()
 addDerivedResult derived = addDerivedResults [derived]
 
-addDerivedResults :: [Ct] -> SupermonadPluginM ()
+-- | Add the given derived results to the list of results.
+addDerivedResults :: [DerivedCt] -> SupermonadPluginM ()
 addDerivedResults derived = modify $ \s -> s { smStateResult = smStateResult s <> (SupermonadPluginResult [] derived) }
 
-processAndRemoveWantedConstraints :: (WantedCt -> SupermonadPluginM Bool) -> (WantedCt -> SupermonadPluginM ([(EvTerm, WantedCt)], [Ct])) -> SupermonadPluginM ()
+-- | Filters the wanted constraints using the given predicate. The found constraints
+--   are then processed using the given function and removed from the pool
+--   of wanted constraints once they were processed.
+processAndRemoveWantedConstraints 
+  :: (WantedCt -> SupermonadPluginM Bool) -- ^ Predicate to filter constraints with.
+  -> (WantedCt -> SupermonadPluginM ([(EvTerm, WantedCt)], [Ct])) -- ^ Processing for found constraints.
+  -> SupermonadPluginM ()
 processAndRemoveWantedConstraints predicate process = do
   wantedCts <- getWantedConstraints
   (foundCts, restCts) <- partitionM predicate wantedCts
@@ -285,12 +298,11 @@ processEachWantedConstraint process = do
   keepCts <- forM wantedCts process
   setWantedConstraints $ fmap snd $ filter (not . fst) $ zip keepCts wantedCts
 
+-- | Execute the given plugin code only if no plugin results were produced so far.
 whenNoResults :: SupermonadPluginM () -> SupermonadPluginM ()
 whenNoResults m = do
   empty <- (uncurry (&&) . (null *** null)) <$> getCurrentResults
   if empty then m else return ()
-
--- listens :: MonadWriter w m => (w -> b) -> m a -> m (a, b)
 
 -- -----------------------------------------------------------------------------
 -- Plugin debug and error printing
