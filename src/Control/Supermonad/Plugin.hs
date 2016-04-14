@@ -29,7 +29,7 @@ import InstEnv ( lookupInstEnv, instanceHead )
 import Unify ( tcUnifyTy )
 import Outputable ( showSDocUnsafe )
 
-import Control.Supermonad.Plugin.Log ( pprToStr )
+import Control.Supermonad.Plugin.Log ( pprToStr, sDocToStr )
 import qualified Control.Supermonad.Plugin.Log as L
 import Control.Supermonad.Plugin.Utils 
   ( isAmbiguousType, collectTyVars, skolemVarsBindFun )
@@ -105,7 +105,7 @@ supermonadSolve s given derived wanted = do
     else return ()
   case res of
     Left err -> do
-      L.printErr err
+      L.printErr $ sDocToStr err
       return noResult
     Right solution -> return solution
 

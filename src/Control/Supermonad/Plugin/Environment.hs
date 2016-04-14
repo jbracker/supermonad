@@ -21,7 +21,7 @@ module Control.Supermonad.Plugin.Environment
   , processAndRemoveWantedConstraints
   , processEachWantedConstraint
   , whenNoResults
-  , throwPluginError, catchPluginError
+  , throwPluginError, throwPluginErrorSDoc, catchPluginError
     -- * Debug and Error Output
   , assert, assertM
   , printErr, printMsg, printObj
@@ -49,6 +49,7 @@ import qualified TcPluginM
 import Outputable ( Outputable )
 import SrcLoc ( srcSpanFileName_maybe )
 import FastString ( unpackFS )
+import qualified Outputable as O
 
 import qualified Control.Supermonad.Plugin.Log as L
 import Control.Supermonad.Plugin.Utils
@@ -70,7 +71,7 @@ import Control.Supermonad.Plugin.Detect
 -- Plugin Monad
 -- -----------------------------------------------------------------------------
 
-type SupermonadError = String
+type SupermonadError = O.SDoc
 
 -- | The plugin monad.
 type SupermonadPluginM = ReaderT SupermonadPluginEnv 
@@ -134,7 +135,7 @@ data SupermonadPluginState = SupermonadPluginState
 --   The function will make sure that only the polymonad constraints
 --   and actually /given/, /derived/ or /wanted/ constraints
 --   are kept, respectivly.
-runSupermonadPlugin :: [GivenCt] -> [WantedCt] -> SupermonadPluginM a -> TcPluginM (Either String TcPluginResult)
+runSupermonadPlugin :: [GivenCt] -> [WantedCt] -> SupermonadPluginM a -> TcPluginM (Either SupermonadError TcPluginResult)
 runSupermonadPlugin givenCts wantedCts smM = do
   mSupermonadMdl <- findSupermonadModule
   mBindCls <- findBindClass
@@ -167,28 +168,28 @@ runSupermonadPlugin givenCts wantedCts smM = do
       let msg = "Could not find " ++ supermonadModuleName ++ " module:"
       L.printErr msg
       L.printErr mdlErrMsg
-      return $ Left $ msg ++ " " ++ mdlErrMsg
+      return $ Left $ stringToSupermonadError $ msg ++ " " ++ mdlErrMsg
     (_, Nothing, _, _, _, _) -> do
       let msg = "Could not find " ++ bindClassName ++ " class!"
       L.printErr msg
-      return $ Left msg
+      return $ Left $ stringToSupermonadError msg
     (_, _, Nothing, _, _, _) -> do
       let msg = "Could not find " ++ returnClassName ++ " class!"
       L.printErr msg
-      return $ Left msg
+      return $ Left $ stringToSupermonadError msg
     (_, _, _, Left mdlErrMsg, _, _) -> do
       let msg = "Could not find " ++ identityModuleName ++ " module:"
       L.printErr msg
       L.printErr mdlErrMsg
-      return $ Left $ msg ++ " " ++ mdlErrMsg
+      return $ Left $ stringToSupermonadError $ msg ++ " " ++ mdlErrMsg
     (_, _, _, _, Nothing, _) -> do
       let msg = "Could not find " ++ identityTyConName ++ " type constructor!"
       L.printErr msg
-      return $ Left msg
+      return $ Left $ stringToSupermonadError msg
     (_, _, _, _, _, Nothing) -> do
       let msg = "Could not find functor bind instances!"
       L.printErr msg
-      return $ Left msg
+      return $ Left $ stringToSupermonadError msg
 
 
 -- | Execute the given 'TcPluginM' computation within the polymonad plugin monad.
@@ -295,6 +296,9 @@ whenNoResults m = do
 -- Plugin debug and error printing
 -- -----------------------------------------------------------------------------
 
+stringToSupermonadError :: String -> SupermonadError
+stringToSupermonadError = O.text
+
 -- | Assert the given condition. If the condition does not
 --   evaluate to 'True', an error with the given message will
 --   be thrown the plugin aborts.
@@ -311,7 +315,12 @@ assertM condM msg = do
 -- | Throw an error with the given message in the plugin.
 --   This will abort all further actions.
 throwPluginError :: String -> SupermonadPluginM a
-throwPluginError = throwError
+throwPluginError = throwError . stringToSupermonadError
+
+-- | Throw an error with the given message in the plugin.
+--   This will abort all further actions.
+throwPluginErrorSDoc :: O.SDoc -> SupermonadPluginM a
+throwPluginErrorSDoc = throwError
 
 -- | Catch an error that was thrown by the plugin.
 catchPluginError :: SupermonadPluginM a -> (SupermonadError -> SupermonadPluginM a) -> SupermonadPluginM a
