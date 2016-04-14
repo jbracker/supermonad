@@ -142,6 +142,7 @@ constraintSourceLocation = RealSrcSpan . tcl_loc . ctl_env . constraintLocation
 constraintSourceLocation = tcl_loc . ctl_env . constraintLocation
 #endif
 
+-- | Collect all type variables in the given constraint.
 constraintTyVars :: Ct -> Set TyVar
 constraintTyVars = collectTyVars . ctev_pred . cc_ev
 

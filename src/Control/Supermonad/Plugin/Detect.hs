@@ -27,6 +27,7 @@ module Control.Supermonad.Plugin.Detect
 import Data.Maybe ( catMaybes, listToMaybe )
 import Control.Monad ( forM, liftM )
 
+import BasicTypes ( Arity )
 import TcRnTypes
   ( TcGblEnv(..)
   , TcTyThing(..) )
@@ -78,32 +79,35 @@ import Control.Supermonad.Plugin.Utils
 -- Constant Names (Magic Numbers...)
 -- -----------------------------------------------------------------------------
 
--- | Name of the 'Control.Supermonad' module.
+-- | Name of the "Control.Supermonad" module.
 supermonadModuleName :: String
 supermonadModuleName = "Control.Supermonad"
 
--- | Name of the 'Bind' type class.
+-- | Name of the 'Control.Supermonad.Bind' type class.
 bindClassName :: String
 bindClassName = "Bind"
 
--- | Name of the 'Bind' type class.
+-- | Name of the 'Control.Supermonad.Bind' type class.
 returnClassName :: String
 returnClassName = "Return"
 
--- | Name of the 'Data.Functor.Identity' module.
+-- | Name of the "Data.Functor.Identity" module.
 identityModuleName :: String
 identityModuleName = "Data.Functor.Identity"
 
--- | Name of the 'Identity' type constructor.
+-- | Name of the 'Data.Functor.Identity.Identity' type constructor.
 identityTyConName :: String
 identityTyConName = "Identity"
 
+-- | Name of the "Control.Supermonad.Prelude" module.
 supermonadPreudeModuleName :: String
 supermonadPreudeModuleName = "Control.Supermonad.Prelude"
 
+-- | Name of the 'Data.Functor.Functor' class.
 functorClassName :: String
 functorClassName = "Functor"
 
+-- | Name of the "Data.Functor" module.
 functorModuleName :: String
 functorModuleName = "Data.Functor"
 
@@ -111,7 +115,7 @@ functorModuleName = "Data.Functor"
 -- Polymonad Class Detection
 -- -----------------------------------------------------------------------------
 
--- | Checks if the module 'Control.Supermonad'
+-- | Checks if the module "Control.Supermonad"
 --   is imported and, if so, returns the module.
 findSupermonadModule :: TcPluginM (Either String Module)
 findSupermonadModule = do
@@ -120,7 +124,7 @@ findSupermonadModule = do
     Left _err -> findSupermonadPreludeModule
     Right mdl -> return $ Right mdl
 
--- | Checks if the module 'Control.Supermonad.Prelude'
+-- | Checks if the module "Control.Supermonad.Prelude"
 --   is imported and, if so, returns the module.
 findSupermonadPreludeModule :: TcPluginM (Either String Module)
 findSupermonadPreludeModule = getModule Nothing supermonadPreudeModuleName
@@ -132,23 +136,23 @@ isSupermonadModule mdl = mdlName `elem` [pmMdlName, pmPrelName, mAIN_NAME]
         pmMdlName = mkModuleName supermonadModuleName
         pmPrelName = mkModuleName supermonadPreudeModuleName
 
--- | Checks if the given class matches the shape of the 'Bind'
+-- | Checks if the given class matches the shape of the 'Control.Supermonad.Bind'
 --   type class and is defined in the right module.
 isBindClass :: Class -> Bool
 isBindClass cls = isClass cls isSupermonadModule bindClassName 3
 
--- | Checks if the given class matches the shape of the 'Return'
+-- | Checks if the given class matches the shape of the 'Control.Supermonad.Return'
 --   type class and is defined in the right module.
 isReturnClass :: Class -> Bool
 isReturnClass cls = isClass cls isSupermonadModule returnClassName 1
 
 -- | Checks if a type class matching the shape and name of the
---   'Bind' type class is in scope.
+--   'Control.Supermonad.Bind' type class is in scope.
 findBindClass :: TcPluginM (Maybe Class)
 findBindClass = findClass isBindClass
 
 -- | Checks if a type class matching the shape and name of the
---   'Bind' type class is in scope.
+--   'Control.Supermonad.Return' type class is in scope.
 findReturnClass :: TcPluginM (Maybe Class)
 findReturnClass = findClass isReturnClass
 
@@ -156,14 +160,13 @@ findReturnClass = findClass isReturnClass
 -- Identity Type Detection
 -- -----------------------------------------------------------------------------
 
--- | Checks if the module 'Data.Functor.Identity'
+-- | Checks if the module "Data.Functor.Identity"
 --   is imported and, if so, returns the module.
 findIdentityModule :: TcPluginM (Either String Module)
 findIdentityModule = getModule (Just basePackageKey) identityModuleName
 
--- | Tries to find the identity type constructor in the imported
---   modules. Will accept the constructor if it is imported through
---   either 'Data.Functor.Identity' or 'Control.Polymonad'.
+-- | Tries to find the 'Data.Functor.Identity.Identity' type constructor in the imported
+--   modules. Only looks for imports through specific modules.
 findIdentityTyCon :: TcPluginM (Maybe TyCon)
 findIdentityTyCon = do
   mdls <- findModules [findIdentityModule, findSupermonadModule, findSupermonadPreludeModule]
@@ -175,47 +178,65 @@ findIdentityTyCon = do
 -- Functor Bind Instance Detection
 -- -----------------------------------------------------------------------------
 
-areBindFunctorArguments :: TyCon -> Type -> Type -> Type -> Bool
+-- | Check if the given type arguments would form a 'Control.Supermonad.Bind' functor instance 
+--   if applied to 'Control.Supermonad.Bind': @Bind m Identity m@
+areBindFunctorArguments :: TyCon -- ^ The 'Data.Functor.Identity.Identity' type constructor.
+                        -> Type -> Type -> Type -> Bool
 areBindFunctorArguments idTyCon t1 t2 t3 =
   let idTC = mkTyConTy idTyCon
   in eqType t2 idTC && eqType t1 t3 -- Bind m Identity m
 
-areBindApplyArguments :: TyCon -> Type -> Type -> Type -> Bool
+-- | Check if the given type arguments would form a 'Control.Supermonad.Bind' apply instance 
+--   if applied to 'Control.Supermonad.Bind': @Bind Identity m m@
+areBindApplyArguments :: TyCon -- ^ The 'Data.Functor.Identity.Identity' type constructor.
+                      -> Type -> Type -> Type -> Bool
 areBindApplyArguments idTyCon t1 t2 t3 =
   let idTC = mkTyConTy idTyCon
   in eqType t1 idTC && eqType t2 t3 -- Bind Identity m m
 
-isFunctorBindInstance :: Class -> TyCon -> ClsInst -> Bool
+-- | Check if the given instance is a 'Control.Supermonad.Bind' functor instance: @Bind m Identity m@
+isFunctorBindInstance :: Class -- ^ 'Control.Supermonad.Bind' class.
+                      -> TyCon -- ^ 'Data.Functor.Identity.Identity' type constructor.
+                      -> ClsInst -> Bool
 isFunctorBindInstance bindCls idTyCon inst = 
   let (_cts, cls, _tc, args) = instanceType inst
   in cls == bindCls && hasOnlyFunctorConstraint inst && case args of
     [t1, t2, t3] -> areBindFunctorArguments idTyCon t1 t2 t3 -- Bind m Identity m
     _ -> False
 
-isApplyBindInstance :: Class -> TyCon -> ClsInst -> Bool
+-- | Check if the given instance is a 'Control.Supermonad.Bind' apply instance: @Bind Identity m m@
+isApplyBindInstance :: Class -- ^ 'Control.Supermonad.Bind' class.
+                    -> TyCon -- ^ 'Identity' type constructor.
+                    -> ClsInst -> Bool
 isApplyBindInstance bindCls idTyCon inst =
   let (_cts, cls, _tc, args) = instanceType inst
   in cls == bindCls && hasOnlyFunctorConstraint inst && case args of
     [t1, t2, t3] -> areBindApplyArguments idTyCon t1 t2 t3 -- Bind Identity m m
     _ -> False
 
+-- | Check if the given type constructor is the 'Data.Functor.Functor' type constructor.
 isFunctorTyCon :: TyCon -> Bool
 isFunctorTyCon tc = isClassTyCon tc && getTyConName tc == functorClassName
 
+-- | Check if the given type is an application of the 'Data.Functor.Functor' 
+--   type constructor to some type arguments.
 isFunctorTyConApp :: Type -> Bool
 isFunctorTyConApp t = case splitTyConApp_maybe t of
   Just (ctTyCon, ctArgs) | length ctArgs == 1 -> isFunctorTyCon ctTyCon
   _ -> False
 
+-- | Check if the constraints of the given instance only contain 
+--   'Data.Functor.Functor' class constraints.
 hasOnlyFunctorConstraint :: ClsInst -> Bool
 hasOnlyFunctorConstraint inst =
   let (cts, _, _, _) = instanceType inst
   in (length cts <= 2) && all isFunctorTyConApp cts
 
--- | Requires the bind class and identity type constructor as argument.
---   Returns the pair of instances (Bind m Identity m, Bind Identity n n)
---   if these instances can be found.
-findFunctorBindInstances :: Class -> TyCon -> TcPluginM (Maybe (ClsInst, ClsInst))
+-- | Returns the pair of 'Control.Supermonad.Bind' 
+--   instances @(Bind m Identity m, Bind Identity n n)@ if these instances can be found.
+findFunctorBindInstances :: Class -- ^ 'Control.Supermonad.Bind' class.
+                         -> TyCon -- ^ 'Data.Functor.Identity.Identity' type constructor.
+                         -> TcPluginM (Maybe (ClsInst, ClsInst))
 findFunctorBindInstances bindCls idTyCon = do
   let isFunctorBindInst = isFunctorBindInstance bindCls idTyCon
   let isApplyBindInst = isApplyBindInstance bindCls idTyCon
@@ -275,7 +296,9 @@ findClass isClass' = do
     (inst : _) -> Just $ is_cls inst
     [] -> Nothing
 
-isClass :: Class -> (Module -> Bool) -> String -> Int -> Bool
+-- | Check if the given class has the given name, arity and if the classes
+--   module fulfills the given predicate.
+isClass :: Class -> (Module -> Bool) -> String -> Arity -> Bool
 isClass cls isModule targetClassName targetArity =
   let clsName = className cls
       clsMdl = nameModule clsName
@@ -327,7 +350,7 @@ isImportedFrom rdrElt mdl = case gre_prov rdrElt of
   Imported [] -> False
   Imported impSpecs -> moduleName mdl == importSpecModule (last impSpecs)
 
--- | Returns a list of all 'Control.Polymonad' instances that are currently in scope.
+-- | Returns a list of all instances for the given class that are currently in scope.
 findInstancesInScope :: Class -> TcPluginM [ClsInst]
 findInstancesInScope cls = do
   instEnvs <- TcPluginM.getInstEnvs
