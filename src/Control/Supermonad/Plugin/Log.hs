@@ -1,7 +1,8 @@
 
 -- | Log message formatting and debuging functions.
 module Control.Supermonad.Plugin.Log
-  ( pprToStr, missingCaseError
+  ( pprToStr, sDocToStr
+  , missingCaseError
   , pmErrMsg, pmDebugMsg, pmObjMsg
   , formatGroupSrcSpans
   , formatConstraint, formatSpan
@@ -9,7 +10,7 @@ module Control.Supermonad.Plugin.Log
   , printTrace, printObjTrace, trace
   -- * Debugging and priniting from within TcPluginM
   , printObj, printMsg, printErr
-  , pluginAssert
+  , pluginAssert, pluginFailSDoc
   ) where
 
 import Data.List ( groupBy, intercalate )
@@ -151,12 +152,16 @@ printErr = internalPrint . pmErrMsg
 printObj :: Outputable o => o -> TcPluginM ()
 printObj = internalPrint . pmObjMsg . pprToStr
 
+-- | Throw a type checker error with the given message.
+pluginFailSDoc :: SDoc -> TcPluginM a
+pluginFailSDoc msg = do
+  printMsg $ sDocToStr msg
+  unsafeTcPluginTcM $ failWithM (sDocToStr msg)
+
 -- | If the given condition is false this will fail the compiler with the given error message.
 pluginAssert :: Bool -> SDoc -> TcPluginM ()
 pluginAssert True _ = return ()
-pluginAssert False msg = do
-  printMsg $ sDocToStr msg
-  unsafeTcPluginTcM $ failWithM (sDocToStr msg)
+pluginAssert False msg = pluginFailSDoc msg
 
 
 
