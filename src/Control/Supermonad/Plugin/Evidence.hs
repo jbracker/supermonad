@@ -114,32 +114,28 @@ matchInstanceTyVars' varsToBind inst instArgs = do
 -- | Apply the given instance dictionary to the given type arguments
 --   and try to produce evidence for the application.
 --
---   The list of types has to match the number of open variables of the
---   given instance dictionary in length. They need to match up with
---   the list of free type variables given for the class instance ('is_tvs').
---   The list can be created using 'matchInstanceTyVars'.
---   
---   The first argument is the 'Bind' class. The second and thrid argument
---   is the functor and apply 'Bind' instance respectivly.
---   
---   The fourth argument is a list of given constraints that can be used
---   to produce evidence for otherwise not fulfilled constraints. Be aware that
---   only actually /given/ constraints (as in 'isGivenCt') are useful here,
---   because only those produce evidence for themselves. All other constraints
---   will be ignored.
---
 --   This function should properly work with type synonyms and type functions.
 --   It only produces evidence for type equalities if they are trivial, i.e., @a ~ a@.
 --   
 --   Handles 'Bind' constraints that can be resolved with the functor or 
 --   apply instance specially. This leads to 'Bind Identity Identity Identity'
 --   being solved although there is no unique matching instance for it.
-produceEvidenceFor :: Class -- ^ The 'Bind' class.
-                   -> ClsInst -- ^ The functor 'Bind' instance.
-                   -> ClsInst -- ^ The apply 'Bind' instance.
-                   -> TyCon -- ^ The 'Identity' type constructor.
-                   -> [GivenCt] -- ^ The given constraints to be used when producing evidence.
-                   -> ClsInst -> [Type] -> TcPluginM (Either SDoc EvTerm)
+produceEvidenceFor 
+  :: Class     -- ^ The 'Bind' class.
+  -> ClsInst   -- ^ The functor 'Bind' instance.
+  -> ClsInst   -- ^ The apply 'Bind' instance.
+  -> TyCon     -- ^ The 'Identity' type constructor.
+  -> [GivenCt] -- ^ The given constraints that can be used when producing evidence.
+               --   Be aware that only actually /given/ constraints (as in 'isGivenCt') 
+               --   are useful here, because only those produce evidence for themselves.
+               --   All other constraints will be ignored.
+  -> ClsInst   -- ^ The instance to produce evidence for.
+  -> [Type]    -- ^ The type arguments of the instance. These 
+               --   have to be given in order of the instance 
+               --   variables ('is_tvs'). It has to match the number of open variables of the
+               --   given instance dictionary in length. See 'matchInstanceTyVars' to achieve this.
+  -> TcPluginM (Either SDoc EvTerm) -- ^ Either an error if evidence can not 
+                                    -- be produced or the actual evidence.
 produceEvidenceFor bindCls instFunctor instApply idTyCon givenCts inst instArgs = do
   -- Get the instance type variables and constraints (by that we know the
   -- number of type arguments and dictionart arguments for the EvDFunApp)
@@ -190,7 +186,7 @@ produceEvidenceForCtType :: Class -- ^ The 'Bind' class.
                          -> ClsInst -- ^ The apply 'Bind' instance.
                          -> TyCon -- ^ The 'Identity' type constructor.
                          -> [GivenCt] -- ^ The given constraints to be used when producing evidence.
-                         -> Type -- ^ The constraint to produce evidence for.
+                         -> Type -- ^ The constraint to produce evidence for, given as a type.
                          -> TcPluginM (Either SDoc EvTerm)
 produceEvidenceForCtType bindCls instFunctor instApply idTyCon givenCts ct =
   case splitTyConApp_maybe ct of
@@ -369,14 +365,17 @@ produceEvidenceForCtType bindCls instFunctor instApply idTyCon givenCts ct =
 --   
 --   Note: This function only handle class constraints. It will always deliver 
 --   'False' when another constraint type is given.
-isPotentiallyInstantiatedCt :: Class -- ^ The 'Bind' class.
-                            -> ClsInst -- ^ The functor 'Bind' instance.
-                            -> ClsInst -- ^ The apply 'Bind' instance.
-                            -> TyCon -- ^ The 'Identity' type constructor.
-                            -> [GivenCt] -- ^ The given constraints to be used when producing evidence.
-                            -> Ct 
-                            -> [(TyVar, Either TyCon TyVar)] 
-                            -> TcPluginM Bool
+isPotentiallyInstantiatedCt 
+  :: Class     -- ^ The 'Bind' class.
+  -> ClsInst   -- ^ The functor 'Bind' instance.
+  -> ClsInst   -- ^ The apply 'Bind' instance.
+  -> TyCon     -- ^ The 'Identity' type constructor.
+  -> [GivenCt] -- ^ The given constraints to be used when producing evidence.
+  -> Ct        -- ^ The constraint to check.
+  -> [(TyVar, Either TyCon TyVar)] -- ^ Associations to use for type constructor variables in the constraint
+  -> TcPluginM Bool -- ^ Will deliver false of the constraint definitly can not 
+                    --   be instantiated. If 'True' is returned the constraint 
+                    --   either can be instantiated or it is unknown of that is possible.
 isPotentiallyInstantiatedCt bindCls instFunctor instApply idTyCon givenCts ct assocs = 
   case constraintClassType ct of
     -- If we have a class constraint...
@@ -384,14 +383,17 @@ isPotentiallyInstantiatedCt bindCls instFunctor instApply idTyCon givenCts ct as
     Nothing -> return False
 
 -- | Utility helper for 'isPotentiallyInstantiatedCt' that checks class constraints.
-isPotentiallyInstantiatedCtType :: Class -- ^ The 'Bind' class.
-                                -> ClsInst -- ^ The functor 'Bind' instance.
-                                -> ClsInst -- ^ The apply 'Bind' instance.
-                                -> TyCon -- ^ The 'Identity' type constructor.
-                                -> [GivenCt] -- ^ The given constraints to be used when producing evidence.
-                                -> (Class, [Type]) 
-                                -> [(TyVar, Either TyCon TyVar)] 
-                                -> TcPluginM Bool
+isPotentiallyInstantiatedCtType 
+  :: Class     -- ^ The 'Bind' class.
+  -> ClsInst   -- ^ The functor 'Bind' instance.
+  -> ClsInst   -- ^ The apply 'Bind' instance.
+  -> TyCon     -- ^ The 'Identity' type constructor.
+  -> [GivenCt] -- ^ The given constraints to be used when producing evidence.
+  -> (Class, [Type]) -- ^ A class and the type arguments for that class to 
+                     --   check if the class is potentially instantiated for those arguments.
+                     --   The arguments are given in the actual representational order used in Haskell.
+  -> [(TyVar, Either TyCon TyVar)] -- ^ Associations to use for type constructor variables in the constraint
+  -> TcPluginM Bool
 isPotentiallyInstantiatedCtType bindCls instFunctor instApply idTyCon givenCts (ctCls, ctArgs) assocs = do
   let produceEvidence :: Type -> TcPluginM (Either SDoc EvTerm)
       produceEvidence = produceEvidenceForCtType bindCls instFunctor instApply idTyCon givenCts
