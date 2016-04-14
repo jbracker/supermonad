@@ -128,15 +128,13 @@ data SupermonadPluginState = SupermonadPluginState
   -- ^ The current results of the supermonad plugin.
   }
 
--- | @runPmPlugin givenAndDerived wanted m@ runs the given polymonad plugin solver @m@
---   within the type checker plugin monad. The /given/ and /derived/ constraints are
---   passed in through @givenAndDerived@ and the /wanted/ constraints are passed in
---   through @wanted@.
---
---   The function will make sure that only the polymonad constraints
---   and actually /given/, /derived/ or /wanted/ constraints
---   are kept, respectivly.
-runSupermonadPlugin :: [GivenCt] -> [WantedCt] -> SupermonadPluginM a -> TcPluginM (Either SupermonadError TcPluginResult)
+-- | Runs the given supermonad plugin solver within the type checker plugin 
+--   monad.
+runSupermonadPlugin 
+  :: [GivenCt] -- ^ /Given/ and /derived/ constraints. 
+  -> [WantedCt] -- ^ /Wanted/ constraints.
+  -> SupermonadPluginM a -- ^ Plugin code to run.
+  -> TcPluginM (Either SupermonadError TcPluginResult) -- ^ Either an error message or an actual plugin result.
 runSupermonadPlugin givenCts wantedCts smM = do
   mSupermonadMdl <- findSupermonadModule
   mBindCls <- findBindClass
@@ -193,7 +191,7 @@ runSupermonadPlugin givenCts wantedCts smM = do
       return $ Left $ stringToSupermonadError msg
 
 
--- | Execute the given 'TcPluginM' computation within the polymonad plugin monad.
+-- | Execute the given 'TcPluginM' computation within the plugin monad.
 runTcPlugin :: TcPluginM a -> SupermonadPluginM a
 runTcPlugin = lift . lift . lift
 

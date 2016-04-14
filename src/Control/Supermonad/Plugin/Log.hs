@@ -38,7 +38,7 @@ import Control.Supermonad.Plugin.Constraint ( constraintSourceLocation )
 prefixMsg :: String -> String -> String
 prefixMsg prefix = unlines . fmap (prefix ++) . lines
 
--- | Message prefix of the polymonad plugin.
+-- | Message prefix of the plugin.
 pluginMsgPrefix :: String
 pluginMsgPrefix = "[SM]"
 
@@ -140,15 +140,15 @@ printObjTrace o = trace (pprToStr o) o
 internalPrint :: String -> TcPluginM ()
 internalPrint = tcPluginIO . putStr
 
--- | Print a message using the polymonad plugin formatting.
+-- | Print a message using the plugin formatting.
 printMsg :: String -> TcPluginM ()
 printMsg = internalPrint . pmDebugMsg
 
--- | Print a message using the polymonad plugin formatting.
+-- | Print a message using the plugin formatting.
 printErr :: String -> TcPluginM ()
 printErr = internalPrint . pmErrMsg
 
--- | Print an object using the polymonad plugin formatting.
+-- | Print an object using the plugin formatting.
 printObj :: Outputable o => o -> TcPluginM ()
 printObj = internalPrint . pmObjMsg . pprToStr
 

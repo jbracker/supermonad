@@ -294,8 +294,8 @@ produceEvidenceForCtType bindCls instFunctor instApply idTyCon givenCts ct =
     produceClassCtEv cls args = do
       -- Get global instance environment
       instEnvs <- getInstEnvs
-      -- Look for suitable instance. Since we are not necessarily working
-      -- with polymonads anymore we need to find a unique one.
+      -- Look for a suitable instance. Since we are not necessarily working
+      -- with 'Bind's anymore we need to find a unique one.
       case lookupUniqueInstEnv instEnvs cls args of -- (snd <$> normCtArgs)
         -- No instance found, too bad...
         Left err ->
@@ -355,10 +355,10 @@ produceEvidenceForCtType bindCls instFunctor instApply idTyCon givenCts ct =
 
 -- | Check if a given class constraint can 
 --   potentially be instantiated using the given
---   type constructors. By potentially we mean: First, check if the
---   polymonad instance can actually be applied to some combination of
---   the type constructors. Then check if all resulting constraints that
---   do not contain free variables actually can be instantiated.
+--   type constructors. By potentially we mean: First, check if an
+--   instance can actually be applied to the instance. 
+--   Then check if all resulting constraints that do not contain 
+--   free variables actually can be instantiated.
 --   
 --   Note: A constraint is only potentially instantiable if there is only
 --   one matching instance for the constraint and all of its implied constraints.
