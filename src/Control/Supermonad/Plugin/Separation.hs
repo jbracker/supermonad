@@ -1,4 +1,6 @@
- 
+
+-- | Functions to separate a set of wanted constrains into groups of 
+--   constraints that require being solved together.
 module Control.Supermonad.Plugin.Separation 
   ( separateContraints
   , componentTopTyCons

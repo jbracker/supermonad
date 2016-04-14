@@ -1,4 +1,5 @@
- 
+
+-- | Functions to solve wanted constraints.
 module Control.Supermonad.Plugin.Solving 
   ( solveConstraints
   ) where
@@ -39,6 +40,7 @@ import Control.Supermonad.Plugin.Utils
   ( collectTopTcVars
   , associations, allM )
 
+-- | Attempts to solve the given group /wanted/ constraints. See 'separateContraints'.
 solveConstraints :: [WantedCt] -> SupermonadPluginM ()
 solveConstraints wantedCts = do
   -- Calculate the different groups of constraints that belong 
