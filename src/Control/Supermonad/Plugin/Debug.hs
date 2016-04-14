@@ -13,10 +13,6 @@ import Data.List ( isInfixOf )
 import Outputable
   ( Outputable(..), SDoc
   , showSDocUnsafe )
-import Coercion ( Coercion(..) )
-import TcEvidence 
-  ( TcCoercion(..)
-  , EvTerm(..), EvTypeable(..), EvCallStack(..) )
 
 -- | Convert some generic outputable to a string (potentially unsafe).
 pprToStr :: Outputable o => o -> String
