@@ -7,43 +7,32 @@ module Control.Supermonad.Plugin
   ( plugin ) where
 
 import Data.Maybe ( catMaybes, isNothing )
-import Data.List ( find )
 import qualified Data.Set as S
 
-import Control.Monad ( forM, forM_, filterM )
+import Control.Monad ( forM_, filterM )
 
 import Plugins ( Plugin(tcPlugin), defaultPlugin )
 import Type 
   ( Type, TyVar, TvSubst
-  , getTyVar, mkTyConTy, substTyVar
-  , eqType
+  , getTyVar, substTyVar
   , isTyVarTy )
-import TyCon ( TyCon )
 import TcRnTypes
   ( Ct(..)
   , TcPlugin(..), TcPluginResult(..) )
 import TcPluginM ( TcPluginM )
-import TcEvidence ( EvTerm )
-import TcType ( isAmbiguousTyVar )
 import InstEnv ( lookupInstEnv, instanceHead )
 import Unify ( tcUnifyTy )
-import Outputable ( showSDocUnsafe )
 
-import Control.Supermonad.Plugin.Log ( pprToStr, sDocToStr )
+import Control.Supermonad.Plugin.Log ( sDocToStr )
 import qualified Control.Supermonad.Plugin.Log as L
 import Control.Supermonad.Plugin.Utils 
-  ( isAmbiguousType, collectTyVars, skolemVarsBindFun )
+  ( collectTyVars )
 import Control.Supermonad.Plugin.Constraint
-  ( WantedCt, DerivedCt
+  ( DerivedCt
   , mkDerivedTypeEqCt
   , constraintClassTyArgs
   , constraintTopTcVars
-  , sortConstraintsByLine
-  , isClassConstraint )
-import Control.Supermonad.Plugin.Detect
-  ( areBindFunctorArguments, areBindApplyArguments )
-import Control.Supermonad.Plugin.Evidence
-  ( matchInstanceTyVars )
+  , sortConstraintsByLine )
 import Control.Supermonad.Plugin.Solving
   ( solveConstraints )
 import Control.Supermonad.Plugin.Environment
@@ -62,8 +51,7 @@ import Control.Supermonad.Plugin.Environment
   , runTcPlugin
   , printMsg, printObj, printConstraints )
 import Control.Supermonad.Plugin.Environment.Lift
-  ( produceEvidenceFor
-  , isBindConstraint)
+  ( isBindConstraint)
 
 -- -----------------------------------------------------------------------------
 -- The Plugin
@@ -171,7 +159,7 @@ supermonadSolve' _s = do
       Nothing -> []
       
     findAndRemove :: (a -> Bool) -> [a] -> Maybe (a, [a])
-    findAndRemove p [] = Nothing
+    findAndRemove _ [] = Nothing
     findAndRemove p (a:as) = 
       if p a 
         then Just (a, as) 

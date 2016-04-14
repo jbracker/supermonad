@@ -13,19 +13,15 @@ import TyCon ( TyCon )
 import Type ( TyVar )
 import TcType ( isAmbiguousTyVar )
 
-import Control.Supermonad.Plugin.Debug ( sDocToStr )
+-- import Control.Supermonad.Plugin.Debug ( sDocToStr )
 import Control.Supermonad.Plugin.Environment 
   ( SupermonadPluginM
   , getGivenConstraints
-  , getInstEnvs
   , getReturnClass, getBindClass
   , getIdentityTyCon
-  , getBindFunctorInstance, getBindApplyInstance
   , addDerivedResult, addEvidenceResult
-  , runTcPlugin
   , printMsg, printConstraints, printObj
-  , throwPluginError, throwPluginErrorSDoc, catchPluginError
-  , assertM )
+  , throwPluginError, throwPluginErrorSDoc )
 import Control.Supermonad.Plugin.Environment.Lift
   ( produceEvidenceForCt
   , isPotentiallyInstantiatedCt
@@ -39,13 +35,8 @@ import Control.Supermonad.Plugin.Constraint
 import Control.Supermonad.Plugin.Separation 
   ( separateContraints
   , componentTopTyCons, componentTopTcVars )
-import Control.Supermonad.Plugin.Evidence 
-  ( matchInstanceTyVars' )
 import Control.Supermonad.Plugin.Utils 
-  ( collectTyVars
-  , collectTopTcVars
-  , applyTyCon
-  --, splitKindFunTyConTyVar
+  ( collectTopTcVars
   , associations, allM )
 
 solveConstraints :: [WantedCt] -> SupermonadPluginM ()
@@ -53,10 +44,6 @@ solveConstraints wantedCts = do
   -- Calculate the different groups of constraints that belong 
   -- together for solving purposes.
   ctGroups <- separateContraints wantedCts
-  
-  -- Get classes to filter constraints.
-  returnCls <- getReturnClass
-  bindCls <- getBindClass
   
   -- TODO: Filter out constraint groups that do not contain return or bind constraints.
   -- We can't solve these so we won't handle them.
@@ -96,28 +83,28 @@ solveConstraints wantedCts = do
       -- 2. There are no associations, because we can't find a solution
       --    to the variables in the group. If this is the case the group 
       --    is unsolvable.
-      (ctGroup, []) -> do
-        topTcVars <- concat <$> mapM collectBindReturnTopTcVars ctGroup
+      (_, []) -> do
+        topTcVars <- concat <$> mapM collectBindReturnTopTcVars clearedCtGroup
         -- The first case:
         if null topTcVars then do
           printMsg "Group does not require solving:"
-          printConstraints ctGroup
+          printConstraints clearedCtGroup
         -- The second case:
         else do
-          printConstraints ctGroup
+          printConstraints clearedCtGroup
           throwPluginError "There are no possible associations for the current constraint group!"
       
       -- There are constraints and exactly one association...
-      (ctGroup, [appliedAssoc]) -> do
+      (_, [appliedAssoc]) -> do
         printMsg "Derived Results:"
         forM_ appliedAssoc $ \(tv, ty, _flexVars) -> do
-          let derivedRes = mkDerivedTypeEqCt (head ctGroup) tv ty
+          let derivedRes = mkDerivedTypeEqCt (head clearedCtGroup) tv ty
           printObj derivedRes
           addDerivedResult derivedRes
       
       -- There are constraints and more then one association...
-      (ctGroup, appliedAssocs) -> do     
-        printConstraints ctGroup
+      (_, _) -> do     
+        printConstraints clearedCtGroup
         printMsg "Possible Assocs:"
         forM_ appliedAssocs printObj
         throwPluginError "There is more then one possible association for the current constraint group!"
@@ -127,7 +114,7 @@ solveConstraints wantedCts = do
     collectBindReturnTopTcVars ct = do
       isBindOrReturn <- liftM2 (||) (isBindConstraint ct) (isReturnConstraint ct)
       case (isBindOrReturn, constraintClassType ct) of
-        (True, Just (cls, tyArgs)) -> return $ S.toList $ collectTopTcVars tyArgs
+        (True, Just (_cls, tyArgs)) -> return $ S.toList $ collectTopTcVars tyArgs
         _ -> return []
 
 

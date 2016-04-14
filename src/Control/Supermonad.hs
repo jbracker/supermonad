@@ -62,7 +62,7 @@ instance Bind P.Maybe P.Maybe P.Maybe where
 --   it still forms a supermonad.
 instance Bind P.Maybe [] [] where
   (P.Just a) >>= f = f a
-  P.Nothing  >>= f = []
+  P.Nothing  >>= _ = []
 instance Bind P.IO P.IO P.IO where
   (>>=) = (P.>>=)
 instance Bind (P.Either e) (P.Either e) (P.Either e) where
