@@ -398,23 +398,7 @@ isPotentiallyInstantiatedCtType bindCls instFunctor instApply idTyCon givenCts (
   
   -- Get the type constructors partially applied to some new variables as
   -- is necessary.
-  {-
-  appliedAssocs <- forM assocs $ \(tv, tc) -> do
-    let (tvKindArgs, tvKindRes) = splitKindFunTys $ tyVarKind tv
-    let (tcKindArgs, tcKindRes) = splitKindFunTyConTyVar tc
-    pluginAssert (length tcKindArgs >= length tvKindArgs) 
-           $ O.text "Kind mismatch between type constructor and type variable: " 
-           $$ O.ppr tcKindArgs $$ O.text " | " $$ O.ppr tvKindArgs
-    pluginAssert (and (uncurry (==) <$> zip (reverse tvKindArgs) (reverse tcKindArgs)) && tcKindRes == tvKindRes) 
-           $ O.text "Kind mismatch between type constructor and type variable: " 
-           $$ O.ppr tc $$ O.text " | " $$ O.ppr tv
-    -- Apply as many new type variables to the type constructor as are 
-    -- necessary for its kind to match that of the type variable.
-    (appliedTcTy, argVars) <- applyTyCon (tc, take (length tcKindArgs - length tvKindArgs) tcKindArgs)
-    return ((tv, appliedTcTy, argVars) :: (TyVar, Type, [TyVar]))
-  -}
-  eAppliedAssocs <- partiallyApplyTyCons assocs
-  appliedAssocs <- either pluginFailSDoc return eAppliedAssocs
+  appliedAssocs <- either pluginFailSDoc return =<< partiallyApplyTyCons assocs
   
   -- Create the substitution for the given associations.
   let ctSubst = mkTopTvSubst $ fmap (\(tv, t, _) -> (tv, t)) appliedAssocs

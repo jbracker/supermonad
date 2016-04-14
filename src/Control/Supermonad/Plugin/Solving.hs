@@ -67,26 +67,9 @@ solveConstraints wantedCts = do
   -- Partially apply type constructors in associations to fit the kind of 
   -- the type variable they are associated with.
   appliedSolvedGroups <- forM validAssocsForGroup $ \(ctGroup, assocs) -> do
-    
     appliedAssocs <- forM assocs $ \assoc -> either throwPluginErrorSDoc return =<< partiallyApplyTyCons assoc
-    
-      {- forM assoc $ \(tv, tc) -> do
-      let (tvKindArgs, tvKindRes) = splitKindFunTys $ tyVarKind tv
-      let (tcKindArgs, tcKindRes) = splitKindFunTyConTyVar tc
-      assertM (return $ length tcKindArgs >= length tvKindArgs) 
-              $ sDocToStr
-              $ O.text "solveConstraints: Kind mismatch between type constructor and type variable: " 
-              $$ O.ppr tcKindArgs $$ O.text " | " $$ O.ppr tvKindArgs
-      assertM (return $ and (uncurry (==) <$> zip (reverse tvKindArgs) (reverse tcKindArgs)) && tcKindRes == tvKindRes)
-              $ sDocToStr
-              $ O.text "solveConstraints: Kind mismatch between type constructor and type variable: " 
-              $$ O.ppr tc $$ O.text " | " $$ O.ppr tv
-      -- Apply as many new type variables to the type constructor as are 
-      -- necessary for its kind to match that of the type variable.
-      (appliedTcTy, argVars) <- runTcPlugin $ applyTyCon (tc, take (length tcKindArgs - length tvKindArgs) tcKindArgs)
-      return ((tv, appliedTcTy, argVars) :: (TyVar, Type, [TyVar]))
-      -}
     return (ctGroup, appliedAssocs)
+    
   -- For each group, try to produde evidence for each involved constraint.
   forM_ appliedSolvedGroups $ \(ctGroup, appliedAssocs) -> do
     -- Look through the group and see if we can find constraints that do not 
