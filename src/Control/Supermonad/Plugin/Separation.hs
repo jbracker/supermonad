@@ -5,6 +5,7 @@ module Control.Supermonad.Plugin.Separation
   ( separateContraints
   , componentTopTyCons
   , componentTopTcVars
+  , componentMonoTyCon
   ) where
 
 import Data.Maybe ( fromJust )
@@ -33,6 +34,17 @@ import Control.Supermonad.Plugin.Environment.Lift
   ( isReturnConstraint, isBindConstraint )
 
 type SCNode = LNode WantedCt
+
+-- | Checks if the given component only involved exactly one top-level type constructor
+--   in its supermonad constraints.
+componentMonoTyCon :: [WantedCt] -> SupermonadPluginM (Maybe TyCon)
+componentMonoTyCon cts = do
+  smCts <- filterM (\ct -> liftM2 (||) (isReturnConstraint ct) (isBindConstraint ct)) cts
+  let tyVars = componentTopTcVars smCts
+  let tyCons = componentTopTyCons smCts
+  return $ case (S.toList tyCons, S.size tyVars) of
+    ([tc], 0) -> Just tc
+    _ -> Nothing
 
 -- | Collect all top-level type constructors for the given list of 
 --   wanted constraints. See 'collectTopTyCons'.

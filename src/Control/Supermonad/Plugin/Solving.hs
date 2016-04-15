@@ -4,7 +4,8 @@ module Control.Supermonad.Plugin.Solving
   ( solveConstraints
   ) where
 
-import Data.Maybe ( catMaybes )
+import Data.Maybe ( catMaybes, isJust, fromJust )
+import Data.List ( partition )
 import qualified Data.Set as S
 
 import Control.Monad ( when, forM, forM_, filterM, liftM2 )
@@ -32,85 +33,120 @@ import Control.Supermonad.Plugin.Constraint
   ( WantedCt
   , mkDerivedTypeEqCt
   , isClassConstraint
-  , constraintClassType )
+  , constraintClassType
+  , constraintClassTyArgs )
 import Control.Supermonad.Plugin.Separation 
   ( separateContraints
-  , componentTopTyCons, componentTopTcVars )
+  , componentTopTyCons, componentTopTcVars
+  , componentMonoTyCon )
 import Control.Supermonad.Plugin.Utils 
   ( collectTopTcVars
   , associations, allM )
 
+
 -- | Attempts to solve the given group /wanted/ constraints. See 'separateContraints'.
 solveConstraints :: [WantedCt] -> SupermonadPluginM ()
 solveConstraints wantedCts = do
+  
+  -- Look through the constraints and see if we can find constraints that do not 
+  -- contain ambiguous variables and try to produce evidence for them.
+  clearedWantedCts <- fmap catMaybes $ forM wantedCts $ \ct -> do
+    eEv <- produceEvidenceForCt ct
+    case eEv of
+      Left _err -> return $ Just ct
+      Right ev -> do
+        addEvidenceResult (ev, ct) -- :: (EvTerm, WantedCt) -> SupermonadPluginM ()
+        return Nothing
+  
   -- Calculate the different groups of constraints that belong 
   -- together for solving purposes.
-  ctGroups <- separateContraints wantedCts
+  ctGroups <- separateContraints clearedWantedCts
+  
+  markedCtGroups <- forM ctGroups $ \g -> do 
+    mMonoTyCon <- componentMonoTyCon g
+    return (mMonoTyCon, g)
   
   -- TODO: Filter out constraint groups that do not contain return or bind constraints.
   -- We can't solve these so we won't handle them.
   
+  let (monoGroups, polyGroups) = partition (isJust . fst) markedCtGroups
+  
+  forM_ (fmap (\(tc, g) -> (fromJust tc, g)) monoGroups) solveMonoConstraintGroup
+  
+  forM_ (fmap snd polyGroups) solvePolyConstraintGroups 
+
+
+solveMonoConstraintGroup :: (TyCon, [WantedCt]) -> SupermonadPluginM ()
+solveMonoConstraintGroup (_, []) = return ()
+solveMonoConstraintGroup (tyCon, ctGroup) = do
+  printMsg "Solve mono group..."
+  printConstraints ctGroup
+  smCtGroup <- filterM (\ct -> liftM2 (||) (isReturnConstraint ct) (isBindConstraint ct)) ctGroup
+  forM_ smCtGroup $ \ct -> do
+    let ctAmbVars = S.filter isAmbiguousTyVar 
+                  $ collectTopTcVars 
+                  $ maybe [] id
+                  $ constraintClassTyArgs ct
+    forM_ ctAmbVars $ \tyVar -> do
+      appliedTyCon <- either throwPluginErrorSDoc return =<< partiallyApplyTyCons [(tyVar, Left tyCon)]
+      case appliedTyCon of
+        [] -> do
+          throwPluginError "How did this become an empty list?"
+        ((tv, t, _) : _) -> do
+          printObj $ mkDerivedTypeEqCt ct tv t
+          addDerivedResult $ mkDerivedTypeEqCt ct tv t
+    
+
+-- | Solve constraint groups that have more them one supermonad type 
+--   constructor (variable) involved.
+solvePolyConstraintGroups :: [WantedCt] -> SupermonadPluginM ()
+solvePolyConstraintGroups ctGroup = do
+  printMsg "Solve poly group..."
+  printConstraints ctGroup
   -- Find a valid associations for each of the constraint groups.
-  validAssocsForGroup <- forM ctGroups $ determineValidConstraintGroupAssocs
+  (_, assocs) <- determineValidConstraintGroupAssocs ctGroup
   
-  -- Partially apply type constructors in associations to fit the kind of 
-  -- the type variable they are associated with.
-  appliedSolvedGroups <- forM validAssocsForGroup $ \(ctGroup, assocs) -> do
-    appliedAssocs <- forM assocs $ \assoc -> either throwPluginErrorSDoc return =<< partiallyApplyTyCons assoc
-    return (ctGroup, appliedAssocs)
-    
-  -- For each group, try to produde evidence for each involved constraint.
-  forM_ appliedSolvedGroups $ \(ctGroup, appliedAssocs) -> do
-    -- Look through the group and see if we can find constraints that do not 
-    -- contain ambiguous variables and try to produce evidence for them.
-    clearedCtGroup <- fmap catMaybes $ forM ctGroup $ \ct -> do
-      eEv <- produceEvidenceForCt ct
-      case eEv of
-        Left _err -> return $ Just ct
-        Right ev -> do
-          addEvidenceResult (ev, ct) -- :: (EvTerm, WantedCt) -> SupermonadPluginM ()
-          return Nothing
-    
-    -- Now check if there are constraint that left that require solving.
-    case (clearedCtGroup, appliedAssocs) of
-      
-      -- No constraints left, we are done.
-      ([], _) -> return ()
-      
-      -- There are constraints, but there are no associations...
-      -- There are two possible reasons for this to happen:
-      -- 1. The group does not have type constructor variables. 
-      --    Which means there is nothing to solve and therefore 
-      --    we are done with solving. 
-      -- 2. There are no associations, because we can't find a solution
-      --    to the variables in the group. If this is the case the group 
-      --    is unsolvable.
-      (_, []) -> do
-        topTcVars <- concat <$> mapM collectBindReturnTopTcVars clearedCtGroup
-        -- The first case:
-        if null topTcVars then do
-          printMsg "Group does not require solving:"
-          printConstraints clearedCtGroup
-        -- The second case:
-        else do
-          printConstraints clearedCtGroup
-          throwPluginError "There are no possible associations for the current constraint group!"
-      
-      -- There are constraints and exactly one association...
-      (_, [appliedAssoc]) -> do
-        printMsg "Derived Results:"
-        forM_ appliedAssoc $ \(tv, ty, _flexVars) -> do
-          let derivedRes = mkDerivedTypeEqCt (head clearedCtGroup) tv ty
-          printObj derivedRes
-          addDerivedResult derivedRes
-      
-      -- There are constraints and more then one association...
-      (_, _) -> do     
-        printConstraints clearedCtGroup
-        printMsg "Possible Assocs:"
-        forM_ appliedAssocs printObj
-        throwPluginError "There is more then one possible association for the current constraint group!"
+  appliedAssocs <- forM assocs $ \assoc -> either throwPluginErrorSDoc return =<< partiallyApplyTyCons assoc
   
+  -- Now check if there are constraint that left that require solving.
+  case (ctGroup, appliedAssocs) of
+    
+    -- No constraints left, we are done.
+    ([], _) -> return ()
+    
+    -- There are constraints, but there are no associations...
+    -- There are two possible reasons for this to happen:
+    -- 1. The group does not have type constructor variables. 
+    --    Which means there is nothing to solve and therefore 
+    --    we are done with solving. 
+    -- 2. There are no associations, because we can't find a solution
+    --    to the variables in the group. If this is the case the group 
+    --    is unsolvable.
+    (_, []) -> do
+      topTcVars <- concat <$> mapM collectBindReturnTopTcVars ctGroup
+      -- The first case:
+      if null topTcVars then do
+        printMsg "Group does not require solving:"
+        printConstraints ctGroup
+      -- The second case:
+      else do
+        printConstraints ctGroup
+        throwPluginError "There are no possible associations for the current constraint group!"
+    
+    -- There are constraints and exactly one association...
+    (_, [appliedAssoc]) -> do
+      printMsg "Derived Results:"
+      forM_ appliedAssoc $ \(tv, ty, _flexVars) -> do
+        let derivedRes = mkDerivedTypeEqCt (head ctGroup) tv ty
+        printObj derivedRes
+        addDerivedResult derivedRes
+    
+    -- There are constraints and more then one association...
+    (_, _) -> do     
+      printConstraints ctGroup
+      printMsg "Possible Assocs:"
+      forM_ appliedAssocs printObj
+      throwPluginError "There is more then one possible association for the current constraint group!"
   where
     collectBindReturnTopTcVars :: Ct -> SupermonadPluginM [TyVar]
     collectBindReturnTopTcVars ct = do
@@ -118,6 +154,7 @@ solveConstraints wantedCts = do
       case (isBindOrReturn, constraintClassType ct) of
         (True, Just (_cls, tyArgs)) -> return $ S.toList $ collectTopTcVars tyArgs
         _ -> return []
+
 
 
 -- | Only keep supermonad constraints ('Bind' and 'Return').
