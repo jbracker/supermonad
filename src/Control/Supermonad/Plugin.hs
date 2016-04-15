@@ -40,13 +40,10 @@ import Control.Supermonad.Plugin.Environment
   , getIdentityTyCon
   , getReturnClass, getBindClass
   , getWantedConstraints, getGivenConstraints
-  , getBindFunctorInstance, getBindApplyInstance
   , getBindInstances
   , getInstEnvs
   , addEvidenceResult
   , addDerivedResults
-  , processAndRemoveWantedConstraints
-  , processEachWantedConstraint
   , whenNoResults
   , runTcPlugin
   , printMsg, printObj, printConstraints )
