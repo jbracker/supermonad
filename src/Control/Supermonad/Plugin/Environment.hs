@@ -11,15 +11,11 @@ module Control.Supermonad.Plugin.Environment
   , getSupermonadModule
   , getIdentityTyCon, getIdentityModule
   , getGivenConstraints, getWantedConstraints
-  , setWantedConstraints
-  , getBindApplyInstance, getBindFunctorInstance
   , getCurrentResults
   , getInstEnvs
   , getBindInstances
   , addEvidenceResult, addEvidenceResults
   , addDerivedResult, addDerivedResults
-  , processAndRemoveWantedConstraints
-  , processEachWantedConstraint
   , whenNoResults
   , throwPluginError, throwPluginErrorSDoc, catchPluginError
     -- * Debug and Error Output
@@ -32,9 +28,9 @@ import Data.List ( groupBy )
 import Data.Monoid ( (<>) )
 
 import Control.Arrow ( (***) )
-import Control.Monad ( unless, forM, forM_ )
+import Control.Monad ( unless, forM_ )
 import Control.Monad.Reader ( ReaderT, runReaderT, asks )
-import Control.Monad.State  ( StateT , runStateT , gets, get, put, modify )
+import Control.Monad.State  ( StateT , runStateT , gets, modify )
 import Control.Monad.Except ( ExceptT, runExceptT, throwError, catchError )
 import Control.Monad.Trans.Class ( lift )
 
@@ -52,8 +48,6 @@ import FastString ( unpackFS )
 import qualified Outputable as O
 
 import qualified Control.Supermonad.Plugin.Log as L
-import Control.Supermonad.Plugin.Utils
-  ( partitionM )
 import Control.Supermonad.Plugin.Constraint
   ( GivenCt, WantedCt, DerivedCt
   , constraintSourceLocation )
@@ -61,7 +55,6 @@ import Control.Supermonad.Plugin.Detect
   ( findSupermonadModule
   , findBindClass, findReturnClass
   , findIdentityModule, findIdentityTyCon
-  , findFunctorBindInstances
   , findInstancesInScope
   , supermonadModuleName, identityModuleName
   , bindClassName, returnClassName
@@ -92,11 +85,12 @@ data SupermonadPluginEnv = SupermonadPluginEnv
   -- ^ The 'Data.Functor.Identity' module.
   , smEnvIdentityTyCon :: TyCon
   -- ^ The 'Identity' type constructor.
-  , smEnvBindFunctorInstance :: ClsInst
-  -- ^ The first functor bind instance: Bind m Identity m.
-  , smEnvBindApplyInstance :: ClsInst
-  -- ^ The second functor bind instance: Bind Identity m m.
   , smEnvBindInstances :: [ClsInst]
+  -- ^ Collection of all 'Bind' instances.
+  , smEnvGivenConstraints  :: [GivenCt]
+  -- ^ The given and derived constraints (all of them).
+  , smEnvWantedConstraints :: [WantedCt]
+  -- ^ The wanted constraints (all of them).
   }
 
 -- | The write-only result of the plugin.
@@ -115,16 +109,9 @@ instance Monoid SupermonadPluginResult where
     { smResultEvidence = []
     , smResultDerived  = [] }
 
---isEmptyResult :: SupermonadPluginResult -> Bool
---isEmptyResult res = null (smResultDerived res) && null (smResultEvidence res)
-
 -- | The modifiable state of the plugin.
 data SupermonadPluginState = SupermonadPluginState 
-  { smStateGivenConstraints  :: [GivenCt]
-  -- ^ The given and derived constraints (all of them).
-  , smStateWantedConstraints :: [WantedCt]
-  -- ^ The wanted constraints (all of them).
-  , smStateResult :: SupermonadPluginResult
+  { smStateResult :: SupermonadPluginResult
   -- ^ The current results of the supermonad plugin.
   }
 
@@ -141,15 +128,9 @@ runSupermonadPlugin givenCts wantedCts smM = do
   mReturnCls <- findReturnClass
   mIdMdl <- findIdentityModule
   mIdTyCon <- findIdentityTyCon
-  mFuncBindInsts <- case (mBindCls, mIdTyCon) of
-    (Just bindCls, Just idTyCon) -> findFunctorBindInstances bindCls idTyCon
-    _ -> return Nothing
-  case (mSupermonadMdl, mBindCls, mReturnCls, mIdMdl, mIdTyCon, mFuncBindInsts) of
-    (Right supermonadMdl, Just bindCls, Just returnCls, Right idMdl, Just idTyCon, Just (bindInstFunc, bindInstApply)) -> do
-      let initState = SupermonadPluginState 
-            { smStateGivenConstraints  = givenCts
-            , smStateWantedConstraints = wantedCts
-            , smStateResult = mempty }
+  case (mSupermonadMdl, mBindCls, mReturnCls, mIdMdl, mIdTyCon) of
+    (Right supermonadMdl, Just bindCls, Just returnCls, Right idMdl, Just idTyCon) -> do
+      let initState = SupermonadPluginState { smStateResult = mempty }
       bindInsts <- findInstancesInScope bindCls
       eResult <- runExceptT $ flip runStateT initState $ runReaderT smM $ SupermonadPluginEnv
         { smEnvSupermonadModule  = supermonadMdl
@@ -157,36 +138,33 @@ runSupermonadPlugin givenCts wantedCts smM = do
         , smEnvReturnClass       = returnCls
         , smEnvIdentityModule    = idMdl
         , smEnvIdentityTyCon     = idTyCon
-        , smEnvBindFunctorInstance = bindInstFunc
-        , smEnvBindApplyInstance   = bindInstApply
-        , smEnvBindInstances       = bindInsts }
+        , smEnvBindInstances     = bindInsts
+        , smEnvGivenConstraints  = givenCts
+        , smEnvWantedConstraints = wantedCts
+        }
       return $ case eResult of
         Left  err -> Left err
         Right (_a, res) -> Right $ TcPluginOk (smResultEvidence $ smStateResult res) (smResultDerived $ smStateResult res)
-    (Left mdlErrMsg, _, _, _, _, _) -> do
+    (Left mdlErrMsg, _, _, _, _) -> do
       let msg = "Could not find " ++ supermonadModuleName ++ " module:"
       L.printErr msg
       L.printErr mdlErrMsg
       return $ Left $ stringToSupermonadError $ msg ++ " " ++ mdlErrMsg
-    (_, Nothing, _, _, _, _) -> do
+    (_, Nothing, _, _, _) -> do
       let msg = "Could not find " ++ bindClassName ++ " class!"
       L.printErr msg
       return $ Left $ stringToSupermonadError msg
-    (_, _, Nothing, _, _, _) -> do
+    (_, _, Nothing, _, _) -> do
       let msg = "Could not find " ++ returnClassName ++ " class!"
       L.printErr msg
       return $ Left $ stringToSupermonadError msg
-    (_, _, _, Left mdlErrMsg, _, _) -> do
+    (_, _, _, Left mdlErrMsg, _) -> do
       let msg = "Could not find " ++ identityModuleName ++ " module:"
       L.printErr msg
       L.printErr mdlErrMsg
       return $ Left $ stringToSupermonadError $ msg ++ " " ++ mdlErrMsg
-    (_, _, _, _, Nothing, _) -> do
+    (_, _, _, _, Nothing) -> do
       let msg = "Could not find " ++ identityTyConName ++ " type constructor!"
-      L.printErr msg
-      return $ Left $ stringToSupermonadError msg
-    (_, _, _, _, _, Nothing) -> do
-      let msg = "Could not find functor bind instances!"
       L.printErr msg
       return $ Left $ stringToSupermonadError msg
 
@@ -221,30 +199,16 @@ getIdentityTyCon = asks smEnvIdentityTyCon
 
 -- | Returns all of the /given/ and /derived/ constraints of this plugin call.
 getGivenConstraints :: SupermonadPluginM [GivenCt]
-getGivenConstraints = gets smStateGivenConstraints
+getGivenConstraints = asks smEnvGivenConstraints
 
 -- | Returns all of the wanted constraints of this plugin call.
 getWantedConstraints :: SupermonadPluginM [WantedCt]
-getWantedConstraints = gets smStateWantedConstraints
-
--- | Returns the functor bind instance: @Bind m Identity m@.
-getBindFunctorInstance :: SupermonadPluginM ClsInst
-getBindFunctorInstance = asks smEnvBindFunctorInstance
-
--- | Returns the functor apply bind instance: @Bind Identity m m@.
-getBindApplyInstance :: SupermonadPluginM ClsInst
-getBindApplyInstance = asks smEnvBindApplyInstance
+getWantedConstraints = asks smEnvWantedConstraints
 
 -- | Returns all bind instances including those given by
 --   'getBindApplyInstance' and 'getBindFunctorInstance'.
 getBindInstances :: SupermonadPluginM [ClsInst]
 getBindInstances = asks smEnvBindInstances
-
--- | Updates the wanted constraints that still require solving.
-setWantedConstraints :: [WantedCt] -> SupermonadPluginM ()
-setWantedConstraints wantedCts = do 
-  state <- get
-  put $ state { smStateWantedConstraints = wantedCts }
 
 -- | Shortcut to access the instance environments.
 getInstEnvs :: SupermonadPluginM InstEnvs
@@ -269,32 +233,6 @@ addDerivedResult derived = addDerivedResults [derived]
 -- | Add the given derived results to the list of results.
 addDerivedResults :: [DerivedCt] -> SupermonadPluginM ()
 addDerivedResults derived = modify $ \s -> s { smStateResult = smStateResult s <> (SupermonadPluginResult [] derived) }
-
--- | Filters the wanted constraints using the given predicate. The found constraints
---   are then processed using the given function and removed from the pool
---   of wanted constraints once they were processed.
-processAndRemoveWantedConstraints 
-  :: (WantedCt -> SupermonadPluginM Bool) -- ^ Predicate to filter constraints with.
-  -> (WantedCt -> SupermonadPluginM ([(EvTerm, WantedCt)], [Ct])) -- ^ Processing for found constraints.
-  -> SupermonadPluginM ()
-processAndRemoveWantedConstraints predicate process = do
-  wantedCts <- getWantedConstraints
-  (foundCts, restCts) <- partitionM predicate wantedCts
-  forM_ foundCts $ \wantedCt -> do
-    (evidence, derived) <- process wantedCt
-    addEvidenceResults evidence
-    addDerivedResults  derived
-  setWantedConstraints restCts
-
--- | Goes over each wanted constraint and applies the processing function.
---   If the processing function returns true the constraint is discarded,
---   otherwise it is kept for further processing. The processing function 
---   has to add the results manually using 'addEvidenceResult' and 'addDerivedResult'.
-processEachWantedConstraint :: (WantedCt -> SupermonadPluginM Bool) -> SupermonadPluginM ()
-processEachWantedConstraint process = do
-  wantedCts <- getWantedConstraints
-  keepCts <- forM wantedCts process
-  setWantedConstraints $ fmap snd $ filter (not . fst) $ zip keepCts wantedCts
 
 -- | Execute the given plugin code only if no plugin results were produced so far.
 whenNoResults :: SupermonadPluginM () -> SupermonadPluginM ()
