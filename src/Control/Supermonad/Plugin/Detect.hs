@@ -16,9 +16,9 @@ module Control.Supermonad.Plugin.Detect
   , findIdentityModule
   , findIdentityTyCon
     -- * Functor Bind Instance Detection
-  , areBindFunctorArguments
-  , areBindApplyArguments
-  , findFunctorBindInstances
+  --, areBindFunctorArguments
+  --, areBindApplyArguments
+  --, findFunctorBindInstances
   , functorClassName, functorModuleName
     -- * General detection utilities
   , findInstancesInScope
@@ -177,7 +177,7 @@ findIdentityTyCon = do
 -- -----------------------------------------------------------------------------
 -- Functor Bind Instance Detection
 -- -----------------------------------------------------------------------------
-
+{-
 -- | Check if the given type arguments would form a 'Control.Supermonad.Bind' functor instance 
 --   if applied to 'Control.Supermonad.Bind': @Bind m Identity m@
 areBindFunctorArguments :: TyCon -- ^ The 'Data.Functor.Identity.Identity' type constructor.
@@ -249,7 +249,7 @@ findFunctorBindInstances bindCls idTyCon = do
       else
         return $ Just (b2, b1)
     _ -> return Nothing
-
+-}
 -- -----------------------------------------------------------------------------
 -- Local Utility Functions
 -- -----------------------------------------------------------------------------
