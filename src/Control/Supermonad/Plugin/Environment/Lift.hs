@@ -6,6 +6,7 @@ module Control.Supermonad.Plugin.Environment.Lift
   -- * From 'Control.Supermonad.Plugin.Evidence'
     produceEvidenceForCt
   , produceEvidenceFor
+  , isPotentiallyInstantiatedCt
   -- * From 'Control.Supermonad.Plugin.Constraint'
   , isBindConstraint, isReturnConstraint
   -- * From 'Control.Supermonad.Plugin.Utils'
@@ -46,6 +47,12 @@ produceEvidenceFor inst instArgs = do
   givenCts <- getGivenConstraints
   runTcPlugin $ E.produceEvidenceFor givenCts inst instArgs
 
+-- | See 'E.isPotentiallyInstantiatedCt'.
+isPotentiallyInstantiatedCt :: Ct -> [(TyVar, Either TyCon TyVar)] -> SupermonadPluginM Bool
+isPotentiallyInstantiatedCt ct assoc = do
+  givenCts <- getGivenConstraints
+  runTcPlugin $ E.isPotentiallyInstantiatedCt givenCts ct assoc
+  
 -- | See 'getBindClass' and 'isClassConstraint'.
 isBindConstraint :: Ct -> SupermonadPluginM Bool
 isBindConstraint ct = do

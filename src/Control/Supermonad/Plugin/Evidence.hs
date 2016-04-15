@@ -8,6 +8,7 @@ module Control.Supermonad.Plugin.Evidence
   , matchInstanceTyVars'
   , produceEvidenceFor
   , produceEvidenceForCt
+  , isPotentiallyInstantiatedCt
   ) where
 
 import Data.Either ( isLeft )
@@ -18,7 +19,7 @@ import Control.Monad ( forM )
 
 import Type
   ( Type, TyVar
-  , mkTopTvSubst, mkTyVarTy
+  , mkTopTvSubst, mkTyVarTy, mkAppTys, mkTyConTy
   , substTy, substTys
   , eqType
   , getClassPredTys_maybe, getClassPredTys
@@ -28,12 +29,13 @@ import Type
 import TyCon
   ( TyCon
   , isTupleTyCon, isTypeFamilyTyCon, isTypeSynonymTyCon )
-import Class ( Class )
+import Class ( Class, classTyCon )
 import Coercion ( Coercion(..) )
 import CoAxiom ( Role(..) )
 import InstEnv
   ( ClsInst(..)
   , instanceSig
+  , lookupInstEnv
   , lookupUniqueInstEnv )
 import Unify ( tcUnifyTys )
 import TcRnTypes ( Ct, isGivenCt, ctPred, ctEvidence, ctEvTerm )
@@ -48,13 +50,15 @@ import qualified Outputable as O
 
 import Control.Supermonad.Plugin.Constraint 
   ( GivenCt
+  , constraintClassType
   , constraintPredicateType )
 import Control.Supermonad.Plugin.Utils
   ( fromLeft, fromRight
+  , allM
   , collectTyVars
-  --, applyTyCon
+  , partiallyApplyTyCons
   , skolemVarsBindFun )
---import qualified Control.Supermonad.Plugin.Log as L
+import qualified Control.Supermonad.Plugin.Log as L
 --import qualified Control.Supermonad.Plugin.Debug as D
 
 -- | Try to evaluate the given type as far as possible by evaluating contained
@@ -310,3 +314,98 @@ produceEvidenceForCtType givenCts ct =
                 Just (_r, ta, tb) -> containsTyFunApp ta || containsTyFunApp tb
                 Nothing -> False
 
+
+-- | Check if a given class constraint can 
+--   potentially be instantiated using the given
+--   type constructors. By potentially we mean: First, check if an
+--   instance can actually be applied to the instance. 
+--   Then check if all resulting constraints that do not contain 
+--   free variables actually can be instantiated.
+--   
+--   Note: A constraint is only potentially instantiable if there is only
+--   one matching instance for the constraint and all of its implied constraints.
+--   
+--   Note: This function only handle class constraints. It will always deliver 
+--   'False' when another constraint type is given.
+isPotentiallyInstantiatedCt 
+  :: [GivenCt] -- ^ The given constraints to be used when producing evidence.
+  -> Ct        -- ^ The constraint to check.
+  -> [(TyVar, Either TyCon TyVar)] -- ^ Associations to use for type constructor variables in the constraint
+  -> TcPluginM Bool -- ^ Will deliver false of the constraint definitly can not 
+                    --   be instantiated. If 'True' is returned the constraint 
+                    --   either can be instantiated or it is unknown of that is possible.
+isPotentiallyInstantiatedCt  givenCts ct assocs = 
+  case constraintClassType ct of
+    -- If we have a class constraint...
+    Just splitCt -> isPotentiallyInstantiatedCtType  givenCts splitCt assocs
+    Nothing -> return False
+
+-- | Utility helper for 'isPotentiallyInstantiatedCt' that checks class constraints.
+isPotentiallyInstantiatedCtType
+  :: [GivenCt] -- ^ The given constraints to be used when producing evidence.
+  -> (Class, [Type]) -- ^ A class and the type arguments for that class to 
+                     --   check if the class is potentially instantiated for those arguments.
+                     --   The arguments are given in the actual representational order used in Haskell.
+  -> [(TyVar, Either TyCon TyVar)] -- ^ Associations to use for type constructor variables in the constraint
+  -> TcPluginM Bool
+isPotentiallyInstantiatedCtType  givenCts (ctCls, ctArgs) assocs = do
+  let produceEvidence :: Type -> TcPluginM (Either SDoc EvTerm)
+      produceEvidence = produceEvidenceForCtType  givenCts
+  
+  -- Get the type constructors partially applied to some new variables as
+  -- is necessary.
+  appliedAssocs <- either L.pluginFailSDoc return =<< partiallyApplyTyCons assocs
+  
+  -- Create the substitution for the given associations.
+  let ctSubst = mkTopTvSubst $ fmap (\(tv, t, _) -> (tv, t)) appliedAssocs
+  -- Substitute variables in the constraint arguments with the type constructors.
+  let ctSubstArgs = substTys ctSubst ctArgs
+  -- Calculate set of generated type variables in constraints
+  let ctGenVars = S.unions $ fmap (\(_tv, _tcTy, vars) -> S.fromList vars) appliedAssocs
+  
+  -- If there are no ambiguous or generated type variables in the substituted arguments of our constraint
+  -- we can simply check if there is evidence.
+  if all (not . containsGivenOrAmbiguousTyVar ctGenVars) ctSubstArgs
+    then do
+      eEv <- produceEvidence $ mkAppTys (mkTyConTy $ classTyCon ctCls) ctSubstArgs
+      return $ either (const False) (const True) eEv
+    else do
+      instEnvs <- getInstEnvs
+      let (instMatches, unificationMatches, _) = lookupInstEnv instEnvs ctCls ctSubstArgs
+      -- FIXME: for now we only accept our constraint as potentially 
+      -- instantiated iff there is only one match.
+      if length instMatches + length unificationMatches == 1 
+        then
+          -- Look at the found instances and check if their implied constraints 
+          -- are also potentially instantiable.
+          flip allM (fmap fst instMatches ++ unificationMatches) $ \inst -> do
+            -- Match the instance variables so we can check the implied constraints.
+            case matchInstanceTyVars inst ctSubstArgs of
+              Just (instArgs, _) -> do
+                let (instVars, instCtTys, _, _) = instanceSig inst
+                let instSubst = mkTopTvSubst $ zip instVars instArgs
+                let instSubstCtTys = substTys instSubst instCtTys
+                flip allM instSubstCtTys $ \substCtTy -> do
+                  if not (containsGivenOrAmbiguousTyVar ctGenVars substCtTy) 
+                    -- The implied constraint does not contain generated or
+                    -- ambiguous type variable, which means we can actually 
+                    -- check its satisfiability.
+                    then do
+                      eEv <- produceEvidence substCtTy 
+                      return $ either (const False) (const True) eEv
+                    -- The implied constraint contains generated or ambiguous
+                    -- type variables, which means we can't check it, but it
+                    -- may potentially be satisfiable.
+                    else return True
+              -- There was no match, this should never happen.
+              Nothing -> return False
+        -- We found more then one matching instance for this constraint 
+        else return False
+  where
+    -- Checks if the given type constains any ambiguous variables or if 
+    -- it contains any of the given type variables.
+    containsGivenOrAmbiguousTyVar :: S.Set TyVar -> Type -> Bool
+    containsGivenOrAmbiguousTyVar givenTvs ty = 
+      let tyVars = collectTyVars ty
+      in any isAmbiguousTyVar tyVars || not (S.null (S.intersection givenTvs tyVars))
+  
