@@ -39,8 +39,11 @@ type SCNode = LNode WantedCt
 --   in its supermonad constraints.
 componentMonoTyCon :: [WantedCt] -> SupermonadPluginM (Maybe TyCon)
 componentMonoTyCon cts = do
+  -- Find all of the return and bind constraints
   smCts <- filterM (\ct -> liftM2 (||) (isReturnConstraint ct) (isBindConstraint ct)) cts
-  let tyVars = componentTopTcVars smCts
+  -- Get the polymorphic type constructors
+  let tyVars = S.filter (not . isAmbiguousTyVar) $ componentTopTcVars smCts
+  -- Get the concrete type constructors
   let tyCons = componentTopTyCons smCts
   return $ case (S.toList tyCons, S.size tyVars) of
     ([tc], 0) -> Just tc
