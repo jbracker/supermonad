@@ -19,7 +19,7 @@ import Control.Supermonad.Plugin.Environment
   ( SupermonadPluginM
   , getGivenConstraints
   , getReturnClass, getBindClass
-  , getIdentityTyCon
+  --, getIdentityTyCon
   , addDerivedResult, addEvidenceResult
   , printMsg, printConstraints, printObj
   , throwPluginError, throwPluginErrorSDoc )
