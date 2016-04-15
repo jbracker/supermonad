@@ -49,11 +49,8 @@ class (Functor m, Functor n, Functor p) => Bind m n p | m n -> p where
   (>>)  :: m a -> n b -> p b
   ma >> mb = ma >>= const mb
 
-instance (Functor a) => Bind Identity a a where
-  ma >>= f = f (runIdentity ma)
-instance (Functor a) => Bind a Identity a where
-  ma >>= f = fmap (runIdentity . f) ma
-
+instance Bind Identity Identity Identity where
+  (>>=) = (P.>>=)
 instance Bind [] [] [] where
   (>>=) = (P.>>=)
 instance Bind P.Maybe P.Maybe P.Maybe where
@@ -111,7 +108,7 @@ instance Bind STM.STM STM.STM STM.STM where
 -- -----------------------------------------------------------------------------
 
 -- | TODO
-class Return m where
+class (Functor m) => Return m where
   return :: a -> m a
 
 instance Return Identity where
