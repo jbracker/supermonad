@@ -6,7 +6,6 @@ module Control.Supermonad.Plugin.Environment.Lift
   -- * From 'Control.Supermonad.Plugin.Evidence'
     produceEvidenceForCt
   , produceEvidenceFor
-  , isPotentiallyInstantiatedCt
   -- * From 'Control.Supermonad.Plugin.Constraint'
   , isBindConstraint, isReturnConstraint
   -- * From 'Control.Supermonad.Plugin.Utils'
@@ -24,10 +23,9 @@ import Control.Supermonad.Plugin.Environment
   , runTcPlugin
   , getBindClass, getReturnClass
   --, getSupermonadModule
-  , getIdentityTyCon --, getIdentityModule
+  --, getIdentityTyCon --, getIdentityModule
   , getGivenConstraints --, getWantedConstraints
   --, setWantedConstraints
-  , getBindApplyInstance, getBindFunctorInstance
   --, getInstEnvs
   --, getBindInstances 
   )
@@ -39,32 +37,14 @@ import Control.Supermonad.Plugin.Constraint ( isClassConstraint )
 -- | See 'E.produceEvidenceForCt'.
 produceEvidenceForCt :: Ct -> SupermonadPluginM (Either SDoc EvTerm)
 produceEvidenceForCt ct = do
-  bindCls <- getBindClass
-  instFunctor <- getBindFunctorInstance
-  instApply <- getBindApplyInstance
-  idTyCon <- getIdentityTyCon
   givenCts <- getGivenConstraints
-  runTcPlugin $ E.produceEvidenceForCt bindCls instFunctor instApply idTyCon givenCts ct
+  runTcPlugin $ E.produceEvidenceForCt givenCts ct
 
 -- | See 'E.produceEvidenceFor'.
 produceEvidenceFor :: ClsInst -> [Type] -> SupermonadPluginM (Either SDoc EvTerm)
 produceEvidenceFor inst instArgs = do
-  bindCls <- getBindClass
-  instFunctor <- getBindFunctorInstance
-  instApply <- getBindApplyInstance
-  idTyCon <- getIdentityTyCon
   givenCts <- getGivenConstraints
-  runTcPlugin $ E.produceEvidenceFor bindCls instFunctor instApply idTyCon givenCts inst instArgs
-
--- | See 'E.isPotentiallyInstantiatedCt'.
-isPotentiallyInstantiatedCt :: Ct -> [(TyVar, Either TyCon TyVar)] -> SupermonadPluginM Bool
-isPotentiallyInstantiatedCt ct assoc = do
-  bindCls <- getBindClass
-  instFunctor <- getBindFunctorInstance
-  instApply <- getBindApplyInstance
-  idTyCon <- getIdentityTyCon
-  givenCts <- getGivenConstraints
-  runTcPlugin $ E.isPotentiallyInstantiatedCt bindCls instFunctor instApply idTyCon givenCts ct assoc
+  runTcPlugin $ E.produceEvidenceFor givenCts inst instArgs
 
 -- | See 'getBindClass' and 'isClassConstraint'.
 isBindConstraint :: Ct -> SupermonadPluginM Bool

@@ -6,7 +6,6 @@
 module Control.Supermonad.Plugin.Evidence
   ( matchInstanceTyVars
   , matchInstanceTyVars'
-  , isPotentiallyInstantiatedCt
   , produceEvidenceFor
   , produceEvidenceForCt
   ) where
@@ -19,14 +18,13 @@ import Control.Monad ( forM )
 
 import Type
   ( Type, TyVar
-  , mkTopTvSubst, mkTyVarTy, mkAppTys, mkTyConTy
+  , mkTopTvSubst, mkTyVarTy
   , substTy, substTys
   , eqType
   , getClassPredTys_maybe, getClassPredTys
   , getEqPredTys_maybe, getEqPredTys, getEqPredRole
   , getTyVar_maybe
   , splitTyConApp_maybe, splitFunTy_maybe, splitAppTy_maybe )
-import Class ( classTyCon )
 import TyCon
   ( TyCon
   , isTupleTyCon, isTypeFamilyTyCon, isTypeSynonymTyCon )
@@ -36,7 +34,6 @@ import CoAxiom ( Role(..) )
 import InstEnv
   ( ClsInst(..)
   , instanceSig
-  , lookupInstEnv
   , lookupUniqueInstEnv )
 import Unify ( tcUnifyTys )
 import TcRnTypes ( Ct, isGivenCt, ctPred, ctEvidence, ctEvTerm )
@@ -51,22 +48,14 @@ import qualified Outputable as O
 
 import Control.Supermonad.Plugin.Constraint 
   ( GivenCt
-  , constraintClassType
   , constraintPredicateType )
-import Control.Supermonad.Plugin.Log ( pluginFailSDoc )
 import Control.Supermonad.Plugin.Utils
   ( fromLeft, fromRight
   , collectTyVars
   --, applyTyCon
-  , partiallyApplyTyCons
-  , allM
   , skolemVarsBindFun )
-import Control.Supermonad.Plugin.Detect 
-  ( areBindApplyArguments, areBindFunctorArguments )
 --import qualified Control.Supermonad.Plugin.Log as L
 --import qualified Control.Supermonad.Plugin.Debug as D
-
-
 
 -- | Try to evaluate the given type as far as possible by evaluating contained
 --   type families and expanding type synonyms.
@@ -121,11 +110,7 @@ matchInstanceTyVars' varsToBind inst instArgs = do
 --   apply instance specially. This leads to 'Bind Identity Identity Identity'
 --   being solved although there is no unique matching instance for it.
 produceEvidenceFor 
-  :: Class     -- ^ The 'Bind' class.
-  -> ClsInst   -- ^ The functor 'Bind' instance.
-  -> ClsInst   -- ^ The apply 'Bind' instance.
-  -> TyCon     -- ^ The 'Identity' type constructor.
-  -> [GivenCt] -- ^ The given constraints that can be used when producing evidence.
+  :: [GivenCt] -- ^ The given constraints that can be used when producing evidence.
                --   Be aware that only actually /given/ constraints (as in 'isGivenCt') 
                --   are useful here, because only those produce evidence for themselves.
                --   All other constraints will be ignored.
@@ -136,7 +121,7 @@ produceEvidenceFor
                --   given instance dictionary in length. See 'matchInstanceTyVars' to achieve this.
   -> TcPluginM (Either SDoc EvTerm) -- ^ Either an error if evidence can not 
                                     -- be produced or the actual evidence.
-produceEvidenceFor bindCls instFunctor instApply idTyCon givenCts inst instArgs = do
+produceEvidenceFor givenCts inst instArgs = do
   -- Get the instance type variables and constraints (by that we know the
   -- number of type arguments and dictionart arguments for the EvDFunApp)
   let (tyVars, instCts, _cls, _tyArgs) = instanceSig inst -- ([TyVar], [Type], Class, [Type])
@@ -144,7 +129,7 @@ produceEvidenceFor bindCls instFunctor instApply idTyCon givenCts inst instArgs 
   let varSubst = mkTopTvSubst $ zip tyVars instArgs
   -- Now go over each constraint and find a suitable instance and evidence.
   -- Don't forget to substitute all variables for their actual values,
-  ctEvTerms <- forM (substTys varSubst instCts) $ produceEvidenceForCtType bindCls instFunctor instApply idTyCon givenCts
+  ctEvTerms <- forM (substTys varSubst instCts) $ produceEvidenceForCtType givenCts
   -- If we found a good instance and evidence for every constraint,
   -- we can create the evidence for this instance.
   return $ if any isLeft ctEvTerms
@@ -162,15 +147,11 @@ produceEvidenceFor bindCls instFunctor instApply idTyCon givenCts inst instArgs 
 --   Handles 'Bind' constraints that can be resolved with the functor or 
 --   apply instance specially. This leads to 'Bind Identity Identity Identity'
 --   being solved although there is no unique matching instance for it.
-produceEvidenceForCt :: Class -- ^ The 'Bind' class.
-                     -> ClsInst -- ^ The functor 'Bind' instance.
-                     -> ClsInst -- ^ The apply 'Bind' instance.
-                     -> TyCon -- ^ The 'Identity' type constructor.
-                     -> [GivenCt] -- ^ The given constraints to be used when producing evidence.
+produceEvidenceForCt :: [GivenCt] -- ^ The given constraints to be used when producing evidence.
                      -> Ct -- ^ The constraint to produce evidence for.
                      -> TcPluginM (Either SDoc EvTerm)
-produceEvidenceForCt bindCls instFunctor instApply idTyCon givenCts ct =
-  produceEvidenceForCtType bindCls instFunctor instApply idTyCon givenCts $ constraintPredicateType ct
+produceEvidenceForCt givenCts ct =
+  produceEvidenceForCtType givenCts $ constraintPredicateType ct
 
 
 -- | Try to find evidence that proves the given constraint given by the type 
@@ -181,14 +162,10 @@ produceEvidenceForCt bindCls instFunctor instApply idTyCon givenCts ct =
 --   Handles 'Bind' constraints that can be resolved with the functor or 
 --   apply instance specially. This leads to 'Bind Identity Identity Identity'
 --   being solved although there is no unique matching instance for it.
-produceEvidenceForCtType :: Class -- ^ The 'Bind' class.
-                         -> ClsInst -- ^ The functor 'Bind' instance.
-                         -> ClsInst -- ^ The apply 'Bind' instance.
-                         -> TyCon -- ^ The 'Identity' type constructor.
-                         -> [GivenCt] -- ^ The given constraints to be used when producing evidence.
+produceEvidenceForCtType :: [GivenCt] -- ^ The given constraints to be used when producing evidence.
                          -> Type -- ^ The constraint to produce evidence for, given as a type.
                          -> TcPluginM (Either SDoc EvTerm)
-produceEvidenceForCtType bindCls instFunctor instApply idTyCon givenCts ct =
+produceEvidenceForCtType givenCts ct =
   case splitTyConApp_maybe ct of
     -- Do we have a tuple of constraints?
     Just (tc, tcArgs) | isTupleTyCon tc -> do
@@ -241,16 +218,6 @@ produceEvidenceForCtType bindCls instFunctor instApply idTyCon givenCts ct =
               case newRes of
                 Right _ -> return newRes
                 Left _ -> return res
-        -- The class constraint is a functor 'Bind' constraint...
-        Just (cls, ctArgs) | isFunctorBind cls ctArgs -> do
-          -- This assumes that the functor instance has the following head 
-          -- "(Functor m) => Bind m Identity m" and therefore there is only one variable.
-          produceEvidenceFor' instFunctor [last ctArgs]
-        -- The class constraint is an apply 'Bind' constraint...
-        Just (cls, ctArgs) | isApplyBind cls ctArgs -> do
-          -- This assumes that the functor instance has the following head 
-          -- "(Functor m) => Bind Identity m m" and therefore there is only one variable.
-          produceEvidenceFor' instApply [last ctArgs]
         -- It is a normal class constraint...
         Just (ctCls, ctArgs) -> do
           res <- produceClassCtEv ctCls ctArgs
@@ -272,10 +239,10 @@ produceEvidenceForCtType bindCls instFunctor instApply idTyCon givenCts ct =
         _ -> return $ produceGivenCtEv ct
   where
     produceEvidenceForCtType' :: Type -> TcPluginM (Either SDoc EvTerm)
-    produceEvidenceForCtType' = produceEvidenceForCtType bindCls instFunctor instApply idTyCon checkedGivenCts
+    produceEvidenceForCtType' = produceEvidenceForCtType checkedGivenCts
     
     produceEvidenceFor' :: ClsInst -> [Type] -> TcPluginM (Either SDoc EvTerm)
-    produceEvidenceFor' = produceEvidenceFor bindCls instFunctor instApply idTyCon checkedGivenCts
+    produceEvidenceFor' = produceEvidenceFor checkedGivenCts
     
     -- Ensure there are only given constraints there.
     checkedGivenCts = filter isGivenCt givenCts
@@ -342,119 +309,4 @@ produceEvidenceForCtType bindCls instFunctor instApply idTyCon givenCts ct =
               Nothing -> case getEqPredTys_maybe t of
                 Just (_r, ta, tb) -> containsTyFunApp ta || containsTyFunApp tb
                 Nothing -> False
-    
-    isFunctorBind :: Class -> [Type] -> Bool
-    isFunctorBind cls [t0, t1, t2] 
-      = cls == bindCls && areBindFunctorArguments idTyCon t0 t1 t2
-    isFunctorBind _ _ = False
 
-    isApplyBind :: Class -> [Type] -> Bool
-    isApplyBind cls [t0, t1, t2] 
-      = cls == bindCls && areBindApplyArguments idTyCon t0 t1 t2
-    isApplyBind _ _ = False
-
--- | Check if a given class constraint can 
---   potentially be instantiated using the given
---   type constructors. By potentially we mean: First, check if an
---   instance can actually be applied to the instance. 
---   Then check if all resulting constraints that do not contain 
---   free variables actually can be instantiated.
---   
---   Note: A constraint is only potentially instantiable if there is only
---   one matching instance for the constraint and all of its implied constraints.
---   
---   Note: This function only handle class constraints. It will always deliver 
---   'False' when another constraint type is given.
-isPotentiallyInstantiatedCt 
-  :: Class     -- ^ The 'Bind' class.
-  -> ClsInst   -- ^ The functor 'Bind' instance.
-  -> ClsInst   -- ^ The apply 'Bind' instance.
-  -> TyCon     -- ^ The 'Identity' type constructor.
-  -> [GivenCt] -- ^ The given constraints to be used when producing evidence.
-  -> Ct        -- ^ The constraint to check.
-  -> [(TyVar, Either TyCon TyVar)] -- ^ Associations to use for type constructor variables in the constraint
-  -> TcPluginM Bool -- ^ Will deliver false of the constraint definitly can not 
-                    --   be instantiated. If 'True' is returned the constraint 
-                    --   either can be instantiated or it is unknown of that is possible.
-isPotentiallyInstantiatedCt bindCls instFunctor instApply idTyCon givenCts ct assocs = 
-  case constraintClassType ct of
-    -- If we have a class constraint...
-    Just splitCt -> isPotentiallyInstantiatedCtType bindCls instFunctor instApply idTyCon givenCts splitCt assocs
-    Nothing -> return False
-
--- | Utility helper for 'isPotentiallyInstantiatedCt' that checks class constraints.
-isPotentiallyInstantiatedCtType 
-  :: Class     -- ^ The 'Bind' class.
-  -> ClsInst   -- ^ The functor 'Bind' instance.
-  -> ClsInst   -- ^ The apply 'Bind' instance.
-  -> TyCon     -- ^ The 'Identity' type constructor.
-  -> [GivenCt] -- ^ The given constraints to be used when producing evidence.
-  -> (Class, [Type]) -- ^ A class and the type arguments for that class to 
-                     --   check if the class is potentially instantiated for those arguments.
-                     --   The arguments are given in the actual representational order used in Haskell.
-  -> [(TyVar, Either TyCon TyVar)] -- ^ Associations to use for type constructor variables in the constraint
-  -> TcPluginM Bool
-isPotentiallyInstantiatedCtType bindCls instFunctor instApply idTyCon givenCts (ctCls, ctArgs) assocs = do
-  let produceEvidence :: Type -> TcPluginM (Either SDoc EvTerm)
-      produceEvidence = produceEvidenceForCtType bindCls instFunctor instApply idTyCon givenCts
-  
-  -- Get the type constructors partially applied to some new variables as
-  -- is necessary.
-  appliedAssocs <- either pluginFailSDoc return =<< partiallyApplyTyCons assocs
-  
-  -- Create the substitution for the given associations.
-  let ctSubst = mkTopTvSubst $ fmap (\(tv, t, _) -> (tv, t)) appliedAssocs
-  -- Substitute variables in the constraint arguments with the type constructors.
-  let ctSubstArgs = substTys ctSubst ctArgs
-  -- Calculate set of generated type variables in constraints
-  let ctGenVars = S.unions $ fmap (\(_tv, _tcTy, vars) -> S.fromList vars) appliedAssocs
-  
-  -- If there are no ambiguous or generated type variables in the substituted arguments of our constraint
-  -- we can simply check if there is evidence.
-  if all (not . containsGivenOrAmbiguousTyVar ctGenVars) ctSubstArgs
-    then do
-      eEv <- produceEvidence $ mkAppTys (mkTyConTy $ classTyCon ctCls) ctSubstArgs
-      return $ either (const False) (const True) eEv
-    else do
-      instEnvs <- getInstEnvs
-      let (instMatches, unificationMatches, _) = lookupInstEnv instEnvs ctCls ctSubstArgs
-      -- FIXME: for now we only accept our constraint as potentially 
-      -- instantiated iff there is only one match.
-      if length instMatches + length unificationMatches == 1 
-        then
-          -- Look at the found instances and check if their implied constraints 
-          -- are also potentially instantiable.
-          flip allM (fmap fst instMatches ++ unificationMatches) $ \inst -> do
-            -- Match the instance variables so we can check the implied constraints.
-            case matchInstanceTyVars inst ctSubstArgs of
-              Just (instArgs, _) -> do
-                let (instVars, instCtTys, _, _) = instanceSig inst
-                let instSubst = mkTopTvSubst $ zip instVars instArgs
-                let instSubstCtTys = substTys instSubst instCtTys
-                flip allM instSubstCtTys $ \substCtTy -> do
-                  if not (containsGivenOrAmbiguousTyVar ctGenVars substCtTy) 
-                    -- The implied constraint does not contain generated or
-                    -- ambiguous type variable, which means we can actually 
-                    -- check its satisfiability.
-                    then do
-                      eEv <- produceEvidence substCtTy 
-                      return $ either (const False) (const True) eEv
-                    -- The implied constraint contains generated or ambiguous
-                    -- type variables, which means we can't check it, but it
-                    -- may potentially be satisfiable.
-                    else return True
-              -- There was no match, this should never happen.
-              Nothing -> return False
-        -- We found more then one matching instance for this constraint 
-        else return False
-  where
-    -- Checks if the given type constains any ambiguous variables or if 
-    -- it contains any of the given type variables.
-    containsGivenOrAmbiguousTyVar :: S.Set TyVar -> Type -> Bool
-    containsGivenOrAmbiguousTyVar givenTvs ty = 
-      let tyVars = collectTyVars ty
-      in any isAmbiguousTyVar tyVars || not (S.null (S.intersection givenTvs tyVars))
-  
-  
-  
-  
