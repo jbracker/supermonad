@@ -97,15 +97,12 @@ supermonadSolve s given derived wanted = do
 -- | The actual plugin code.
 supermonadSolve' :: SupermonadState -> SupermonadPluginM ()
 supermonadSolve' _s = do
-  getWantedConstraints >>= (printConstraints . sortConstraintsByLine)
-  getGivenConstraints >>= (printConstraints . sortConstraintsByLine)
+  --getWantedConstraints >>= (printConstraints . sortConstraintsByLine)
+  --getGivenConstraints >>= (printConstraints . sortConstraintsByLine)
+  
+  
   
   getWantedConstraints >>= solveConstraints 
-  
-  -- Old naive version...
-  --whenNoResults processWantedReturnConstraints
-  --whenNoResults processWantedFunctorBindConstraints
-  --whenNoResults processWantedBindConstraintsWithOnlyOneMatchingInstance
   
   whenNoResults $ do
     bindCts <- filterM isBindConstraint =<< getWantedConstraints
@@ -170,118 +167,6 @@ supermonadSolve' _s = do
 noResult :: TcPluginResult
 noResult = TcPluginOk [] []
 
--- -----------------------------------------------------------------------------
--- Plugin processing steps
--- -----------------------------------------------------------------------------
--- Functions for the naive version of the solving algorithm.
-
-{-
-processWantedReturnConstraints :: SupermonadPluginM ()
-processWantedReturnConstraints = do
-  -- Get information from the environment
-  identityTC <- getIdentityTyCon
-  returnCls <- getReturnClass
-  -- Default all ambiguous type variables in 'Return' constraints
-  -- to 'Identity'.
-  processAndRemoveWantedConstraints (return . isClassConstraint returnCls) $ \returnCt ->
-    case constraintClassTyArgs returnCt of
-      Just [t] -> if isAmbiguousType t
-        then do
-          let ambTv = getTyVar "Type is not a TyVar" t
-          return $ ([], [mkDerivedTypeEqCt returnCt ambTv (mkTyConTy identityTC)])
-        else return ([], [])
-      _ -> return ([], [])
-
-processWantedFunctorBindConstraints :: SupermonadPluginM ()
-processWantedFunctorBindConstraints = do
-  
-  processAndRemoveWantedConstraints (isBindConstraintWith areBindFunctorArguments) $ \bindCt -> do
-    let Just [_, _, t] = constraintClassTyArgs bindCt
-    if isAmbiguousType t then do
-      return ([], [])
-    else do
-      instFunctor <- getBindFunctorInstance
-      -- This assumes that the functor instance has the following head 
-      -- "(Functor m) => Bind m Identity m" and therefore there is only one variable.
-      eEvidence <- produceEvidenceFor instFunctor [t]
-      case eEvidence of
-        Right evidence -> return ([(evidence, bindCt)], [])
-        Left err -> do
-          printMsg "Failed to produce evidence for functor bind constraint:"
-          printObj bindCt
-          printMsg $ showSDocUnsafe err
-          return ([], [])
-  
-  processAndRemoveWantedConstraints (isBindConstraintWith areBindApplyArguments) $ \bindCt -> do
-    let Just [_, _, t] = constraintClassTyArgs bindCt
-    if isAmbiguousType t then do
-      return ([], [])
-    else do
-      instApply <- getBindApplyInstance
-      -- This assumes that the functor instance has the following head 
-      -- "(Functor m) => Bind Identity m m" and therefore there is only one variable.
-      eEvidence <- produceEvidenceFor instApply [t]
-      case eEvidence of
-        Right evidence -> return ([(evidence, bindCt)], [])
-        Left err -> do
-          printMsg "Failed to produce evidence for functor apply bind constraint:"
-          printObj bindCt
-          printMsg $ showSDocUnsafe err
-          return ([], [])
-
-processWantedBindConstraintsWithOnlyOneMatchingInstance :: SupermonadPluginM ()
-processWantedBindConstraintsWithOnlyOneMatchingInstance =
-  processEachWantedConstraint $ \wantedCt -> do
-    bindCls <- getBindClass
-    if isClassConstraint bindCls wantedCt then do
-      eEv <- selectOnlyMatchingBindInstance wantedCt
-      case eEv of
-        Just (ev, eqs) -> do
-          printMsg "ONLY MATCHING INSTANCE SELECTED:"
-          printObj $ snd ev
-          addEvidenceResult ev
-          addDerivedResults eqs
-          return True -- Discard
-        Nothing -> return False -- Keep
-    else return False -- Keep
-
-
-selectOnlyMatchingBindInstance :: WantedCt -> SupermonadPluginM (Maybe ((EvTerm, WantedCt), [Ct]))
-selectOnlyMatchingBindInstance wantedCt = do
-  case constraintClassTyArgs wantedCt of
-    Just tyArgs | all (not . isAmbiguousTyVar) (concatMap (S.toList . collectTyVars) tyArgs) -> do
-      bindInsts <- getBindInstances
-      mFoundInstEvs <- forM bindInsts $ \bindInst -> 
-        case matchInstanceTyVars bindInst tyArgs of
-          Just (instVariableArgs, ambEqs) -> do
-            eResult <- produceEvidenceFor bindInst instVariableArgs -- SupermonadPluginM (Either SDoc EvTerm)
-            -- mkDerivedTypeEqCt :: Ct -> TyVar -> Type -> Ct
-            return $ case eResult of
-              Left _err -> Nothing
-              Right ev -> Just (bindInst, (ev, wantedCt), fmap (uncurry $ mkDerivedTypeEqCt wantedCt) ambEqs)
-          Nothing -> return Nothing
-      let foundInstEvs = catMaybes mFoundInstEvs
-      -- Only keep those matches that actually found a type for every argument.
-      case fmap (\(_, ev, eqs) -> (ev, eqs)) foundInstEvs of
-        -- Only one matching instance, try to use it...
-        [ev] -> return $ Just ev
-        -- More then one or no matching instance...
-        _ -> return Nothing
-    _ -> return Nothing
-
--- -----------------------------------------------------------------------------
--- General plugin utilities
--- -----------------------------------------------------------------------------
-      
-isBindConstraintWith :: (TyCon -> Type -> Type -> Type -> Bool) -> Ct -> SupermonadPluginM Bool
-isBindConstraintWith p ct = do
-  bindCls <- getBindClass
-  idTyCon <- getIdentityTyCon
-  case (isClassConstraint bindCls ct, constraintClassTyArgs ct) of
-    (True, Just [t1, t2, t3]) -> return $ p idTyCon t1 t2 t3
-    _ -> return False
-  
--}
 
 
 
