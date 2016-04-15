@@ -145,8 +145,7 @@ getTyConBaseFrom cts = do
       baseTvs = S.map Right $ S.filter (not . isAmbiguousTyVar) $ componentTopTcVars checkedCts
   let baseTcs :: S.Set (Either TyCon TyVar)
       baseTcs = S.map Left $ componentTopTyCons checkedCts
-  idTyCon <- getIdentityTyCon
-  return $ S.insert (Left idTyCon) $ S.union baseTvs baseTcs
+  return $ S.union baseTvs baseTcs
 
 getTyConVarsFrom :: [Ct] -> SupermonadPluginM (S.Set TyVar)
 getTyConVarsFrom cts = do
