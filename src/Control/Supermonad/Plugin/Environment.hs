@@ -14,6 +14,7 @@ module Control.Supermonad.Plugin.Environment
   , getCurrentResults
   , getInstEnvs
   , getBindInstances
+  , getSupermonadFor
   , addEvidenceResult, addEvidenceResults
   , addDerivedResult, addDerivedResults
   , whenNoResults
@@ -27,6 +28,7 @@ module Control.Supermonad.Plugin.Environment
 import Data.List ( groupBy )
 import Data.Monoid ( (<>) )
 import Data.Map ( Map )
+import qualified Data.Map as M
 
 import Control.Arrow ( (***) )
 import Control.Monad ( unless, forM_ )
@@ -239,6 +241,11 @@ getInstEnvs = runTcPlugin TcPluginM.getInstEnvs
 -- | Returns all collected results of the plugin so far.
 getCurrentResults :: SupermonadPluginM ([(EvTerm, WantedCt)], [DerivedCt])
 getCurrentResults = (\res -> (smResultEvidence res, smResultDerived res)) <$> gets smStateResult
+
+-- | Retrieves the supermonad bind and return instance of the given type constructor,
+--   if the type constructor represents a supermonad in scope.
+getSupermonadFor :: TyCon -> SupermonadPluginM (Maybe (ClsInst, ClsInst))
+getSupermonadFor tc = (return . M.lookup tc) =<< asks smEnvSupermonads
 
 -- | Add the given evidence to the list of results.
 addEvidenceResult :: (EvTerm, WantedCt) -> SupermonadPluginM ()
