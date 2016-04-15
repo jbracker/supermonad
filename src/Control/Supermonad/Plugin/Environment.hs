@@ -26,6 +26,7 @@ module Control.Supermonad.Plugin.Environment
 
 import Data.List ( groupBy )
 import Data.Monoid ( (<>) )
+import Data.Map ( Map )
 
 import Control.Arrow ( (***) )
 import Control.Monad ( unless, forM_ )
@@ -58,7 +59,9 @@ import Control.Supermonad.Plugin.Detect
   , findInstancesInScope
   , supermonadModuleName, identityModuleName
   , bindClassName, returnClassName
-  , identityTyConName )
+  , identityTyConName
+  , findSupermonads
+  , checkSupermonadInstances )
 
 -- -----------------------------------------------------------------------------
 -- Plugin Monad
@@ -91,6 +94,10 @@ data SupermonadPluginEnv = SupermonadPluginEnv
   -- ^ The given and derived constraints (all of them).
   , smEnvWantedConstraints :: [WantedCt]
   -- ^ The wanted constraints (all of them).
+  , smEnvSupermonads :: Map TyCon (ClsInst, ClsInst)
+  -- ^ The supermonads currently in scope. Associates the type constructor 
+  --   of each supermonad with its 'Control.Supermonad.Bind' and 
+  --   'Control.Supermonad.Return' instance.
   }
 
 -- | The write-only result of the plugin.
@@ -128,8 +135,16 @@ runSupermonadPlugin givenCts wantedCts smM = do
   mReturnCls <- findReturnClass
   mIdMdl <- findIdentityModule
   mIdTyCon <- findIdentityTyCon
-  case (mSupermonadMdl, mBindCls, mReturnCls, mIdMdl, mIdTyCon) of
-    (Right supermonadMdl, Just bindCls, Just returnCls, Right idMdl, Just idTyCon) -> do
+  -- Calculate the supermonads in scope and check for rogue bind and return instances.
+  (smInsts, smErrors) <- case (mBindCls, mReturnCls) of
+      (Just bindCls, Just returnCls) -> do
+        (smInsts, smErrors) <- findSupermonads bindCls returnCls
+        smCheckErrors <- checkSupermonadInstances bindCls returnCls
+        return $ (smInsts, fmap snd smErrors ++ fmap snd smCheckErrors) 
+      (_, _) -> return mempty
+  -- Try to construct the environment or throw errors
+  case (mSupermonadMdl, mBindCls, mReturnCls, mIdMdl, mIdTyCon, smErrors) of
+    (Right supermonadMdl, Just bindCls, Just returnCls, Right idMdl, Just idTyCon, []) -> do
       let initState = SupermonadPluginState { smStateResult = mempty }
       bindInsts <- findInstancesInScope bindCls
       eResult <- runExceptT $ flip runStateT initState $ runReaderT smM $ SupermonadPluginEnv
@@ -141,32 +156,39 @@ runSupermonadPlugin givenCts wantedCts smM = do
         , smEnvBindInstances     = bindInsts
         , smEnvGivenConstraints  = givenCts
         , smEnvWantedConstraints = wantedCts
+        , smEnvSupermonads       = smInsts
         }
       return $ case eResult of
         Left  err -> Left err
         Right (_a, res) -> Right $ TcPluginOk (smResultEvidence $ smStateResult res) (smResultDerived $ smStateResult res)
-    (Left mdlErrMsg, _, _, _, _) -> do
+    (Left mdlErrMsg, _, _, _, _, _) -> do
       let msg = "Could not find " ++ supermonadModuleName ++ " module:"
       L.printErr msg
       L.printErr mdlErrMsg
       return $ Left $ stringToSupermonadError $ msg ++ " " ++ mdlErrMsg
-    (_, Nothing, _, _, _) -> do
+    (_, Nothing, _, _, _, _) -> do
       let msg = "Could not find " ++ bindClassName ++ " class!"
       L.printErr msg
       return $ Left $ stringToSupermonadError msg
-    (_, _, Nothing, _, _) -> do
+    (_, _, Nothing, _, _, _) -> do
       let msg = "Could not find " ++ returnClassName ++ " class!"
       L.printErr msg
       return $ Left $ stringToSupermonadError msg
-    (_, _, _, Left mdlErrMsg, _) -> do
+    (_, _, _, Left mdlErrMsg, _, _) -> do
       let msg = "Could not find " ++ identityModuleName ++ " module:"
       L.printErr msg
       L.printErr mdlErrMsg
       return $ Left $ stringToSupermonadError $ msg ++ " " ++ mdlErrMsg
-    (_, _, _, _, Nothing) -> do
+    (_, _, _, _, Nothing, _) -> do
       let msg = "Could not find " ++ identityTyConName ++ " type constructor!"
       L.printErr msg
       return $ Left $ stringToSupermonadError msg
+    (_, _, _, _, _, smErrors) -> do
+      let msg = "Problems when finding supermonad instances:"
+      let sdocErr = O.vcat smErrors
+      L.printErr msg
+      L.printErr $ L.sDocToStr sdocErr
+      return $ Left $ stringToSupermonadError msg O.$$ sdocErr
 
 
 -- | Execute the given 'TcPluginM' computation within the plugin monad.

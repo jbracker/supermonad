@@ -10,22 +10,23 @@ module Control.Supermonad.Plugin.Detect
   , isBindClass, isReturnClass
   , isSupermonadModule
   , findBindClass, findReturnClass
+  , findSupermonads
+  , checkSupermonadInstances
     -- * Identity Type Detection
   , identityModuleName
   , identityTyConName
   , findIdentityModule
   , findIdentityTyCon
-    -- * Functor Bind Instance Detection
-  --, areBindFunctorArguments
-  --, areBindApplyArguments
-  --, findFunctorBindInstances
   , functorClassName, functorModuleName
     -- * General detection utilities
   , findInstancesInScope
   ) where
 
 import Data.Maybe ( catMaybes, listToMaybe )
-import Control.Monad ( forM, liftM )
+import qualified Data.Set as S
+import qualified Data.Map as M
+
+import Control.Monad ( mzero, forM, liftM )
 
 import BasicTypes ( Arity )
 import TcRnTypes
@@ -66,14 +67,20 @@ import InstEnv
   , ie_global
   , classInstances )
 import PrelNames ( mAIN_NAME )
+import Outputable ( SDoc, ($$), (<>), text, vcat, ppr )
+--import qualified Outputable as O
 
 import Control.Supermonad.Plugin.Log
   ( pmErrMsg
   , pprToStr ) --, printObj, printObjTrace )
 import Control.Supermonad.Plugin.Instance
-  ( instanceType )
+  ( instanceTyArgs
+  , isClassInstance
+  , isMonoTyConInstance 
+  , isPolyTyConInstance )
 import Control.Supermonad.Plugin.Utils
-  ( getTyConName )
+  ( getTyConName
+  , collectTopTyCons )
 
 -- -----------------------------------------------------------------------------
 -- Constant Names (Magic Numbers...)
@@ -355,3 +362,73 @@ findInstancesInScope :: Class -> TcPluginM [ClsInst]
 findInstancesInScope cls = do
   instEnvs <- TcPluginM.getInstEnvs
   return $ classInstances instEnvs cls
+
+-- | Check if there are any supermonad instances that clearly 
+--   do not belong to a specific supermonad.
+checkSupermonadInstances 
+  :: Class -- ^ 'Control.Supermonad.Bind' type class.
+  -> Class -- ^ 'Control.Supermonad.Return' type class.
+  -> TcPluginM [(ClsInst, SDoc)]
+checkSupermonadInstances bindCls returnCls = do
+    bindInsts   <- findInstancesInScope bindCls
+    returnInsts <- findInstancesInScope returnCls
+    
+    let polyBindInsts   = filter (isPolyTyConInstance bindCls  ) bindInsts
+    let polyReturnInsts = filter (isPolyTyConInstance returnCls) returnInsts
+    
+    return $  fmap (\inst -> (inst, text "Not a valid supermonad instance: " $$ ppr inst)) polyBindInsts 
+           ++ fmap (\inst -> (inst, text "Not a valid supermonad instance: " $$ ppr inst)) polyReturnInsts
+
+-- | Constructs the map between type constructors and their supermonad instance.
+findSupermonads 
+  :: Class -- ^ 'Control.Supermonad.Bind' type class.
+  -> Class -- ^ 'Control.Supermonad.Return' type class.
+  -> TcPluginM (M.Map TyCon (ClsInst, ClsInst), [(TyCon, SDoc)])
+  -- ^ Association between type constructor and its 
+  --   'Control.Supermonad.Bind' and 'Control.Supermonad.Return' 
+  --   instance in that order.
+findSupermonads bindCls returnCls = do
+  bindInsts   <- findInstancesInScope bindCls
+  returnInsts <- findInstancesInScope returnCls
+  -- Collect all type constructors that are used for supermonads
+  let supermonadTyCons = S.unions $ fmap instTopTyCons $ bindInsts ++ returnInsts
+  -- Find the supermonad instances of each type constructor
+  return $ mconcat 
+          $ fmap (findSupermonad bindInsts returnInsts)
+          $ S.toList supermonadTyCons
+  where
+    findSupermonad :: [ClsInst] -> [ClsInst] -> TyCon -> (M.Map TyCon (ClsInst, ClsInst), [(TyCon, SDoc)])
+    findSupermonad bindInsts returnInsts tc = 
+      case ( filter (isMonoTyConInstance tc bindCls) bindInsts
+           , filter (isMonoTyConInstance tc returnCls) returnInsts ) of
+        ([bindInst], [returnInst]) -> (M.singleton tc (bindInst, returnInst), [])
+        ([], _) -> findError tc 
+          $ text "Missing 'Bind' instance for supermonad '" <> ppr tc <> text "'."
+        (_, []) -> findError tc 
+          $ text "Missing 'Return' instance for supermonad '" <> ppr tc <> text "'."
+        (bindInsts@(_:_), _) -> findError tc 
+          $ text "Multiple 'Bind' instances for supermonad '" <> ppr tc <> text "':" $$ vcat (fmap ppr bindInsts)
+        (_, returnInsts@(_:_)) -> findError tc 
+          $ text "Multiple 'Return' instances for supermonad '" <> ppr tc <> text "':" $$ vcat (fmap ppr returnInsts)
+    
+    findError :: TyCon -> SDoc -> (M.Map TyCon (ClsInst, ClsInst), [(TyCon, SDoc)])
+    findError tc msg = (M.empty, [(tc, msg)])
+    
+    -- | Collect the top-level type constructors in the arguments 
+    --   of the given instance.
+    instTopTyCons :: ClsInst -> S.Set TyCon
+    instTopTyCons = collectTopTyCons . instanceTyArgs
+    
+    -- | Check if the given instance is a 'Control.Supermonad.Bind' or 
+    --   'Control.Supermonad.Return' class instance.
+    isBindOrReturnInst :: ClsInst -> Bool
+    isBindOrReturnInst inst = isClassInstance bindCls inst || isClassInstance returnCls inst
+
+
+
+
+
+
+
+
+
