@@ -24,7 +24,7 @@ module Control.Supermonad.Functions
   , sequence, sequence_
   , (=<<)
   , (>=>), (<=<)
-  , forever, void
+  , forever, void, void'
     -- ** Generalizations of list functions
   , join
   -- , msum, mfilter -- FIXME: Requires an alternative of 'MonadPlus'.
@@ -37,7 +37,7 @@ module Control.Supermonad.Functions
   -- , guard -- FIXME: Requires an alternative of 'Alternative'
   , when, unless
     -- ** Monadic lifting operators
-  , liftM, liftM2, liftM3
+  , liftM, liftM', liftM2, liftM3
   -- , liftM4, liftM5 -- TODO
   , ap
     -- ** Strict monadic functions
@@ -53,7 +53,7 @@ import Prelude
   ( Bool(..), Int
   , Functor(..)
   , (.), ($)
-  , id, flip
+  , id, flip, const
   , not
   , fromInteger
   --, const
@@ -86,12 +86,12 @@ f =<< ma = ma >>= f
 (<=<) g f x = f x >>= g
 
 -- | When the condition is true do the given action.
-when :: (Functor m, Return m) => Bool -> m () -> m ()
-when True  s = void s
+when :: (Return n, Bind m n n) => Bool -> m () -> n ()
+when True  s = void' s
 when False _ = return ()
 
 -- | When the condition is false do the given action.
-unless :: (Functor m, Return m) => Bool -> m () -> m ()
+unless :: (Return n, Bind m n n) => Bool -> m () -> n ()
 unless b = when (not b)
 
 -- | Map the given function on each element of the list and collect the results.
@@ -100,8 +100,7 @@ mapM f = P.foldr k (return [])
   where
     k a r = do
       x <- f a
-      xs <- r
-      return (x : xs)
+      fmap (x :) r
 
 -- | 'mapM' ignoring the result.
 mapM_ :: (Return n, Bind m n n) => (a -> m b) -> [a] -> n ()
@@ -121,7 +120,11 @@ join k = k >>= id
 
 -- | Ignore the result of a computation.
 void :: (Functor m) => m a -> m ()
-void = (>> return ())
+void = fmap (const ())
+
+-- | Ignore the result of a computation, but allow morphing the computational type.
+void' :: (Bind m n n, Return n) => m a -> n ()
+void' = (>> return ())
 
 -- | Execute all computations in the list in order and returns the list of results.
 sequence :: (Return n, Bind m n n) => [m b] -> n [b]
@@ -132,18 +135,17 @@ sequence_ :: (Return n, Bind m n n) => [m b] -> n ()
 sequence_ = void . sequence
 
 -- | Execute the given computation repeatedly forever.
-forever :: (Bind n m m) => n a -> m b
+forever :: (Bind m n n) => m a -> n b
 forever na = na >> forever na
 
 -- | Like @filter@ but with a monadic predicate and result.
-filterM :: ( Bind n m m
-           , Return m, Bind m Identity m)
-        => (a -> n Bool) -> [a] -> m [a]
+filterM :: ( Bind m n n, Return n)
+        => (a -> m Bool) -> [a] -> n [a]
 filterM _f [] = return []
 filterM f (x : xs) = do
   keep <- f x
   if keep
-    then filterM f xs >>= (return . (x :))
+    then fmap (x :) $ filterM f xs
     else filterM f xs
 
 -- | Map a given monadic function on the list and the unzip the results.
@@ -174,8 +176,9 @@ replicateM :: (Return n, Bind m n n) => Int -> m a -> n [a]
 replicateM n _ma | n <= 0 = return []
 replicateM n ma = do
   a <- ma
-  as <- replicateM (n - 1) ma
-  return $ a : as
+  fmap (a :) $ replicateM (n - 1) ma
+  -- Rewrite for less restrictive constraints.
+  --return $ a : as
 
 -- | Same as 'replicateM', but ignores the results.
 replicateM_ :: (Return n, Bind m n n) => Int -> m a -> n ()
@@ -183,40 +186,51 @@ replicateM_ n = void . replicateM n
 
 -- | Make arguments and result of a pure function monadic.
 liftM :: (Functor m) => (a -> b) -> m a -> m b
-liftM f ma = ma >>= (return . f)
+liftM f ma = fmap f ma
+
+-- | Make arguments and result of a pure function monadic with allowed morphing
+liftM' :: (Return n, Bind m n n) => (a -> b) -> m a -> n b
+liftM' f ma = ma >>= (return . f)
 
 -- | Make arguments and result of a pure function monadic.
-liftM2 :: (Bind m n p) --, Bind n Identity n) 
+liftM2 :: (Bind m n p)
        => (a -> b -> c) -> m a -> n b -> p c
 liftM2 f ma nb = do
+  a <- ma 
+  fmap (f a) nb
+  -- Rewritten because the constraint are simpler this way.
+  -- (Bind m p p, n p p, Return p)
+  {- do
   a <- ma
   b <- nb
   return $ f a b
+  -}
 
 -- | Make arguments and result of a pure function monadic.
-liftM3 :: (Bind m q q, Bind n p q, Bind p Identity p)
+liftM3 :: (Bind m q q, Bind n p q)
        => (a -> b -> c -> d) -> m a -> n b -> p c -> q d
 liftM3 f ma nb pc = do --ma >>= (\a -> nb >>= (\b -> pc >>= (\c -> return $ f a b c)))
   a <- ma
   b <- nb
-  c <- pc
-  return $ f a b c
+  fmap (f a b) pc
+  --return $ f a b c
 
 -- | Make the resulting function a monadic function.
 ap :: (Bind m n p) => m (a -> b) -> n a -> p b
 ap mf na = do
   f <- mf
-  a <- na
-  return $ f a
+  fmap f na
+  -- Remove the necessity of a 'Return' constraint.
+  --return $ f a
 
 -- | Apply the given function to the result of a computation.
-(<$>) :: (Functor m) => (a -> b) -> m a -> m b
+(<$>) :: (Return n, Bind m n n) => (a -> b) -> m a -> n b
 f <$> m = do
   x <- m
   return (f x)
 
 -- | Strict version of '<$>'.
-(<$!>) :: (Functor m) => (a -> b) -> m a -> m b
+(<$!>) :: (Return n, Bind m n n) => (a -> b) -> m a -> n b
 f <$!> m = do
   x <- m
   let z = f x
