@@ -8,7 +8,7 @@ module Control.Supermonad.Plugin.Constraint
     GivenCt, WantedCt, DerivedCt
     -- * Constraint Creation
   , mkDerivedTypeEqCt
-  , mkDerivedTypeEqCt'
+  , mkDerivedTypeEqCtOfTypes
   , mkDerivedClassCt
     -- * Constraint inspection
   , isClassConstraint
@@ -62,17 +62,17 @@ type WantedCt = Ct
 
 -- | Create a derived type equality constraint. The constraint
 --   will be located at the location of the given constraints
---   and equate the given variable with the given type.
-mkDerivedTypeEqCt :: Ct -> TyVar -> Type -> Ct
-mkDerivedTypeEqCt ct = mkDerivedTypeEqCt' (constraintLocation ct)
+--   and equate the given types with each other.
+mkDerivedTypeEqCtOfTypes :: Ct -> Type -> Type -> Ct
+mkDerivedTypeEqCtOfTypes ct ta tb = mkNonCanonical CtDerived
+  { ctev_pred = mkTcEqPred ta tb
+  , ctev_loc = constraintLocation ct }
 
 -- | Create a derived type equality constraint. The constraint
---   will be located at the given location
+--   will be located at the location of the given constraints
 --   and equate the given variable with the given type.
-mkDerivedTypeEqCt' :: CtLoc -> TyVar -> Type -> Ct
-mkDerivedTypeEqCt' loc tv ty = mkNonCanonical CtDerived
-  { ctev_pred = mkTcEqPred (mkTyVarTy tv) ty
-  , ctev_loc = loc }
+mkDerivedTypeEqCt :: Ct -> TyVar -> Type -> Ct
+mkDerivedTypeEqCt ct tv = mkDerivedTypeEqCtOfTypes ct (mkTyVarTy tv)
 
 -- | Creates a derived class constraint using the given location
 --   as origin. It is the programmers responsibility to supply the
