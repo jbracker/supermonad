@@ -5,14 +5,14 @@ module Control.Supermonad.Plugin.Solving
   ) where
 
 import Data.Maybe ( catMaybes, isJust, fromJust )
-import Data.List ( partition )
+import Data.List ( partition, nubBy )
 import qualified Data.Set as S
 
 import Control.Monad ( when, forM, forM_, filterM, liftM2 )
 
 import TcRnTypes ( Ct )
 import TyCon ( TyCon )
-import Type ( TyVar )
+import Type ( Type, TyVar, eqType )
 import TcType ( isAmbiguousTyVar )
 
 -- import Control.Supermonad.Plugin.Debug ( sDocToStr )
@@ -41,7 +41,8 @@ import Control.Supermonad.Plugin.Separation
   , componentMonoTyCon )
 import Control.Supermonad.Plugin.Utils 
   ( collectTopTcVars
-  , associations, allM )
+  , associations
+  , allM )
 
 
 -- | Attempts to solve the given group /wanted/ constraints. See 'separateContraints'.
@@ -80,7 +81,7 @@ solveMonoConstraintGroup :: (TyCon, [WantedCt]) -> SupermonadPluginM ()
 solveMonoConstraintGroup (_, []) = return ()
 solveMonoConstraintGroup (tyCon, ctGroup) = do
   printMsg "Solve mono group..."
-  printConstraints ctGroup
+  --printConstraints ctGroup
   smCtGroup <- filterM (\ct -> liftM2 (||) (isReturnConstraint ct) (isBindConstraint ct)) ctGroup
   forM_ smCtGroup $ \ct -> do
     let ctAmbVars = S.filter isAmbiguousTyVar 
@@ -89,13 +90,17 @@ solveMonoConstraintGroup (tyCon, ctGroup) = do
                   $ constraintClassTyArgs ct
     forM_ ctAmbVars $ \tyVar -> do
       appliedTyCon <- either throwPluginErrorSDoc return =<< partiallyApplyTyCons [(tyVar, Left tyCon)]
-      case appliedTyCon of
+      case nubBy tyConAssocEq appliedTyCon of
         [] -> do
           throwPluginError "How did this become an empty list?"
-        ((tv, t, _) : _) -> do
-          printObj $ mkDerivedTypeEqCt ct tv t
+        [(tv, t, _)] -> do
           addDerivedResult $ mkDerivedTypeEqCt ct tv t
-    
+        _ -> do
+          throwPluginError "How did this become a list with more then one element?"
+  where
+    tyConAssocEq :: (TyVar, Type, [TyVar]) -> (TyVar, Type, [TyVar]) -> Bool
+    tyConAssocEq (tv, t, tvs) (tv', t', tvs') = tv == tv' && tvs == tvs' && eqType t t'
+
 
 -- | Solve constraint groups that have more them one supermonad type 
 --   constructor (variable) involved.
