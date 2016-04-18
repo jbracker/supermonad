@@ -52,7 +52,7 @@ import Control.Supermonad.Plugin.Environment
   , runTcPlugin
   , printMsg, printObj, printConstraints )
 import Control.Supermonad.Plugin.Environment.Lift
-  ( isBindConstraint)
+  ( isBindConstraint, isReturnConstraint )
 
 -- -----------------------------------------------------------------------------
 -- The Plugin
@@ -108,6 +108,22 @@ supermonadSolve' _s = do
   
   getWantedConstraints >>= solveConstraints 
   
+  -- Unification solve return constraints that are applied to top-level tycons.
+  whenNoResults $ do
+    returnCts <- getTopTyConSolvedConstraints isReturnConstraint
+    forM_ returnCts $ \returnCt -> do
+      eResult <- withTopTyCon returnCt $ \topTyCon bindCtArgs bindInst returnInst -> do
+        case deriveUnificationConstraints returnCt returnInst of
+          Left err -> do
+            printMsg err
+          Right eqCts -> do 
+            printObj eqCts
+            addDerivedResults eqCts
+      case eResult of
+        Left err -> printMsg $ sDocToStr err
+        Right () -> return ()
+  
+  -- Unification solve bind constraints that are applied to top-level tycons.
   whenNoResults $ do
     bindCts <- getTopTyConSolvedConstraints isBindConstraint
     forM_ bindCts $ \bindCt -> do
