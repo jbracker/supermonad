@@ -44,7 +44,7 @@ import qualified GHC.Conc as STM ( STM )
 -- -----------------------------------------------------------------------------
 
 -- | TODO
-class (Functor m, Functor n, Functor p) => Bind m n p | m n -> p where
+class (Functor m, Functor n, Functor p) => Bind m n p where
   (>>=) :: m a -> (a -> n b) -> p b
   (>>)  :: m a -> n b -> p b
   ma >> mb = ma >>= const mb
