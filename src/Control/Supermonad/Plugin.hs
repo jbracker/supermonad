@@ -9,29 +9,33 @@ module Control.Supermonad.Plugin
 import Data.Maybe ( catMaybes, isNothing )
 import qualified Data.Set as S
 
-import Control.Monad ( forM_, filterM )
+import Control.Monad ( forM, forM_, filterM )
 
 import Plugins ( Plugin(tcPlugin), defaultPlugin )
 import Type 
   ( Type, TyVar, TvSubst
   , getTyVar, substTyVar
   , isTyVarTy )
+import TyCon ( TyCon )
 import TcRnTypes
   ( Ct(..)
   , TcPlugin(..), TcPluginResult(..) )
 import TcPluginM ( TcPluginM )
-import InstEnv ( lookupInstEnv, instanceHead )
+import InstEnv ( ClsInst, lookupInstEnv, instanceHead )
 import Unify ( tcUnifyTy )
+import qualified Outputable as O
 
 import Control.Supermonad.Plugin.Log ( sDocToStr )
 import qualified Control.Supermonad.Plugin.Log as L
 import Control.Supermonad.Plugin.Utils 
   ( collectTyVars )
 import Control.Supermonad.Plugin.Constraint
-  ( DerivedCt
+  ( DerivedCt, WantedCt
   , mkDerivedTypeEqCt
+  , mkDerivedTypeEqCtOfTypes
   , constraintClassTyArgs
   , constraintTopTcVars
+  , constraintTopTyCons
   , sortConstraintsByLine )
 import Control.Supermonad.Plugin.Solving
   ( solveConstraints )
@@ -40,7 +44,7 @@ import Control.Supermonad.Plugin.Environment
   , getIdentityTyCon
   , getReturnClass, getBindClass
   , getWantedConstraints, getGivenConstraints
-  , getBindInstances
+  , getSupermonadFor
   , getInstEnvs
   , addEvidenceResult
   , addDerivedResults
@@ -105,64 +109,77 @@ supermonadSolve' _s = do
   getWantedConstraints >>= solveConstraints 
   
   whenNoResults $ do
-    bindCts <- filterM isBindConstraint =<< getWantedConstraints
-    let solvedBindCts = filter (S.null . constraintTopTcVars) bindCts
-    instEnvs <- getInstEnvs
-    bindCls <- getBindClass
-    forM_ solvedBindCts $ \bindCt -> do
-      let Just bindCtArgs = constraintClassTyArgs bindCt
-      let (lookupInstMatch, lookupInsts, _) = lookupInstEnv instEnvs bindCls bindCtArgs 
-      let foundInsts = fmap fst lookupInstMatch ++ lookupInsts
-      case foundInsts of
-        [inst] -> do
-          let (instVars, _instCls, instArgs) = instanceHead inst
-          let bindCtVars = S.toList $ S.unions $ fmap collectTyVars bindCtArgs 
-          printMsg "Found possible instance:"
-          printObj bindCt
-          printObj inst
-          let mSubsts = zipWith tcUnifyTy instArgs bindCtArgs
-          if any isNothing mSubsts then do
-            printMsg "Missing substitution!"
-          else do
-            let eqGroups = collectEqualityGroup (catMaybes mSubsts) instVars
-            forM_ eqGroups $ \(_, eqGroup) -> do
-              let eqGroupCts = mkEqGroup bindCt eqGroup
-              printObj eqGroupCts
-              addDerivedResults eqGroupCts
-          
-        (_ : _) -> do
-          printMsg "No unique instance match for solved bind constraint:"
-          printObj bindCt
-          printMsg "Matching instances:"
-          printObj foundInsts
-        [] -> do
-          printMsg "No matching instance for bind constraint:"
-          printObj bindCt
-          
+    bindCts <- getTopTyConSolvedConstraints isBindConstraint
+    forM_ bindCts $ \bindCt -> do
+      eResult <- withTopTyCon bindCt $ \topTyCon bindCtArgs bindInst returnInst -> do
+        case deriveUnificationConstraints bindCt bindInst of
+          Left err -> do
+            printMsg err
+          Right eqCts -> do 
+            printObj eqCts
+            addDerivedResults eqCts
+      case eResult of
+        Left err -> printMsg $ sDocToStr err
+        Right () -> return ()
   
   -- End of plugin code.
   return ()
   where
+    getTopTyConSolvedConstraints :: (WantedCt -> SupermonadPluginM Bool) -> SupermonadPluginM [WantedCt]
+    getTopTyConSolvedConstraints p = do
+      -- Get all wanted bind constraints.
+      bindCts <- filterM p =<< getWantedConstraints
+      -- Get all bind constraints that already have been assigned their top-level
+      -- type constructors and process them to solve the type constructor arguments...
+      return $ filter (S.null . constraintTopTcVars) bindCts
     
-    mkEqStar :: Ct -> TyVar -> [Type] -> [DerivedCt]
-    mkEqStar baseCt tv tys = fmap (mkDerivedTypeEqCt baseCt tv) tys
-      
+    withTopTyCon :: WantedCt -> ( TyCon -> [Type] -> ClsInst -> ClsInst -> SupermonadPluginM a ) -> SupermonadPluginM (Either O.SDoc a)
+    withTopTyCon ct process = do
+      let mCtArgs = constraintClassTyArgs ct
+      -- Get the top-level type constructor for this bind constraint.
+      let mTopTyCon = S.toList $ constraintTopTyCons ct
+      -- Begin error handling.
+      case (mCtArgs, mTopTyCon) of
+        (Just ctArgs, [topTyCon]) -> do
+          -- Get the bind instance for the current type constructor.
+          mSupermonadInst <- getSupermonadFor topTyCon
+          case mSupermonadInst of
+            Just (bindInst, returnInst) -> Right <$> process topTyCon ctArgs bindInst returnInst
+            -- We could not find a bind and return instance associated with the 
+            -- given type constructor.
+            Nothing -> do
+              return $ Left
+                     $ O.text "Constraints top type constructor does not form a supermonad:"
+                       O.$$ O.ppr topTyCon
+        (Nothing, _) -> do
+          return $ Left 
+                 $ O.text "Constraint is not a class constraint:"
+                 O.$$ O.ppr ct
+        (_, _) -> do
+          return $ Left
+                 $ O.text "Constraint misses a unqiue top-level type constructor:"
+                 O.$$ O.ppr ct
+    
+    deriveUnificationConstraints :: WantedCt -> ClsInst -> Either String [DerivedCt]
+    deriveUnificationConstraints ct inst = do
+      let (instVars, _instCls, instArgs) = instanceHead inst
+      let Just ctArgs = constraintClassTyArgs ct
+      let bindCtVars = S.toList $ S.unions $ fmap collectTyVars ctArgs
+      let mSubsts = zipWith tcUnifyTy instArgs ctArgs
+      if any isNothing mSubsts then do
+        Left "Missing substitution!"
+      else do
+        let eqGroups = collectEqualityGroup (catMaybes mSubsts) instVars
+        fmap concat $ forM eqGroups $ \(_, eqGroup) -> do
+          let eqGroupCts = mkEqGroup ct eqGroup
+          return eqGroupCts
+    
     mkEqGroup ::  Ct -> [Type] -> [DerivedCt]
-    mkEqGroup baseCt tys = case findAndRemove isTyVarTy tys of
-      Just (t, tys') -> mkEqStar baseCt (getTyVar "Plugin.hs: Should never happen!" t) tys'
-      Nothing -> []
-      
-    findAndRemove :: (a -> Bool) -> [a] -> Maybe (a, [a])
-    findAndRemove _ [] = Nothing
-    findAndRemove p (a:as) = 
-      if p a 
-        then Just (a, as) 
-        else do
-          (foundA, as') <- findAndRemove p as
-          return (foundA, a : as')
+    mkEqGroup _ [] = []
+    mkEqGroup baseCt (ty : tys) = fmap (mkDerivedTypeEqCtOfTypes baseCt ty) tys
       
     collectEqualityGroup :: [TvSubst] -> [TyVar] -> [(TyVar, [Type])]
-    collectEqualityGroup substs tvs = [ (tv, [ substTyVar subst tv | subst <- substs]) | tv <- tvs]
+    collectEqualityGroup substs tvs = [ (tv, filter (all (tv /=) . collectTyVars) [ substTyVar subst tv | subst <- substs]) | tv <- tvs]
 
 noResult :: TcPluginResult
 noResult = TcPluginOk [] []
