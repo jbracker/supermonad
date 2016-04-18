@@ -242,7 +242,7 @@ getInstEnvs = runTcPlugin TcPluginM.getInstEnvs
 getCurrentResults :: SupermonadPluginM ([(EvTerm, WantedCt)], [DerivedCt])
 getCurrentResults = (\res -> (smResultEvidence res, smResultDerived res)) <$> gets smStateResult
 
--- | Retrieves the supermonad bind and return instance of the given type constructor,
+-- | Retrieves the supermonad bind and return instance (in that order) of the given type constructor,
 --   if the type constructor represents a supermonad in scope.
 getSupermonadFor :: TyCon -> SupermonadPluginM (Maybe (ClsInst, ClsInst))
 getSupermonadFor tc = (return . M.lookup tc) =<< asks smEnvSupermonads
