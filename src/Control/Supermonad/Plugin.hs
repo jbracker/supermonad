@@ -195,7 +195,7 @@ supermonadSolve' _s = do
       else do
         let substs = catMaybes mSubsts
         let instVarEqGroups = collectEqualityGroup substs instVars
-        instVarEqGroupsCt <- map concat $ forM instVarEqGroups $ \(_, eqGroup) -> do
+        instVarEqGroupsCt <- fmap concat $ forM instVarEqGroups $ \(_, eqGroup) -> do
           return $ mkEqGroup ct eqGroup
         -- There may still the type variables from the constraint that were unified
         -- with constants. Also create type equalities for these.
