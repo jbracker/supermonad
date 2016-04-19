@@ -1,9 +1,9 @@
 
 {-# LANGUAGE MultiParamTypeClasses  #-} -- for 'Bind' class.
-{-# LANGUAGE FunctionalDependencies #-} -- for 'Bind' class.
+{-# LANGUAGE ConstraintKinds        #-} -- for 'Bind' class.
+{-# LANGUAGE TypeFamilies           #-} -- for 'Bind' class.
 
-{-# LANGUAGE FlexibleInstances #-} -- for 'Bind Identity a a' and 'Bind a Identity a' instances.
-
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
 -- | Representation of supermonads in Haskell.
@@ -37,6 +37,7 @@ import qualified Text.ParserCombinators.ReadP as Read ( ReadP )
 import qualified Text.ParserCombinators.ReadPrec as Read ( ReadPrec )
 
 import qualified GHC.Conc as STM ( STM )
+import GHC.Exts ( Constraint )
 
 
 -- -----------------------------------------------------------------------------
@@ -45,8 +46,10 @@ import qualified GHC.Conc as STM ( STM )
 
 -- | TODO
 class (Functor m, Functor n, Functor p) => Bind m n p where
-  (>>=) :: m a -> (a -> n b) -> p b
-  (>>)  :: m a -> n b -> p b
+  type BindCts m n p :: Constraint
+  type BindCts m n p = ()
+  (>>=) :: (BindCts m n p) => m a -> (a -> n b) -> p b
+  (>>)  :: (BindCts m n p) => m a -> n b -> p b
   ma >> mb = ma >>= const mb
 
 instance Bind Identity Identity Identity where
@@ -65,6 +68,7 @@ instance Bind Mon.First Mon.First Mon.First where
 instance Bind Mon.Last Mon.Last Mon.Last where
   (>>=) = (P.>>=)
 instance (Bind f f f) => Bind (Mon.Alt f) (Mon.Alt f) (Mon.Alt f) where
+  type BindCts (Mon.Alt f) (Mon.Alt f) (Mon.Alt f) = BindCts f f f
   m >>= f = Mon.Alt $ (Mon.getAlt m) >>= (Mon.getAlt . f)
 
 instance Bind Proxy.Proxy Proxy.Proxy Proxy.Proxy where
@@ -93,6 +97,7 @@ instance (Arrow.ArrowApply a) => Bind (Arrow.ArrowMonad a) (Arrow.ArrowMonad a) 
 --   >   fmap f m = App.WrapMonad $ fmap (App.unwrapMonad m) f
 --   
 instance (Bind m m m, P.Monad m) => Bind (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) where
+  type BindCts (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) = BindCts m m m
   m >>= f = App.WrapMonad $ (App.unwrapMonad m) >>= (App.unwrapMonad . f)
 
 instance Bind STM.STM STM.STM STM.STM where
