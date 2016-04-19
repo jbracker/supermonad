@@ -17,6 +17,7 @@ module Control.Supermonad.Plugin.Environment
   , getSupermonadFor
   , addEvidenceResult, addEvidenceResults
   , addDerivedResult, addDerivedResults
+  , getDerivedResults
   , whenNoResults
   , throwPluginError, throwPluginErrorSDoc, catchPluginError
     -- * Debug and Error Output
@@ -262,6 +263,10 @@ addDerivedResult derived = addDerivedResults [derived]
 -- | Add the given derived results to the list of results.
 addDerivedResults :: [DerivedCt] -> SupermonadPluginM ()
 addDerivedResults derived = modify $ \s -> s { smStateResult = smStateResult s <> (SupermonadPluginResult [] derived) }
+
+-- | Returns all derived constraints that were added to the results thus far.
+getDerivedResults :: SupermonadPluginM [DerivedCt]
+getDerivedResults = gets $ smResultDerived . smStateResult
 
 -- | Execute the given plugin code only if no plugin results were produced so far.
 whenNoResults :: SupermonadPluginM () -> SupermonadPluginM ()
