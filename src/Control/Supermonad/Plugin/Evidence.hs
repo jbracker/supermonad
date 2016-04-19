@@ -187,10 +187,20 @@ produceEvidenceForCtType givenCts ct =
     Just (tc, _tcArgs) | isTyFunCon tc -> do
       -- Evaluate it...
       (coer, evalCt) <- evaluateType Representational ct
-      -- Produce evidence for the evaluated term
-      eEvEvalCt <- produceEvidenceForCtType' evalCt
-      -- Add the appropriate cast to the produced evidence
-      return $ (\ev -> EvCast ev (TcSymCo $ TcCoercion coer)) <$> eEvEvalCt
+      -- Check if evaluation made progress...
+      if eqType ct evalCt 
+        -- Evaluation did not make any progress, end with error...
+        then do
+          return $ Left 
+                 $ O.text "Could make progress evaluating a type function:"
+                 $$ O.ppr ct
+        -- Evaluation could make progress, we can try producing 
+        -- evidence for the new constraints...
+        else do
+          -- Produce evidence for the evaluated term
+          eEvEvalCt <- produceEvidenceForCtType' evalCt
+          -- Add the appropriate cast to the produced evidence
+          return $ (\ev -> EvCast ev (TcSymCo $ TcCoercion coer)) <$> eEvEvalCt
     -- Do we have a type equality constraint?
     _ -> case getEqPredTys_maybe ct of
       -- If there is a synonym or type function in the equality...
