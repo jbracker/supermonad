@@ -23,6 +23,7 @@ import TcRnTypes
   ( Ct(..)
   , TcPlugin(..), TcPluginResult(..) )
 import TcPluginM ( TcPluginM )
+import TcType ( isAmbiguousTyVar )
 import InstEnv ( ClsInst, lookupInstEnv, instanceHead )
 import Unify ( tcUnifyTy )
 import qualified Outputable as O
@@ -50,6 +51,7 @@ import Control.Supermonad.Plugin.Environment
   , getInstEnvs
   , addEvidenceResult
   , addDerivedResults
+  , getDerivedResults
   , whenNoResults
   , runTcPlugin
   , printMsg, printObj, printConstraints )
@@ -103,7 +105,8 @@ supermonadSolve s given derived wanted = do
 -- | The actual plugin code.
 supermonadSolve' :: SupermonadState -> SupermonadPluginM ()
 supermonadSolve' _s = do
-  --getWantedConstraints >>= (printConstraints . sortConstraintsByLine)
+  --(getWantedConstraints >>= filterM isBindConstraint) >>= (printConstraints . sortConstraintsByLine)
+  --(getWantedConstraints >>= filterM isReturnConstraint) >>= (printConstraints . sortConstraintsByLine)
   --getGivenConstraints >>= (printConstraints . sortConstraintsByLine)
   
   
@@ -141,6 +144,9 @@ supermonadSolve' _s = do
         Right () -> return ()
   
   -- End of plugin code.
+  --printMsg "END PLUGIN"
+  --printConstraints =<< getDerivedResults
+  --printMsg "END OUTPUT"
   return ()
   where
     getTopTyConSolvedConstraints :: (WantedCt -> SupermonadPluginM Bool) -> SupermonadPluginM [WantedCt]
@@ -182,22 +188,32 @@ supermonadSolve' _s = do
     deriveUnificationConstraints ct inst = do
       let (instVars, _instCls, instArgs) = instanceHead inst
       let Just ctArgs = constraintClassTyArgs ct
-      let bindCtVars = S.toList $ S.unions $ fmap collectTyVars ctArgs
+      let ctVars = S.toList $ S.unions $ fmap collectTyVars ctArgs
       let mSubsts = zipWith tcUnifyTy instArgs ctArgs
       if any isNothing mSubsts then do
         Left "Missing substitution!"
       else do
-        let eqGroups = collectEqualityGroup (catMaybes mSubsts) instVars
-        fmap concat $ forM eqGroups $ \(_, eqGroup) -> do
-          let eqGroupCts = mkEqGroup ct $ nubBy eqType eqGroup
-          return eqGroupCts
+        let substs = catMaybes mSubsts
+        let instVarEqGroups = collectEqualityGroup substs instVars
+        instVarEqGroupsCt <- map concat $ forM instVarEqGroups $ \(_, eqGroup) -> do
+          return $ mkEqGroup ct eqGroup
+        -- There may still the type variables from the constraint that were unified
+        -- with constants. Also create type equalities for these.
+        let ctVarEqGroups = collectEqualityGroup substs $ filter isAmbiguousTyVar ctVars
+        let ctVarEqCts = mkEqStarGroup ct ctVarEqGroups
+        return $ instVarEqGroupsCt ++ ctVarEqCts
     
     mkEqGroup ::  Ct -> [Type] -> [DerivedCt]
     mkEqGroup _ [] = []
     mkEqGroup baseCt (ty : tys) = fmap (mkDerivedTypeEqCtOfTypes baseCt ty) tys
-      
+    
+    mkEqStarGroup :: Ct -> [(TyVar, [Type])] -> [DerivedCt]
+    mkEqStarGroup baseCt eqGroups = concatMap (\(tv, tys) -> fmap (mkDerivedTypeEqCt baseCt tv) tys) eqGroups
+    
     collectEqualityGroup :: [TvSubst] -> [TyVar] -> [(TyVar, [Type])]
-    collectEqualityGroup substs tvs = [ (tv, filter (all (tv /=) . collectTyVars) [ substTyVar subst tv | subst <- substs]) | tv <- tvs]
+    collectEqualityGroup substs tvs = [ (tv, nubBy eqType $ filter (all (tv /=) . collectTyVars) 
+                                                          $ [ substTyVar subst tv | subst <- substs]
+                                        ) | tv <- tvs]
 
 noResult :: TcPluginResult
 noResult = TcPluginOk [] []
