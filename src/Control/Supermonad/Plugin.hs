@@ -7,6 +7,7 @@ module Control.Supermonad.Plugin
   ( plugin ) where
 
 import Data.Maybe ( catMaybes, isNothing )
+import Data.List ( nubBy )
 import qualified Data.Set as S
 
 import Control.Monad ( forM, forM_, filterM )
@@ -15,7 +16,8 @@ import Plugins ( Plugin(tcPlugin), defaultPlugin )
 import Type 
   ( Type, TyVar, TvSubst
   , getTyVar, substTyVar
-  , isTyVarTy )
+  , isTyVarTy
+  , eqType )
 import TyCon ( TyCon )
 import TcRnTypes
   ( Ct(..)
@@ -117,7 +119,7 @@ supermonadSolve' _s = do
           Left err -> do
             printMsg err
           Right eqCts -> do 
-            printObj eqCts
+            printConstraints eqCts
             addDerivedResults eqCts
       case eResult of
         Left err -> printMsg $ sDocToStr err
@@ -132,7 +134,7 @@ supermonadSolve' _s = do
           Left err -> do
             printMsg err
           Right eqCts -> do 
-            printObj eqCts
+            printConstraints eqCts
             addDerivedResults eqCts
       case eResult of
         Left err -> printMsg $ sDocToStr err
@@ -187,7 +189,7 @@ supermonadSolve' _s = do
       else do
         let eqGroups = collectEqualityGroup (catMaybes mSubsts) instVars
         fmap concat $ forM eqGroups $ \(_, eqGroup) -> do
-          let eqGroupCts = mkEqGroup ct eqGroup
+          let eqGroupCts = mkEqGroup ct $ nubBy eqType eqGroup
           return eqGroupCts
     
     mkEqGroup ::  Ct -> [Type] -> [DerivedCt]
