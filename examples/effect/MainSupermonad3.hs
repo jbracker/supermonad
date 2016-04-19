@@ -2,15 +2,10 @@
 {-# LANGUAGE RebindableSyntax #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE PolyKinds #-}
+--{-# LANGUAGE TypeOperators #-}
 
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-
-{-# LANGUAGE UndecidableInstances #-}
 
 -- Ignore our orphan instance in this file.
 {-# OPTIONS_GHC -fno-warn-orphans #-}
@@ -21,7 +16,7 @@
 import Control.Supermonad.Prelude
 
 import qualified Control.Effect as E
-import Control.Effect ( Effect, Plus, Unit, Inv )
+import Control.Effect ( Plus, Inv )
 import Control.Effect.CounterNat
 
 import GHC.TypeLits
@@ -29,10 +24,11 @@ import GHC.TypeLits
 instance Functor (Counter (s :: Nat)) where
   fmap f ma = ma E.>>= (E.return . f)
 
-instance (h ~ (f + g)) => Bind (Counter (f :: Nat)) (Counter (g :: Nat)) (Counter (h :: Nat)) where
+instance (h ~ Plus Counter f g) => Bind (Counter (f :: Nat)) (Counter (g :: Nat)) (Counter (h :: Nat)) where
+  type BindCts (Counter (f :: Nat)) (Counter (g :: Nat)) (Counter (h :: Nat)) = Inv Counter f g
   (>>=) = (E.>>=)
 
-instance (h ~ 0) => Return (Counter (h :: Nat)) where
+instance Return (Counter (0 :: Nat)) where
   return = E.return
 
 instance Fail (Counter (h :: Nat)) where

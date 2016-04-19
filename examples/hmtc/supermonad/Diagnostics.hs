@@ -1,6 +1,8 @@
 {-# LANGUAGE RebindableSyntax #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+
 {-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
+{-# LANGUAGE TypeFamilies #-} -- To enable the definition of BindCts
 
 {-
 ******************************************************************************
@@ -180,32 +182,35 @@ ppDMsg (DMsg {dmLvl = lvl, dmSrcPos = sp, dmTxt = msg}) =
 -- instance Monad m => MonadTransformer DFT m where
 --     lift m = DFT $ m >>= \a -> return (Just a)
 
+-- NOTE: Adjusted to work with supermonads
 class MonadTransformer t where
-    lift :: (Bind m m m, Return m) => m a -> t m a
+    lift :: (BindCts m m m, Bind m m m, Return m) => m a -> t m a
 
 
 -- | Class for diagnostic computations. Diagnostic computations accumulate
 -- diagnostic messages.
 -- Context "Applicative d" for backwards compatibility
+
+-- NOTE: Adjusted to work with supermonads
 class (Applicative d, Bind d d d, Return d) => Diagnostic d where
 
     -- | Emits a diagnostic message
-    emitD :: DMsg -> d ()
+    emitD :: (BindCts d d d) => DMsg -> d ()
 
     -- | Emits an information message.
-    emitInfoD :: SrcPos -> String -> d ()
+    emitInfoD :: (BindCts d d d) => SrcPos -> String -> d ()
     emitInfoD sp msg = emitD (mkInfoMsg sp msg)
 
     -- | Emits a warning message.
-    emitWngD :: SrcPos -> String -> d ()
+    emitWngD :: (BindCts d d d) => SrcPos -> String -> d ()
     emitWngD sp msg = emitD (mkWngMsg sp msg)
 
     -- | Emits an error message.
-    emitErrD :: SrcPos -> String -> d ()
+    emitErrD :: (BindCts d d d) => SrcPos -> String -> d ()
     emitErrD sp msg = emitD (mkErrMsg sp msg)
 
     -- | Diagnostic messages emitted thus far
-    getDMsgsD :: d [DMsg]
+    getDMsgsD :: (BindCts d d d) => d [DMsg]
 
     -- | Tries the first diagnostic computation. If that results in errors,
     -- discards those and runs the second computation.
@@ -213,19 +218,21 @@ class (Applicative d, Bind d d d, Return d) => Diagnostic d where
 
 
 -- | Class for diagnostic computations with failure.
+
+-- NOTE: Adjusted to work with supermonads
 class Diagnostic df => DiagnosticFail df where
 
     -- | Emits an error message and fails.
-    failD :: SrcPos -> String -> df a
+    failD :: (BindCts df df df) => SrcPos -> String -> df a
     
     -- | Fails without giving any specific reason.
-    failNoReasonD :: df a
+    failNoReasonD :: (BindCts df df df) => df a
     
     -- | Fails if there has been errors thus far
-    failIfErrorsD :: df ()
+    failIfErrorsD :: (BindCts df df df) => df ()
     
     -- | Forces a stop, e.g. after some user-specified pass.
-    stopD :: df a
+    stopD :: (BindCts df df df) => df a
 
 
 ------------------------------------------------------------------------------
@@ -377,6 +384,7 @@ instance (Applicative m, Monad m) => Monad (DFT m) where
             Just a  -> unDFT (f a)
 -}
 instance (Bind m m m, Return m) => Bind (DFT m) (DFT m) (DFT m) where
+  type BindCts (DFT m) (DFT m) (DFT m) = BindCts m m m
   m >>= f = DFT $
         unDFT m >>= \ma ->
         case ma of
@@ -399,7 +407,7 @@ instance Diagnostic d => Diagnostic (DFT d) where
     dftd1 ||| dftd2 = DFT $ unDFT dftd1 ||| unDFT dftd2
 
 
-instance Diagnostic d => DiagnosticFail (DFT d) where
+instance (Diagnostic d) => DiagnosticFail (DFT d) where
     failD sp msg = DFT $ emitErrD sp msg >> return Nothing
     
     failNoReasonD = DFT $ emitErrD NoSrcPos "Failure, unknown reason"
