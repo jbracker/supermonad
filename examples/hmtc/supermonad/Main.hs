@@ -168,21 +168,21 @@ main = do
         (ft, prog) <- case mfn of
                           Nothing -> do
                               prog <- getContents
-                              return (MT, prog) :: IO (FileType, String)  -- NOTE: Type annotation to guide plugin (same reason as in library)
+                              return (MT, prog)
                           Just fn  -> do
                               prog <- readFile fn
                               return (fileType fn, prog)
         case ft of
             TAM -> do
                 let (mbCode, msgs) = runDF (parseTC prog)
-                mapM_ (putStrLn . ppDMsg) msgs :: IO ()  -- NOTE: Type annotation to guide plugin (same reason as in library)
+                mapM_ (putStrLn . ppDMsg) msgs
                 case mbCode of
                     Nothing -> putStrLn "No valid TAM code read."
                     Just code ->
                         runTAM (optTrace opts) (code ++ libMT)
             MT -> do
                 let (mbCode, msgs) = runDF (compile opts prog)
-                mapM_ (putStrLn . ppDMsg) msgs :: IO ()  -- NOTE: Type annotation to guide plugin (same reason as in library)
+                mapM_ (putStrLn . ppDMsg) msgs
                 case mbCode of
                     Nothing   -> putStrLn "No code generated."
                     Just code ->
@@ -206,7 +206,7 @@ parseCmdLine :: IO (Options, Maybe String)
 parseCmdLine = do
     args <- getArgs
     let (mof, msgs) = runDF (processOptions defaultOptions args)
-    mapM_ (putStrLn . ppDMsg) msgs :: IO ()  -- NOTE: Type annotation to guide plugin (same reason as in library)
+    mapM_ (putStrLn . ppDMsg) msgs
     case mof of
         Just (opts, as) -> return (opts,
                                    if null as then
@@ -219,7 +219,7 @@ parseCmdLine = do
 processOptions :: Options -> [String] -> DF (Options, [String])
 processOptions opts as = do
     oas <- dToDF (posAux opts as)
-    failIfErrorsD :: DF () -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
+    failIfErrorsD
     return oas
     where
         posAux :: Options -> [String] -> D (Options, [String])
@@ -277,27 +277,27 @@ compile opts src = do
     -- separately. (The result of scanning is then discarded.)
     when (optPAScanning opts) $ do
         tss <- scan src
-        emitInfoD NoSrcPos (ppTSs tss) :: DF () -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
-        failIfErrorsD :: DF () -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
-    when (optSAScanning opts) (stopD :: DF ()) -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
+        emitInfoD NoSrcPos (ppTSs tss)
+        failIfErrorsD
+    when (optSAScanning opts) stopD
 
     -- Parsing
     ast <- parse src
-    when (optPAParsing opts) (emitInfoD NoSrcPos (ppAST ast) :: DF ()) -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
-    failIfErrorsD :: DF () -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
-    when (optSAParsing opts) (stopD :: DF ()) -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
+    when (optPAParsing opts) (emitInfoD NoSrcPos (ppAST ast))
+    failIfErrorsD
+    when (optSAParsing opts) stopD
 
     -- Type checking
     mtir <- dToDF (typeCheck ast)
-    when (optPAChecking opts) (emitInfoD NoSrcPos (ppMTIR mtir) :: DF ()) -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
-    failIfErrorsD :: DF () -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
-    when (optSAChecking opts) (stopD :: DF ()) -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
+    when (optPAChecking opts) (emitInfoD NoSrcPos (ppMTIR mtir))
+    failIfErrorsD
+    when (optSAChecking opts) stopD
 
     -- Code generation
     code <- dToDF (genCode (optPeepOpt opts) mtir)
-    when (optPACodeGen opts) (emitInfoD NoSrcPos (ppTAMCode code) :: DF ()) -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
-    failIfErrorsD :: DF () -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
-    when (optSACodeGen opts) (stopD :: DF ()) -- NOTE: Type annotation to guide plugin (Backward reasoning missing)
+    when (optPACodeGen opts) (emitInfoD NoSrcPos (ppTAMCode code))
+    failIfErrorsD
+    when (optSACodeGen opts) stopD
 
     return code
 

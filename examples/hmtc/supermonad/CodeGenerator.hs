@@ -151,13 +151,13 @@ execute majl env n (CmdAssign {caVar = v, caVal = e}) = do
     evaluate majl env v         -- 0 as there could be side effects. 
     emit (STOREIB (sizeOf (expType e)))
 execute majl env n (CmdCall {ccProc = p, ccArgs = as}) = do
-    mapM_ (evaluate majl env) as :: TAMCG () -- NOTE: Type annotation to guide plugin (same reason as in library)
+    mapM_ (evaluate majl env) as
     evaluate majl env p
     emit CALLI
 execute majl env n (CmdSeq {csCmds = cs}) = executeSeq majl env n cs
 execute majl env n (CmdIf {ciCondThens = ecs, ciMbElse = mbce}) = do
     lblOver <- newName
-    mapM_ (executeCondThen majl env n lblOver) ecs :: TAMCG () -- NOTE: Type annotation to guide plugin (same reason as in library)
+    mapM_ (executeCondThen majl env n lblOver) ecs
     case mbce of
         Nothing -> return ()
         Just ce -> execute majl env n ce
@@ -239,8 +239,8 @@ executeSeq majl env n (c:cs) = do
 elaborateDecls :: MSL -> CGEnv -> MTInt -> [Declaration] -> TAMCG (CGEnv,MTInt)
 elaborateDecls majl env n ds = do
      (env', n') <- extendEnv env n ds
-     mapM_ (elaborateDecl majl env') ds :: TAMCG () -- NOTE: Type annotation to guide plugin (same reason as in library)
-     return (env', n') :: TAMCG (CGEnv,MTInt) -- NOTE: Type annotation to guide plugin (same reason as in library)
+     mapM_ (elaborateDecl majl env') ds
+     return (env', n')
 
 
 -- Extend environment according to declarations.
@@ -370,7 +370,7 @@ evaluate majl env (ExpDeref {edArg = e, expType = t}) = do
                                 -- could be side effects.
     emit (LOADIB (sizeOf t))
 evaluate majl env (ExpApp {eaFun = f, eaArgs = as}) = do
-    mapM_ (evaluate majl env) as :: TAMCG () -- NOTE: Type annotation to guide plugin (same reason as in library)
+    mapM_ (evaluate majl env) as
     evaluate majl env f
     emit CALLI     
 evaluate majl env (ExpCond {ecCond = e1, ecTrue = e2, ecFalse = e3}) = do

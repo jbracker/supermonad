@@ -851,7 +851,6 @@ testTypeChecker s bs = do
                 Left _ -> error "Extending MT Standard Environment failed!"
                 Right (env', _) -> extend env' bs
 
-        parseCheck :: String -> Env -> DF MTIR -- NOTE: Type signature added, because the inferred one was to general and implied constraint that are unavailable.
         parseCheck s env = do
             ast <- parse s
             failIfErrorsD
