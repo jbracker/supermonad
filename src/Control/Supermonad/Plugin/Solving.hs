@@ -63,7 +63,7 @@ import Control.Supermonad.Plugin.Utils
 -- | Attempts to solve the given /wanted/ constraints.
 solveConstraints :: [WantedCt] -> SupermonadPluginM ()
 solveConstraints wantedCts = do
-  
+  {-
   -- Look through the constraints and see if we can find constraints that do not 
   -- contain ambiguous variables and try to produce evidence for them.
   clearedWantedCts <- fmap catMaybes $ forM wantedCts $ \ct -> do
@@ -73,10 +73,10 @@ solveConstraints wantedCts = do
       Right ev -> do
         addEvidenceResult (ev, ct) -- :: (EvTerm, WantedCt) -> SupermonadPluginM ()
         return Nothing
-  
+  -}
   -- Calculate the different groups of constraints that belong 
   -- together for solving purposes.
-  ctGroups <- separateContraints clearedWantedCts
+  ctGroups <- separateContraints wantedCts
   
   -- Check each group wether it constains exactly one type constructor or not.
   markedCtGroups <- forM ctGroups $ \g -> do 
