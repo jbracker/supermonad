@@ -26,18 +26,14 @@ import Data.Maybe ( catMaybes, listToMaybe )
 import qualified Data.Set as S
 import qualified Data.Map as M
 
-import Control.Monad ( mzero, forM, liftM )
+import Control.Monad ( forM, liftM )
 
 import BasicTypes ( Arity )
 import TcRnTypes
   ( TcGblEnv(..)
   , TcTyThing(..) )
-import Type
-  ( Type, TyThing(..)
-  , mkTyConTy
-  , splitTyConApp_maybe
-  , eqType )
-import TyCon ( TyCon, isClassTyCon )
+import Type ( TyThing(..) )
+import TyCon ( TyCon )
 import TcPluginM
   ( TcPluginM
   , getEnvs, getInstEnvs
@@ -75,12 +71,10 @@ import Control.Supermonad.Plugin.Log
   , pprToStr ) --, printObj, printObjTrace )
 import Control.Supermonad.Plugin.Instance
   ( instanceTyArgs
-  , isClassInstance
   , isMonoTyConInstance 
   , isPolyTyConInstance )
 import Control.Supermonad.Plugin.Utils
-  ( getTyConName
-  , collectTopTyCons )
+  ( collectTopTyCons )
 
 -- -----------------------------------------------------------------------------
 -- Constant Names (Magic Numbers...)
@@ -181,82 +175,6 @@ findIdentityTyCon = do
     [] -> return Nothing
     _ -> findTyConByNameAndModule (mkTcOcc identityTyConName) mdls
 
--- -----------------------------------------------------------------------------
--- Functor Bind Instance Detection
--- -----------------------------------------------------------------------------
-{-
--- | Check if the given type arguments would form a 'Control.Supermonad.Bind' functor instance 
---   if applied to 'Control.Supermonad.Bind': @Bind m Identity m@
-areBindFunctorArguments :: TyCon -- ^ The 'Data.Functor.Identity.Identity' type constructor.
-                        -> Type -> Type -> Type -> Bool
-areBindFunctorArguments idTyCon t1 t2 t3 =
-  let idTC = mkTyConTy idTyCon
-  in eqType t2 idTC && eqType t1 t3 -- Bind m Identity m
-
--- | Check if the given type arguments would form a 'Control.Supermonad.Bind' apply instance 
---   if applied to 'Control.Supermonad.Bind': @Bind Identity m m@
-areBindApplyArguments :: TyCon -- ^ The 'Data.Functor.Identity.Identity' type constructor.
-                      -> Type -> Type -> Type -> Bool
-areBindApplyArguments idTyCon t1 t2 t3 =
-  let idTC = mkTyConTy idTyCon
-  in eqType t1 idTC && eqType t2 t3 -- Bind Identity m m
-
--- | Check if the given instance is a 'Control.Supermonad.Bind' functor instance: @Bind m Identity m@
-isFunctorBindInstance :: Class -- ^ 'Control.Supermonad.Bind' class.
-                      -> TyCon -- ^ 'Data.Functor.Identity.Identity' type constructor.
-                      -> ClsInst -> Bool
-isFunctorBindInstance bindCls idTyCon inst = 
-  let (_cts, cls, _tc, args) = instanceType inst
-  in cls == bindCls && hasOnlyFunctorConstraint inst && case args of
-    [t1, t2, t3] -> areBindFunctorArguments idTyCon t1 t2 t3 -- Bind m Identity m
-    _ -> False
-
--- | Check if the given instance is a 'Control.Supermonad.Bind' apply instance: @Bind Identity m m@
-isApplyBindInstance :: Class -- ^ 'Control.Supermonad.Bind' class.
-                    -> TyCon -- ^ 'Identity' type constructor.
-                    -> ClsInst -> Bool
-isApplyBindInstance bindCls idTyCon inst =
-  let (_cts, cls, _tc, args) = instanceType inst
-  in cls == bindCls && hasOnlyFunctorConstraint inst && case args of
-    [t1, t2, t3] -> areBindApplyArguments idTyCon t1 t2 t3 -- Bind Identity m m
-    _ -> False
-
--- | Check if the given type constructor is the 'Data.Functor.Functor' type constructor.
-isFunctorTyCon :: TyCon -> Bool
-isFunctorTyCon tc = isClassTyCon tc && getTyConName tc == functorClassName
-
--- | Check if the given type is an application of the 'Data.Functor.Functor' 
---   type constructor to some type arguments.
-isFunctorTyConApp :: Type -> Bool
-isFunctorTyConApp t = case splitTyConApp_maybe t of
-  Just (ctTyCon, ctArgs) | length ctArgs == 1 -> isFunctorTyCon ctTyCon
-  _ -> False
-
--- | Check if the constraints of the given instance only contain 
---   'Data.Functor.Functor' class constraints.
-hasOnlyFunctorConstraint :: ClsInst -> Bool
-hasOnlyFunctorConstraint inst =
-  let (cts, _, _, _) = instanceType inst
-  in (length cts <= 2) && all isFunctorTyConApp cts
-
--- | Returns the pair of 'Control.Supermonad.Bind' 
---   instances @(Bind m Identity m, Bind Identity n n)@ if these instances can be found.
-findFunctorBindInstances :: Class -- ^ 'Control.Supermonad.Bind' class.
-                         -> TyCon -- ^ 'Data.Functor.Identity.Identity' type constructor.
-                         -> TcPluginM (Maybe (ClsInst, ClsInst))
-findFunctorBindInstances bindCls idTyCon = do
-  let isFunctorBindInst = isFunctorBindInstance bindCls idTyCon
-  let isApplyBindInst = isApplyBindInstance bindCls idTyCon
-  bindInsts <-  filter (\inst -> isFunctorBindInst inst || isApplyBindInst inst) 
-            <$> findInstancesInScope bindCls
-  case bindInsts of
-    [b1, b2] -> do
-      if isFunctorBindInst b1 then
-        return $ Just (b1, b2)
-      else
-        return $ Just (b2, b1)
-    _ -> return Nothing
--}
 -- -----------------------------------------------------------------------------
 -- Local Utility Functions
 -- -----------------------------------------------------------------------------
@@ -406,10 +324,9 @@ findSupermonads bindCls returnCls = do
           $ text "Missing 'Bind' instance for supermonad '" <> ppr tc <> text "'."
         (_, []) -> findError tc 
           $ text "Missing 'Return' instance for supermonad '" <> ppr tc <> text "'."
-        (bindInsts@(_:_), _) -> findError tc 
-          $ text "Multiple 'Bind' instances for supermonad '" <> ppr tc <> text "':" $$ vcat (fmap ppr bindInsts)
-        (_, returnInsts@(_:_)) -> findError tc 
-          $ text "Multiple 'Return' instances for supermonad '" <> ppr tc <> text "':" $$ vcat (fmap ppr returnInsts)
+        (bindInsts', returnInsts') -> findError tc 
+          $ text "Multiple 'Bind' instances for supermonad '" <> ppr tc <> text "':" $$ vcat (fmap ppr bindInsts')
+          $$ text "Multiple 'Return' instances for supermonad '" <> ppr tc <> text "':" $$ vcat (fmap ppr returnInsts')
     
     findError :: TyCon -> SDoc -> (M.Map TyCon (ClsInst, ClsInst), [(TyCon, SDoc)])
     findError tc msg = (M.empty, [(tc, msg)])
@@ -418,11 +335,6 @@ findSupermonads bindCls returnCls = do
     --   of the given instance.
     instTopTyCons :: ClsInst -> S.Set TyCon
     instTopTyCons = collectTopTyCons . instanceTyArgs
-    
-    -- | Check if the given instance is a 'Control.Supermonad.Bind' or 
-    --   'Control.Supermonad.Return' class instance.
-    isBindOrReturnInst :: ClsInst -> Bool
-    isBindOrReturnInst inst = isClassInstance bindCls inst || isClassInstance returnCls inst
 
 
 
