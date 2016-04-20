@@ -17,11 +17,10 @@ import TcRnTypes ( Ct(..) )
 import TyCon ( TyCon )
 import Type 
   ( Type, TyVar, TvSubst
-  , getTyVar, substTyVar
-  , isTyVarTy
+  , substTyVar
   , eqType )
 import TcType ( isAmbiguousTyVar )
-import InstEnv ( ClsInst, lookupInstEnv, instanceHead )
+import InstEnv ( ClsInst, instanceHead )
 import Unify ( tcUnifyTy )
 import qualified Outputable as O
 
@@ -316,7 +315,7 @@ solveSolvedTyConIndices = do
   whenNoResults $ do
     returnCts <- getTopTyConSolvedConstraints isReturnConstraint
     forM_ returnCts $ \returnCt -> do
-      eResult <- withTopTyCon returnCt $ \topTyCon bindCtArgs bindInst returnInst -> do
+      eResult <- withTopTyCon returnCt $ \_topTyCon _bindCtArgs _bindInst returnInst -> do
         case deriveUnificationConstraints returnCt returnInst of
           Left err -> do
             printErr err
@@ -331,7 +330,7 @@ solveSolvedTyConIndices = do
   whenNoResults $ do
     bindCts <- getTopTyConSolvedConstraints isBindConstraint
     forM_ bindCts $ \bindCt -> do
-      eResult <- withTopTyCon bindCt $ \topTyCon bindCtArgs bindInst returnInst -> do
+      eResult <- withTopTyCon bindCt $ \_topTyCon _bindCtArgs bindInst _returnInst -> do
         case deriveUnificationConstraints bindCt bindInst of
           Left err -> do
             printErr err

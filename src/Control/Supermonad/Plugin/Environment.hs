@@ -186,7 +186,7 @@ runSupermonadPlugin givenCts wantedCts smM = do
       let msg = "Could not find " ++ identityTyConName ++ " type constructor!"
       L.printErr msg
       return $ Left $ stringToSupermonadError msg
-    (_, _, _, _, _, smErrors) -> do
+    (_, _, _, _, _, _) -> do
       let msg = "Problems when finding supermonad instances:"
       let sdocErr = O.vcat smErrors
       L.printErr msg

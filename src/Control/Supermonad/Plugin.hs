@@ -6,12 +6,6 @@
 module Control.Supermonad.Plugin
   ( plugin ) where
 
-import Data.Maybe ( catMaybes, isNothing )
-import Data.List ( nubBy )
-import qualified Data.Set as S
-
-import Control.Monad ( forM, forM_, filterM )
-
 import Plugins ( Plugin(tcPlugin), defaultPlugin )
 import TcRnTypes
   ( Ct(..)
@@ -20,33 +14,14 @@ import TcPluginM ( TcPluginM )
 
 import Control.Supermonad.Plugin.Log ( sDocToStr )
 import qualified Control.Supermonad.Plugin.Log as L
-import Control.Supermonad.Plugin.Utils 
-  ( collectTyVars )
-import Control.Supermonad.Plugin.Constraint
-  ( DerivedCt, WantedCt
-  , mkDerivedTypeEqCt
-  , mkDerivedTypeEqCtOfTypes
-  , constraintClassTyArgs
-  , constraintTopTcVars
-  , constraintTopTyCons
-  , sortConstraintsByLine )
 import Control.Supermonad.Plugin.Solving
   ( solveConstraints )
 import Control.Supermonad.Plugin.Environment
   ( SupermonadPluginM, runSupermonadPlugin
-  , getIdentityTyCon
-  , getReturnClass, getBindClass
-  , getWantedConstraints, getGivenConstraints
-  , getSupermonadFor
-  , getInstEnvs
-  , addEvidenceResult
-  , addDerivedResults
-  , getDerivedResults
-  , whenNoResults
-  , runTcPlugin
-  , printMsg, printObj, printConstraints )
-import Control.Supermonad.Plugin.Environment.Lift
-  ( isBindConstraint, isReturnConstraint )
+  , getWantedConstraints
+  , printMsg
+  -- , printObj, printConstraints
+  )
 
 -- -----------------------------------------------------------------------------
 -- The Plugin
