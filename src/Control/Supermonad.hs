@@ -8,7 +8,11 @@
 
 -- | Representation of supermonads in Haskell.
 module Control.Supermonad
-  ( Bind(..), Return(..), Fail(..)
+  ( -- * Supermonads
+    Bind(..), Return(..), Fail(..)
+    -- * Conveniences
+  , Monad
+    -- * Reexports
     -- Reexporting this is convenient for users, because they don't
     -- have to remember to import Data.Functor.Identity separatly anymore.
   , Identity( Identity, runIdentity )
@@ -196,3 +200,14 @@ instance (Fail m, P.Monad m) => Fail (App.WrappedMonad m) where
 
 instance Fail STM.STM where
   fail = P.fail
+  
+-- -----------------------------------------------------------------------------
+-- Convenient type synonyms
+-- -----------------------------------------------------------------------------
+
+-- | A short-hand for writing polymorphic standard monad functions.
+type family Monad m :: Constraint where
+  Monad m = (Bind m m m, Return m, Fail m)
+
+
+
