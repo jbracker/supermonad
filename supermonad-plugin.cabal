@@ -24,9 +24,12 @@ source-repository head
 
 library
   exposed-modules: Control.Supermonad
-                 , Control.Supermonad.Plugin
                  , Control.Supermonad.Prelude
                  , Control.Supermonad.Functions
+                 , Control.Supermonad.Plugin
+                 , Control.Supermonad.Constrained
+                 , Control.Supermonad.Constrained.Prelude
+                 , Control.Supermonad.Constrained.Functions
   other-modules: Control.Supermonad.Plugin.Utils
                , Control.Supermonad.Plugin.Log
                , Control.Supermonad.Plugin.Detect
