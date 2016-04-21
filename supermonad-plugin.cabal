@@ -27,6 +27,7 @@ library
                  , Control.Supermonad.Prelude
                  , Control.Supermonad.Functions
                  , Control.Supermonad.Plugin
+                 , Control.Supermonad.PreludeWithoutMonad
                  , Control.Supermonad.Constrained
                  , Control.Supermonad.Constrained.Prelude
                  , Control.Supermonad.Constrained.Functions
