@@ -40,6 +40,9 @@ session-example: install
 effect-example: install
 	cabal install ./examples/effect
 
+constrained-example: install
+	cabal install ./examples/constrained
+
 hmtc-orig-example:
 	cabal install ./examples/hmtc/original
 
