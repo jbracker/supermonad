@@ -32,13 +32,11 @@ import Control.Supermonad.Plugin.Environment
   , getReturnClass, getBindClass
   , getSupermonadFor
   , addDerivedResult, addDerivedResults
-  , addEvidenceResult
   , printMsg, printConstraints, printObj, printErr
   , throwPluginError, throwPluginErrorSDoc
   , whenNoResults )
 import Control.Supermonad.Plugin.Environment.Lift
-  ( produceEvidenceForCt
-  , isPotentiallyInstantiatedCt
+  ( isPotentiallyInstantiatedCt
   , isBindConstraint, isReturnConstraint
   , partiallyApplyTyCons )
 import Control.Supermonad.Plugin.Constraint 
