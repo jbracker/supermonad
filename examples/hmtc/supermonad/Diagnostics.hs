@@ -184,7 +184,7 @@ ppDMsg (DMsg {dmLvl = lvl, dmSrcPos = sp, dmTxt = msg}) =
 
 -- NOTE: Adjusted to work with supermonads
 class MonadTransformer t where
-    lift :: (BindCts m m m a a, Bind m m m, Return m) => m a -> t m a
+    lift :: (BindCts m m m, Bind m m m, Return m) => m a -> t m a
 
 
 -- | Class for diagnostic computations. Diagnostic computations accumulate
