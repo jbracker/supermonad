@@ -12,7 +12,7 @@ module Control.Supermonad.Constrained.Prelude
   , module Control.Supermonad.PreludeWithoutMonad
   ) where
 
-import Control.Supermonad.PreludeWithoutMonad
+import Control.Supermonad.PreludeWithoutMonad hiding ( Functor(..) )
 import Control.Supermonad.Constrained
 import qualified Control.Supermonad.Constrained.Functions as F
 
