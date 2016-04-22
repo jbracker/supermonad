@@ -29,6 +29,7 @@ library
                  , Control.Supermonad.Plugin
                  , Control.Supermonad.PreludeWithoutMonad
                  , Control.Supermonad.Constrained
+                 , Control.Supermonad.Constrained.Functor
                  , Control.Supermonad.Constrained.Prelude
                  , Control.Supermonad.Constrained.Functions
   other-modules: Control.Supermonad.Plugin.Utils
