@@ -94,7 +94,9 @@ unless :: (Return n, Bind m n n, BindCts m n n () ()) => Bool -> m () -> n ()
 unless b = when (not b)
 
 -- | Map the given function on each element of the list and collect the results.
-mapM :: (Return n, Bind m n n, BindCts m n n b [b]) => (a -> m b) -> [a] -> n [b]
+mapM :: ( Return n, Bind m n n, BindCts m n n b [b]
+        , CFunctorCts n [b] [b]
+        ) => (a -> m b) -> [a] -> n [b]
 mapM f = P.foldr k (return [])
   where
     k a r = do
@@ -102,15 +104,21 @@ mapM f = P.foldr k (return [])
       fmap (x :) r
 
 -- | 'mapM' ignoring the result.
-mapM_ :: (Return n, Bind m n n, BindCts m n n b [b]) => (a -> m b) -> [a] -> n ()
+mapM_ :: ( Return n, Bind m n n, BindCts m n n b [b]
+         , CFunctorCts n [b] (), CFunctorCts n [b] [b]
+         ) => (a -> m b) -> [a] -> n ()
 mapM_ f = void . mapM f
 
 -- | 'flip'ped version of 'mapM'.
-forM :: (Return n, Bind m n n, BindCts m n n b [b]) => [a] -> (a -> m b) -> n [b]
+forM :: ( Return n, Bind m n n, BindCts m n n b [b]
+        , CFunctorCts n [b] [b]
+        ) => [a] -> (a -> m b) -> n [b]
 forM = flip mapM
 
 -- | 'forM' ignoring the result.
-forM_ :: (Return n, Bind m n n, BindCts m n n b [b]) => [a] -> (a -> m b) -> n ()
+forM_ :: ( Return n, Bind m n n, BindCts m n n b [b]
+         , CFunctorCts n [b] (), CFunctorCts n [b] [b]
+         ) => [a] -> (a -> m b) -> n ()
 forM_ xs = void . forM xs
 
 -- | Monadic join operation.
@@ -118,19 +126,22 @@ join :: (Bind m n p, BindCts m n p (n a) a) => m (n a) -> p a
 join k = k >>= id
 
 -- | Ignore the result of a computation.
-void :: (CFunctor m) => m a -> m ()
+void :: (CFunctor m, CFunctorCts m a ()) => m a -> m ()
 void = fmap (const ())
 
 -- | Ignore the result of a computation, but allow morphing the computational type.
-void' :: (Bind m n n, BindCts m n n a (), Return n) => m a -> n ()
+void' :: ( Return n, Bind m n n, BindCts m n n a ()
+         ) => m a -> n ()
 void' = (>> return ())
 
 -- | Execute all computations in the list in order and returns the list of results.
-sequence :: (Return n, Bind m n n, BindCts m n n b [b]) => [m b] -> n [b]
+sequence :: (Return n, Bind m n n, BindCts m n n b [b], CFunctorCts n [b] [b]) => [m b] -> n [b]
 sequence = mapM id
 
 -- | 'sequence' ignoring the result.
-sequence_ :: (Return n, Bind m n n, BindCts m n n b [b]) => [m b] -> n ()
+sequence_ :: ( Return n, Bind m n n, BindCts m n n b [b]
+             , CFunctorCts n [b] (), CFunctorCts n [b] [b]
+             ) => [m b] -> n ()
 sequence_ = void . sequence
 
 -- | Execute the given computation repeatedly forever.
@@ -139,7 +150,8 @@ forever na = na >> forever na
 
 -- | Like @filter@ but with a monadic predicate and result.
 filterM :: ( Bind m n n, BindCts m n n Bool [a]
-           , Return n)
+           , Return n
+           , CFunctorCts n [a] [a])
         => (a -> m Bool) -> [a] -> n [a]
 filterM _f [] = return []
 filterM f (x : xs) = do
@@ -149,30 +161,41 @@ filterM f (x : xs) = do
     else filterM f xs
 
 -- | Map a given monadic function on the list and the unzip the results.
-mapAndUnzipM :: (Return n, Bind m n n, BindCts m n n (b, c) [(b, c)]) => (a -> m (b, c)) -> [a] -> n ([b], [c])
+mapAndUnzipM :: ( Return n, Bind m n n, BindCts m n n (b, c) [(b, c)]
+                , CFunctorCts n [(b, c)] ([b], [c]), CFunctorCts n [(b, c)] [(b, c)]
+                ) => (a -> m (b, c)) -> [a] -> n ([b], [c])
 mapAndUnzipM f xs = liftM P.unzip (forM xs f)
 
 -- | Zip together two list using a monadic function.
-zipWithM :: (Return n, Bind m n n, BindCts m n n c [c]) => (a -> b -> m c) -> [a] -> [b] -> n [c]
+zipWithM :: ( Return n, Bind m n n, BindCts m n n c [c]
+            , CFunctorCts n [c] [c]
+            ) => (a -> b -> m c) -> [a] -> [b] -> n [c]
 zipWithM f xs ys = sequence $ P.zipWith f xs ys
 
 -- | Same as 'zipWithM', but ignores the results.
-zipWithM_ :: (Return n, Bind m n n, BindCts m n n c [c]) => (a -> b -> m c) -> [a] -> [b] -> n ()
+zipWithM_ :: ( Return n, Bind m n n, BindCts m n n c [c]
+             , CFunctorCts n [c] (), CFunctorCts n [c] [c]
+             ) => (a -> b -> m c) -> [a] -> [b] -> n ()
 zipWithM_ f xs ys = void $ zipWithM f xs ys
 
 -- | Fold the given foldable using a monadic function.
 --   See 'foldl'.
-foldM :: ( P.Foldable t, Return m, Bind m n m, BindCts m n m b b) => (b -> a -> n b) -> b -> t a -> m b
+foldM :: ( P.Foldable t, Return m, Bind m n m, BindCts m n m b b
+         ) => (b -> a -> n b) -> b -> t a -> m b
 foldM f e = P.foldl f' (return e)
   where f' nb a = nb >>= \b -> f b a
 
 -- | Same as 'foldM', but ignores the result.
-foldM_ :: (P.Foldable t, Return m, Bind m n m, BindCts m n m b b) => (b -> a -> n b) -> b -> t a -> m ()
+foldM_ :: ( P.Foldable t, Return m, Bind m n m, BindCts m n m b b
+          , CFunctorCts m b ()
+          ) => (b -> a -> n b) -> b -> t a -> m ()
 foldM_ f e = void . foldM f e
 
 -- | Repeats the given monadic operation for the given amount of times and
 --   returns the accumulated results.
-replicateM :: (Return n, Bind m n n, BindCts m n n a [a]) => Int -> m a -> n [a]
+replicateM :: ( Return n, Bind m n n, BindCts m n n a [a]
+              , CFunctorCts n [a] [a]
+              ) => Int -> m a -> n [a]
 replicateM n _ma | n <= 0 = return []
 replicateM n ma = do
   a <- ma
@@ -181,11 +204,13 @@ replicateM n ma = do
   --return $ a : as
 
 -- | Same as 'replicateM', but ignores the results.
-replicateM_ :: (Return n, Bind m n n, BindCts m n n a [a]) => Int -> m a -> n ()
+replicateM_ :: ( Return n, Bind m n n, BindCts m n n a [a]
+               , CFunctorCts n [a] (), CFunctorCts n [a] [a]
+               ) => Int -> m a -> n ()
 replicateM_ n = void . replicateM n
 
 -- | Make arguments and result of a pure function monadic.
-liftM :: (CFunctor m) => (a -> b) -> m a -> m b
+liftM :: (CFunctor m, CFunctorCts m a b) => (a -> b) -> m a -> m b
 liftM f ma = fmap f ma
 
 -- | Make arguments and result of a pure function monadic with allowed morphing
@@ -193,8 +218,9 @@ liftM' :: (Return n, Bind m n n, BindCts m n n a b) => (a -> b) -> m a -> n b
 liftM' f ma = ma >>= (return . f)
 
 -- | Make arguments and result of a pure function monadic.
-liftM2 :: (Bind m n p, BindCts m n p a c)
-       => (a -> b -> c) -> m a -> n b -> p c
+liftM2 :: (Bind m n p, BindCts m n p a c
+          , CFunctorCts n b c
+          ) => (a -> b -> c) -> m a -> n b -> p c
 liftM2 f ma nb = do
   a <- ma 
   fmap (f a) nb
@@ -208,7 +234,8 @@ liftM2 f ma nb = do
 
 -- | Make arguments and result of a pure function monadic.
 liftM3 :: ( Bind m q q, BindCts m q q a d
-          , Bind n p q, BindCts n p q b d)
+          , Bind n p q, BindCts n p q b d
+          , CFunctorCts p c d)
        => (a -> b -> c -> d) -> m a -> n b -> p c -> q d
 liftM3 f ma nb pc = do --ma >>= (\a -> nb >>= (\b -> pc >>= (\c -> return $ f a b c)))
   a <- ma
@@ -217,7 +244,9 @@ liftM3 f ma nb pc = do --ma >>= (\a -> nb >>= (\b -> pc >>= (\c -> return $ f a 
   --return $ f a b c
 
 -- | Make the resulting function a monadic function.
-ap :: (Bind m n p, BindCts m n p (a -> b) b) => m (a -> b) -> n a -> p b
+ap :: ( Bind m n p, BindCts m n p (a -> b) b
+      , CFunctorCts n a b
+      ) => m (a -> b) -> n a -> p b
 ap mf na = do
   f <- mf
   fmap f na
