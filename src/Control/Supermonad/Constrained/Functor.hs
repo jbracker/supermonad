@@ -42,11 +42,11 @@ import qualified Data.Set as S
 -- | Class for constrained functors. Obeys all of the same laws as the standard
 --   'Functor' class, but allows to constrain the functors result type.
 class CFunctor f where
-  type FunctorCts (f :: * -> *) (a :: *) (b :: *) :: Constraint
-  type FunctorCts f a b = ()
+  type CFunctorCts (f :: * -> *) (a :: *) (b :: *) :: Constraint
+  type CFunctorCts f a b = ()
   
-  fmap :: (FunctorCts f a b) => (a -> b) -> f a -> f b
-  (<$) :: (FunctorCts f b a) => a -> f b -> f a
+  fmap :: (CFunctorCts f a b) => (a -> b) -> f a -> f b
+  (<$) :: (CFunctorCts f b a) => a -> f b -> f a
   (<$) = fmap . const
 
 -- Unconstrained instances -----------------------------------------------------
@@ -74,7 +74,7 @@ instance CFunctor Mon.Last where
   fmap = P.fmap
   (<$) = (P.<$)
 instance (CFunctor f) => CFunctor (Mon.Alt f) where
-  type FunctorCts (Mon.Alt f) a b = FunctorCts f a b
+  type CFunctorCts (Mon.Alt f) a b = CFunctorCts f a b
   fmap f (Mon.Alt ma) = Mon.Alt $ fmap f ma
   a <$ (Mon.Alt mb) = Mon.Alt $ a <$ mb
 
@@ -99,7 +99,7 @@ instance (Arrow.ArrowApply a) => CFunctor (Arrow.ArrowMonad a) where
   fmap = P.fmap
   (<$) = (P.<$)
 instance (CFunctor m) => CFunctor (App.WrappedMonad m) where
-  type FunctorCts (App.WrappedMonad m) a b = FunctorCts m a b
+  type CFunctorCts (App.WrappedMonad m) a b = CFunctorCts m a b
   fmap f (App.WrapMonad ma) = App.WrapMonad $ fmap f ma
   a <$ (App.WrapMonad mb) = App.WrapMonad $ a <$ mb
 
@@ -110,5 +110,5 @@ instance CFunctor STM.STM where
 -- Constrained instances -------------------------------------------------------
 
 instance CFunctor S.Set where
-  type FunctorCts S.Set a b = Ord b
+  type CFunctorCts S.Set a b = Ord b
   fmap = S.map
