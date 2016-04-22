@@ -7,8 +7,7 @@ module Control.Supermonad.Constrained.Functor
   ) where
 
 import Prelude
-  ( String
-  , Ord
+  ( Ord
   , (.), ($), const
   )
 

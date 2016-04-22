@@ -38,7 +38,6 @@ import TyCon ( TyCon )
 import TcPluginM
   ( TcPluginM
   , getEnvs, getInstEnvs
-  , findImportedModule, FindResult(..)
   , tcLookup )
 import Name
   ( nameModule
@@ -68,9 +67,7 @@ import PrelNames ( mAIN_NAME )
 import Outputable ( SDoc, ($$), (<>), text, vcat, ppr )
 --import qualified Outputable as O
 
-import Control.Supermonad.Plugin.Log
-  ( pmErrMsg
-  , pprToStr, printObj, printObjTrace )
+--import Control.Supermonad.Plugin.Log ( printObj, printObjTrace )
 import Control.Supermonad.Plugin.Instance
   ( instanceTyArgs
   , isMonoTyConInstance 
@@ -136,11 +133,8 @@ findSupermonadModule = do
     (Left _err, Right _    ) -> return eSmCtMdl
     (Left err, Left errCt) -> return $ Left
       $ text "Could not find supermonad or constrained supermonad modules!" $$ err $$ errCt
-    (Right a, Right b) -> do
-      printObj a
-      printObj b
-      return $ Left
-        $ text "Found unconstrained and constrained supermonad modules!"
+    (Right a, Right b) -> return $ Left
+      $ text "Found unconstrained and constrained supermonad modules!"
 
 -- | Checks if the module "Control.Supermonad" or "Control.Supermonad.Prelude"
 --   is imported and, if so, returns either.
@@ -247,7 +241,7 @@ getModule pkgKeyToFind mdlNameToFind = do
 --   if so, returns that module.
 getModule :: Maybe PackageKey -> String -> TcPluginM (Either SDoc Module)
 getModule pkgKeyToFind mdlNameToFind = do
-  mdlResult <- findImportedModule (mkModuleName mdlNameToFind) Nothing
+  mdlResult <- findImportedModule (mkModuleName mdlNameToFind) Nothing -- From "TcPluginM"
   case mdlResult of
     Found _mdlLoc mdl ->
       if maybe True (modulePackageKey mdl ==) pkgKeyToFind then
