@@ -60,7 +60,7 @@ import Control.Supermonad.Plugin.Detect
   , findBindClass, findReturnClass
   , findIdentityModule, findIdentityTyCon
   , findInstancesInScope
-  , supermonadModuleName, identityModuleName
+  , identityModuleName
   , bindClassName, returnClassName
   , identityTyConName
   , findSupermonads
@@ -165,10 +165,10 @@ runSupermonadPlugin givenCts wantedCts smM = do
         Left  err -> Left err
         Right (_a, res) -> Right $ TcPluginOk (smResultEvidence $ smStateResult res) (smResultDerived $ smStateResult res)
     (Left mdlErrMsg, _, _, _, _, _) -> do
-      let msg = "Could not find " ++ supermonadModuleName ++ " module:"
+      let msg = "Could not find supermonad module:"
       L.printErr msg
-      L.printErr mdlErrMsg
-      return $ Left $ stringToSupermonadError $ msg ++ " " ++ mdlErrMsg
+      L.printErr $ L.sDocToStr mdlErrMsg
+      return $ Left $ stringToSupermonadError msg O.$$ mdlErrMsg
     (_, Nothing, _, _, _, _) -> do
       let msg = "Could not find " ++ bindClassName ++ " class!"
       L.printErr msg
@@ -180,8 +180,8 @@ runSupermonadPlugin givenCts wantedCts smM = do
     (_, _, _, Left mdlErrMsg, _, _) -> do
       let msg = "Could not find " ++ identityModuleName ++ " module:"
       L.printErr msg
-      L.printErr mdlErrMsg
-      return $ Left $ stringToSupermonadError $ msg ++ " " ++ mdlErrMsg
+      L.printErr $ L.sDocToStr mdlErrMsg
+      return $ Left $ stringToSupermonadError msg O.$$ mdlErrMsg
     (_, _, _, _, Nothing, _) -> do
       let msg = "Could not find " ++ identityTyConName ++ " type constructor!"
       L.printErr msg
