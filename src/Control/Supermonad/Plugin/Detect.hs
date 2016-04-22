@@ -133,7 +133,7 @@ findSupermonadModule = do
     (Left _err, Right _    ) -> return eSmCtMdl
     (Left err, Left errCt) -> return $ Left
       $ text "Could not find supermonad or constrained supermonad modules!" $$ err $$ errCt
-    (Right a, Right b) -> return $ Left
+    (Right _, Right _) -> return $ Left
       $ text "Found unconstrained and constrained supermonad modules!"
 
 -- | Checks if the module "Control.Supermonad" or "Control.Supermonad.Prelude"
