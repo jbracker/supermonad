@@ -6,7 +6,6 @@ module Control.Supermonad.Plugin.Detect
     supermonadModuleName
   , bindClassName, returnClassName
   , findSupermonadModule
-  , findSupermonadPreludeModule
   , isBindClass, isReturnClass
   , isSupermonadModule
   , findBindClass, findReturnClass
@@ -22,6 +21,7 @@ module Control.Supermonad.Plugin.Detect
   , findInstancesInScope
   ) where
 
+import Data.List  ( find )
 import Data.Maybe ( catMaybes, listToMaybe )
 import qualified Data.Set as S
 import qualified Data.Map as M
@@ -31,7 +31,8 @@ import Control.Monad ( forM, liftM )
 import BasicTypes ( Arity )
 import TcRnTypes
   ( TcGblEnv(..)
-  , TcTyThing(..) )
+  , TcTyThing(..)
+  , ImportAvails( imp_mods ) )
 import Type ( TyThing(..) )
 import TyCon ( TyCon )
 import TcPluginM
@@ -51,8 +52,9 @@ import RdrName
   , importSpecModule
   , lookupGlobalRdrEnv )
 import Module
-  ( Module(..), PackageKey
+  ( Module(..), ModuleName, PackageKey
   , basePackageKey
+  , moduleEnvKeys
   , mkModuleName )
 import Class
   ( Class(..)
@@ -68,7 +70,7 @@ import Outputable ( SDoc, ($$), (<>), text, vcat, ppr )
 
 import Control.Supermonad.Plugin.Log
   ( pmErrMsg
-  , pprToStr ) --, printObj, printObjTrace )
+  , pprToStr, printObj, printObjTrace )
 import Control.Supermonad.Plugin.Instance
   ( instanceTyArgs
   , isMonoTyConInstance 
@@ -83,6 +85,10 @@ import Control.Supermonad.Plugin.Utils
 -- | Name of the "Control.Supermonad" module.
 supermonadModuleName :: String
 supermonadModuleName = "Control.Supermonad"
+
+-- | Name of the "Control.Supermonad.Constrained" module.
+supermonadCtModuleName :: String
+supermonadCtModuleName = "Control.Supermonad.Constrained"
 
 -- | Name of the 'Control.Supermonad.Bind' type class.
 bindClassName :: String
@@ -101,8 +107,12 @@ identityTyConName :: String
 identityTyConName = "Identity"
 
 -- | Name of the "Control.Supermonad.Prelude" module.
-supermonadPreudeModuleName :: String
-supermonadPreudeModuleName = "Control.Supermonad.Prelude"
+supermonadPreludeModuleName :: String
+supermonadPreludeModuleName = "Control.Supermonad.Prelude"
+
+-- | Name of the "Control.Supermonad.Constrained.Prelude" module.
+supermonadCtPreludeModuleName :: String
+supermonadCtPreludeModuleName = "Control.Supermonad.Constrained.Prelude"
 
 -- | Name of the 'Data.Functor.Functor' class.
 functorClassName :: String
@@ -116,26 +126,48 @@ functorModuleName = "Data.Functor"
 -- Polymonad Class Detection
 -- -----------------------------------------------------------------------------
 
--- | Checks if the module "Control.Supermonad"
---   is imported and, if so, returns the module.
-findSupermonadModule :: TcPluginM (Either String Module)
+-- | Checks if a module providing the supermonad classes is imported.
+findSupermonadModule :: TcPluginM (Either SDoc Module)
 findSupermonadModule = do
-  eitherMdl <- getModule Nothing supermonadModuleName
-  case eitherMdl of
-    Left _err -> findSupermonadPreludeModule
-    Right mdl -> return $ Right mdl
+  eSmUnCtMdl <- findSupermonadUnCtModule
+  eSmCtMdl   <- findSupermonadCtModule
+  case (eSmUnCtMdl, eSmCtMdl) of
+    (Right _  , Left _errCt) -> return eSmUnCtMdl
+    (Left _err, Right _    ) -> return eSmCtMdl
+    (Left err, Left errCt) -> return $ Left
+      $ text "Could not find supermonad or constrained supermonad modules!" $$ err $$ errCt
+    (Right a, Right b) -> do
+      printObj a
+      printObj b
+      return $ Left
+        $ text "Found unconstrained and constrained supermonad modules!"
 
--- | Checks if the module "Control.Supermonad.Prelude"
---   is imported and, if so, returns the module.
-findSupermonadPreludeModule :: TcPluginM (Either String Module)
-findSupermonadPreludeModule = getModule Nothing supermonadPreudeModuleName
+-- | Checks if the module "Control.Supermonad" or "Control.Supermonad.Prelude"
+--   is imported and, if so, returns either.
+findSupermonadUnCtModule :: TcPluginM (Either SDoc Module)
+findSupermonadUnCtModule = do
+  eMdl <- getModule Nothing supermonadModuleName
+  case eMdl of
+    Left _err -> getModule Nothing supermonadPreludeModuleName
+    Right _ -> return eMdl
+
+-- | Checks if the module "Control.Supermonad.Constrained" or "Control.Supermonad.Constrained.Prelude"
+--   is imported and, if so, returns either.
+findSupermonadCtModule :: TcPluginM (Either SDoc Module)
+findSupermonadCtModule = do
+  eCtMdl <- getModule Nothing supermonadCtModuleName
+  case eCtMdl of
+    Left _err -> getModule Nothing supermonadCtPreludeModuleName
+    Right _ -> return eCtMdl
 
 -- | Check if the given module is the supermonad module.
 isSupermonadModule :: Module -> Bool
-isSupermonadModule mdl = mdlName `elem` [pmMdlName, pmPrelName, mAIN_NAME]
+isSupermonadModule mdl = mdlName `elem` [smMdlName, smPrelName, smCtMdlName, smCtPrelName, mAIN_NAME]
   where mdlName = moduleName mdl
-        pmMdlName = mkModuleName supermonadModuleName
-        pmPrelName = mkModuleName supermonadPreudeModuleName
+        smMdlName = mkModuleName supermonadModuleName
+        smPrelName = mkModuleName supermonadPreludeModuleName
+        smCtMdlName = mkModuleName supermonadCtModuleName
+        smCtPrelName = mkModuleName supermonadCtPreludeModuleName
 
 -- | Checks if the given class matches the shape of the 'Control.Supermonad.Bind'
 --   type class and is defined in the right module.
@@ -163,14 +195,18 @@ findReturnClass = findClass isReturnClass
 
 -- | Checks if the module "Data.Functor.Identity"
 --   is imported and, if so, returns the module.
-findIdentityModule :: TcPluginM (Either String Module)
-findIdentityModule = getModule (Just basePackageKey) identityModuleName
+findIdentityModule :: TcPluginM (Either SDoc Module)
+findIdentityModule = do
+  mdls <- findModules [getModule (Just basePackageKey) identityModuleName, findSupermonadModule]
+  case mdls of
+    [] -> return $ Left $ text "Could not find module 'Identity' module."
+    (mdl:_) -> return $ Right mdl
 
 -- | Tries to find the 'Data.Functor.Identity.Identity' type constructor in the imported
 --   modules. Only looks for imports through specific modules.
 findIdentityTyCon :: TcPluginM (Maybe TyCon)
 findIdentityTyCon = do
-  mdls <- findModules [findIdentityModule, findSupermonadModule, findSupermonadPreludeModule]
+  mdls <- findModules [findIdentityModule, findSupermonadModule]
   case mdls of
     [] -> return Nothing
     _ -> findTyConByNameAndModule (mkTcOcc identityTyConName) mdls
@@ -181,14 +217,35 @@ findIdentityTyCon = do
 
 -- | Tries to find all of the given modules using the given search functions.
 --   Returns the list of all found modules.
-findModules :: [TcPluginM (Either String Module)] -> TcPluginM [Module]
+findModules :: [TcPluginM (Either SDoc Module)] -> TcPluginM [Module]
 findModules findMdls = do
   eitherMdls <- sequence findMdls
   return $ catMaybes $ fmap (either (const Nothing) Just) eitherMdls
 
 -- | Checks if the module with the given name is imported and,
 --   if so, returns that module.
-getModule :: Maybe PackageKey -> String -> TcPluginM (Either String Module)
+getModule :: Maybe PackageKey -> String -> TcPluginM (Either SDoc Module)
+getModule pkgKeyToFind mdlNameToFind = do
+  (gblEnv, _lclEnv) <- getEnvs
+  let mdls = moduleEnvKeys $ imp_mods $ tcg_imports $ gblEnv
+  case find (isModule . splitModule) mdls of
+    Just mdl -> return $ Right mdl
+    Nothing  -> return $ Left $ text $ "Could not find module '" ++ mdlNameToFind ++ "'"
+  where
+    isModule :: (PackageKey, ModuleName) -> Bool
+    isModule (pkgKey, mdlName) 
+      =  maybe True (pkgKey ==) pkgKeyToFind 
+      && mdlName == mkModuleName mdlNameToFind
+    
+    splitModule :: Module -> (PackageKey, ModuleName)
+    splitModule mdl = (modulePackageKey mdl, moduleName mdl)
+  
+-- For some reason this version also found modules that are not in the
+-- imports.
+{-
+-- | Checks if the module with the given name is imported and,
+--   if so, returns that module.
+getModule :: Maybe PackageKey -> String -> TcPluginM (Either SDoc Module)
 getModule pkgKeyToFind mdlNameToFind = do
   mdlResult <- findImportedModule (mkModuleName mdlNameToFind) Nothing
   case mdlResult of
@@ -196,15 +253,18 @@ getModule pkgKeyToFind mdlNameToFind = do
       if maybe True (modulePackageKey mdl ==) pkgKeyToFind then
         return $ Right mdl
       else
-        return $ Left $ pmErrMsg
-          $  "Package key of found module (" ++ pprToStr (modulePackageKey mdl) ++ ")"
-          ++ " does not match the requested key (" ++ pprToStr pkgKeyToFind ++ ")."
-    NoPackage pkgKey -> return $ Left $ pmErrMsg
-      $ "Found module, but missing its package: " ++ pprToStr pkgKey
-    FoundMultiple mdls -> return $ Left $ pmErrMsg
-      $ "Module " ++ mdlNameToFind ++ " appears in several packages:\n"
-      ++ pprToStr (fmap snd mdls)
-    NotFound {} -> return $ Left $ pmErrMsg "Module was not found."
+        return $ Left
+          $  text "Package key of found module does not match the requested key:"
+          $$ text "Found:     " <> ppr (modulePackageKey mdl)
+          $$ text "Requested: " <> ppr pkgKeyToFind
+    NoPackage pkgKey -> return $ Left
+      $ text "Found module, but missing its package: " <> ppr pkgKey
+    FoundMultiple mdls -> return $ Left
+      $  text ("Module '" ++ mdlNameToFind ++ "' appears in several packages:")
+      $$ ppr (fmap snd mdls)
+    NotFound {} -> return $ Left 
+      $ text $ "Module was not found: " ++ mdlNameToFind
+-}
 
 -- | Checks if a type class matching the shape of the given 
 --   predicate is in scope.
