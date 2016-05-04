@@ -214,7 +214,7 @@ class (Applicative d, Bind d d d, Return d) => Diagnostic d where
 
     -- | Tries the first diagnostic computation. If that results in errors,
     -- discards those and runs the second computation.
-    (|||) :: d a -> d a -> d a
+    (|||) :: (BindCts d d d) => d a -> d a -> d a
 
 
 -- | Class for diagnostic computations with failure.
