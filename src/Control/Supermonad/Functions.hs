@@ -268,7 +268,7 @@ ap mf na = do
          ) => (a -> b) -> m a -> n b
 f <$> m = do
   x <- m
-  return (f x)
+  return $ f x
 
 -- | Strict version of '<$>'.
 (<$!>) :: ( Return n, ReturnCts n
