@@ -57,7 +57,7 @@ import Control.Supermonad.Constrained.Functor
 
 -- | TODO
 class (CFunctor m, CFunctor n, CFunctor p) => Bind m n p where
-  type BindCts (m :: * -> *) (n :: * -> *) (p :: * -> *) (a :: *) (b :: *) :: Constraint
+  type BindCts m n p (a :: *) (b :: *) :: Constraint
   type BindCts m n p a b = ()
   (>>=) :: (BindCts m n p a b) => m a -> (a -> n b) -> p b
   (>>)  :: (BindCts m n p a b) => m a -> n b -> p b
