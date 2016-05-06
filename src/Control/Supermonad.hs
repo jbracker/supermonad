@@ -113,7 +113,9 @@ instance Bind STM.STM STM.STM STM.STM where
 
 -- | TODO
 class (Functor m) => Return m where
-  return :: a -> m a
+  type ReturnCts m :: Constraint
+  type ReturnCts m = ()
+  return :: (ReturnCts m) => a -> m a
 
 instance Return Identity where
   return = P.return
@@ -131,6 +133,7 @@ instance Return Mon.First where
 instance Return Mon.Last where
   return = P.return
 instance (Return a) => Return (Mon.Alt a) where
+  type ReturnCts (Mon.Alt a) = ReturnCts a
   return a = Mon.Alt $ return a
 
 instance Return Proxy.Proxy where
@@ -149,6 +152,7 @@ instance (Arrow.ArrowApply a) => Return (Arrow.ArrowMonad a) where
   return = P.return
 -- | TODO / FIXME: This has the same issue as the 'Bind' instance for 'App.WrappedMonad'.
 instance (Return m, P.Monad m) => Return (App.WrappedMonad m) where
+  type ReturnCts (App.WrappedMonad m) = ReturnCts m
   return a = App.WrapMonad $ return a
 
 instance Return STM.STM where
