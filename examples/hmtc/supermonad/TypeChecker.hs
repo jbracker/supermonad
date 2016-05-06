@@ -814,7 +814,7 @@ require p sp m = unless p (emitErrD sp m)
 
 -- Generalisation of zipWithM
 
-zipWith3M :: (BindCts m m m, Bind m m m, Return m) => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m [d]
+zipWith3M :: (BindCts m m m, Bind m m m, Return m, ReturnCts m) => (a -> b -> c -> m d) -> [a] -> [b] -> [c] -> m [d]
 zipWith3M f (a:as) (b:bs) (c:cs) = do
     d  <- f a b c
     ds <- zipWith3M f as bs cs

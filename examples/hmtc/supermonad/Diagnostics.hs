@@ -184,7 +184,7 @@ ppDMsg (DMsg {dmLvl = lvl, dmSrcPos = sp, dmTxt = msg}) =
 
 -- NOTE: Adjusted to work with supermonads
 class MonadTransformer t where
-    lift :: (BindCts m m m, Bind m m m, Return m) => m a -> t m a
+    lift :: (BindCts m m m, Bind m m m, Return m, ReturnCts m) => m a -> t m a
 
 
 -- | Class for diagnostic computations. Diagnostic computations accumulate
@@ -195,26 +195,26 @@ class MonadTransformer t where
 class (Applicative d, Bind d d d, Return d) => Diagnostic d where
 
     -- | Emits a diagnostic message
-    emitD :: (BindCts d d d) => DMsg -> d ()
+    emitD :: (BindCts d d d, ReturnCts d) => DMsg -> d ()
 
     -- | Emits an information message.
-    emitInfoD :: (BindCts d d d) => SrcPos -> String -> d ()
+    emitInfoD :: (BindCts d d d, ReturnCts d) => SrcPos -> String -> d ()
     emitInfoD sp msg = emitD (mkInfoMsg sp msg)
 
     -- | Emits a warning message.
-    emitWngD :: (BindCts d d d) => SrcPos -> String -> d ()
+    emitWngD :: (BindCts d d d, ReturnCts d) => SrcPos -> String -> d ()
     emitWngD sp msg = emitD (mkWngMsg sp msg)
 
     -- | Emits an error message.
-    emitErrD :: (BindCts d d d) => SrcPos -> String -> d ()
+    emitErrD :: (BindCts d d d, ReturnCts d) => SrcPos -> String -> d ()
     emitErrD sp msg = emitD (mkErrMsg sp msg)
 
     -- | Diagnostic messages emitted thus far
-    getDMsgsD :: (BindCts d d d) => d [DMsg]
+    getDMsgsD :: (BindCts d d d, ReturnCts d) => d [DMsg]
 
     -- | Tries the first diagnostic computation. If that results in errors,
     -- discards those and runs the second computation.
-    (|||) :: (BindCts d d d) => d a -> d a -> d a
+    (|||) :: (BindCts d d d, ReturnCts d) => d a -> d a -> d a
 
 
 -- | Class for diagnostic computations with failure.
@@ -223,16 +223,16 @@ class (Applicative d, Bind d d d, Return d) => Diagnostic d where
 class Diagnostic df => DiagnosticFail df where
 
     -- | Emits an error message and fails.
-    failD :: (BindCts df df df) => SrcPos -> String -> df a
+    failD :: (BindCts df df df, ReturnCts df) => SrcPos -> String -> df a
     
     -- | Fails without giving any specific reason.
-    failNoReasonD :: (BindCts df df df) => df a
+    failNoReasonD :: (BindCts df df df, ReturnCts df) => df a
     
     -- | Fails if there has been errors thus far
-    failIfErrorsD :: (BindCts df df df) => df ()
+    failIfErrorsD :: (BindCts df df df, ReturnCts df) => df ()
     
     -- | Forces a stop, e.g. after some user-specified pass.
-    stopD :: (BindCts df df df) => df a
+    stopD :: (BindCts df df df, ReturnCts df) => df a
 
 
 ------------------------------------------------------------------------------
@@ -384,14 +384,15 @@ instance (Applicative m, Monad m) => Monad (DFT m) where
             Just a  -> unDFT (f a)
 -}
 instance (Bind m m m, Return m) => Bind (DFT m) (DFT m) (DFT m) where
-  type BindCts (DFT m) (DFT m) (DFT m) = BindCts m m m
+  type BindCts (DFT m) (DFT m) (DFT m) = (BindCts m m m, ReturnCts m)
   m >>= f = DFT $
         unDFT m >>= \ma ->
         case ma of
             Nothing -> return Nothing
             Just a  -> unDFT (f a)
-instance (Applicative m) => Return (DFT m) where
-  return = pure
+instance (Return m) => Return (DFT m) where
+  type ReturnCts (DFT m) = ReturnCts m
+  return = DFT . return . Just
 instance Fail (DFT m) where
   fail = error
 
@@ -427,8 +428,18 @@ instance (Diagnostic d) => DiagnosticFail (DFT d) where
 -- Diagnostic computation with failure
 ------------------------------------------------------------------------------
 
-newtype DF a = DF (DFT D a) deriving (Functor, Applicative, -- Monad,
-                                      Diagnostic, DiagnosticFail)
+newtype DF a = DF (DFT D a) deriving (Functor, Applicative)
+
+instance Diagnostic DF where
+    emitD msg = DF $ emitD msg -- :: (BindCts d d d, ReturnCts d) => DMsg -> d ()
+    getDMsgsD = DF getDMsgsD -- :: (BindCts d d d, ReturnCts d) => d [DMsg]
+    (DF a) ||| (DF b) = DF $ (a ||| b) -- :: (BindCts d d d, ReturnCts d) => d a -> d a -> d a
+instance DiagnosticFail DF where
+    failD pos str = DF $ failD pos str -- :: (BindCts df df df, ReturnCts df) => SrcPos -> String -> df a
+    failNoReasonD = DF failNoReasonD -- :: (BindCts df df df, ReturnCts df) => df a
+    failIfErrorsD = DF failIfErrorsD -- :: (BindCts df df df, ReturnCts df) => df ()
+    stopD = DF stopD -- :: (BindCts df df df, ReturnCts df) => df a
+
 instance Bind DF DF DF where
   (DF m) >>= f = DF $ m >>= \x -> let DF mb = f x in mb
 instance Return DF where
@@ -478,5 +489,5 @@ assert c m f msg v | c         = v
 -- otherwise. Call with condition, module name, name of function, error
 -- message.
 
-assertM :: Return m => Bool -> String -> String -> String -> m ()
+assertM :: (Return m, ReturnCts m) => Bool -> String -> String -> String -> m ()
 assertM c m f msg = assert c m f msg (return ())
