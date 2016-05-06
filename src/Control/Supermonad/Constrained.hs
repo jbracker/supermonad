@@ -126,7 +126,7 @@ instance Bind S.Set S.Set S.Set where
 
 -- | TODO
 class (CFunctor m) => Return m where
-  type ReturnCts (m :: * -> *) (a :: *) :: Constraint
+  type ReturnCts m (a :: *) :: Constraint
   type ReturnCts m a = ()
   return :: (ReturnCts m a) => a -> m a
 
