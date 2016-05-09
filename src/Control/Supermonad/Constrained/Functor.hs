@@ -41,7 +41,7 @@ import qualified Data.Set as S
 -- | Class for constrained functors. Obeys all of the same laws as the standard
 --   'Functor' class, but allows to constrain the functors result type.
 class CFunctor f where
-  type CFunctorCts (f :: * -> *) (a :: *) (b :: *) :: Constraint
+  type CFunctorCts f (a :: *) (b :: *) :: Constraint
   type CFunctorCts f a b = ()
   
   fmap :: (CFunctorCts f a b) => (a -> b) -> f a -> f b
