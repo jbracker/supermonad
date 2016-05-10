@@ -3,13 +3,13 @@
 module Control.Supermonad.Plugin.Log
   ( pprToStr, sDocToStr
   , missingCaseError
-  , pmErrMsg, pmDebugMsg, pmObjMsg
+  , smErrMsg, smDebugMsg, smObjMsg, smWarnMsg
   , formatGroupSrcSpans
   , formatConstraint, formatSpan
   -- * Debug Functions
   , printTrace, printObjTrace, trace
   -- * Debugging and priniting from within TcPluginM
-  , printObj, printMsg, printErr
+  , printObj, printMsg, printErr, printWarn
   , pluginAssert, pluginFailSDoc
   ) where
 
@@ -36,24 +36,28 @@ import Control.Supermonad.Plugin.Constraint ( constraintSourceLocation )
 
 -- | @prefixMsg prefix msg@ prefixes a message with the given string.
 prefixMsg :: String -> String -> String
-prefixMsg prefix = unlines . fmap (prefix ++) . lines
+prefixMsg prefix = unlines . fmap ((pluginMsgPrefix ++ prefix) ++) . lines
 
 -- | Message prefix of the plugin.
 pluginMsgPrefix :: String
 pluginMsgPrefix = "[SM]"
 
 -- | Prefix a message with the error prefix.
-pmErrMsg :: String -> String
-pmErrMsg = prefixMsg $ pluginMsgPrefix ++ " ERROR: "
+smErrMsg :: String -> String
+smErrMsg = prefixMsg $ " ERROR: "
+
+-- | Prefix a message with the warning prefix.
+smWarnMsg :: String -> String
+smWarnMsg = prefixMsg $ " WARNING: "
 
 -- | Prefix a message with the standard debug prefix.
-pmDebugMsg :: String -> String
-pmDebugMsg = prefixMsg $ pluginMsgPrefix ++ " "
+smDebugMsg :: String -> String
+smDebugMsg = prefixMsg $ " "
 
 -- | Prefix a message with the debug prefix and a note that this is a
 --   printed object.
-pmObjMsg :: String -> String
-pmObjMsg = prefixMsg $ pluginMsgPrefix ++ "> "
+smObjMsg :: String -> String
+smObjMsg = prefixMsg $ "> "
 
 -- | Used to emit an error with a message describing the missing case.
 --   The string is the function that misses the case and the 'Outputable'
@@ -142,15 +146,19 @@ internalPrint = tcPluginIO . putStr
 
 -- | Print a message using the plugin formatting.
 printMsg :: String -> TcPluginM ()
-printMsg = internalPrint . pmDebugMsg
+printMsg = internalPrint . smDebugMsg
 
--- | Print a message using the plugin formatting.
+-- | Print an error message using the plugin formatting.
 printErr :: String -> TcPluginM ()
-printErr = internalPrint . pmErrMsg
+printErr = internalPrint . smErrMsg
+
+-- | Print a warning message using the plugin formatting.
+printWarn :: String -> TcPluginM ()
+printWarn = internalPrint . smWarnMsg
 
 -- | Print an object using the plugin formatting.
 printObj :: Outputable o => o -> TcPluginM ()
-printObj = internalPrint . pmObjMsg . pprToStr
+printObj = internalPrint . smObjMsg . pprToStr
 
 -- | Throw a type checker error with the given message.
 pluginFailSDoc :: SDoc -> TcPluginM a

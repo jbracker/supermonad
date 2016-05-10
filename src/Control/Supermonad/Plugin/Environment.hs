@@ -310,15 +310,19 @@ catchPluginError = catchError
 
 -- | Print some generic outputable object from the plugin (Unsafe).
 printObj :: Outputable o => o -> SupermonadPluginM ()
-printObj = internalPrint . L.pmObjMsg . L.pprToStr
+printObj = internalPrint . L.smObjMsg . L.pprToStr
 
 -- | Print a message from the plugin.
 printMsg :: String -> SupermonadPluginM ()
-printMsg = internalPrint . L.pmDebugMsg
+printMsg = internalPrint . L.smDebugMsg
 
--- | Print a error message from the plugin.
+-- | Print an error message from the plugin.
 printErr :: String -> SupermonadPluginM ()
-printErr = internalPrint . L.pmErrMsg
+printErr = internalPrint . L.smErrMsg
+
+-- | Print a warning message from the plugin.
+printWarn :: String -> SupermonadPluginM ()
+printWarn = internalPrint . L.smWarnMsg
 
 -- | Internal function for printing from within the monad.
 internalPrint :: String -> SupermonadPluginM ()
@@ -327,7 +331,7 @@ internalPrint = runTcPlugin . tcPluginIO . putStr
 -- | Print the given string as if it was an object. This allows custom
 --   formatting of object.
 printFormattedObj :: String -> SupermonadPluginM ()
-printFormattedObj = internalPrint . L.pmObjMsg
+printFormattedObj = internalPrint . L.smObjMsg
 
 -- | Print the given constraints in the plugins custom format.
 printConstraints :: [Ct] -> SupermonadPluginM ()
