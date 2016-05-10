@@ -19,6 +19,7 @@ module Control.Supermonad.Plugin.Environment
   , addDerivedResult, addDerivedResults
   , getDerivedResults
   , whenNoResults
+  , addWarning, displayWarnings
   , throwPluginError, throwPluginErrorSDoc, catchPluginError
     -- * Debug and Error Output
   , assert, assertM
@@ -123,6 +124,8 @@ instance Monoid SupermonadPluginResult where
 data SupermonadPluginState = SupermonadPluginState 
   { smStateResult :: SupermonadPluginResult
   -- ^ The current results of the supermonad plugin.
+  , smWarningQueue :: [(String, O.SDoc)]
+  -- ^ A queue of warnings that are only important if not progress could be made.
   }
 
 -- | Runs the given supermonad plugin solver within the type checker plugin 
@@ -148,7 +151,10 @@ runSupermonadPlugin givenCts wantedCts smM = do
   -- Try to construct the environment or throw errors
   case (mSupermonadMdl, mBindCls, mReturnCls, mIdMdl, mIdTyCon, smErrors) of
     (Right supermonadMdl, Just bindCls, Just returnCls, Right idMdl, Just idTyCon, []) -> do
-      let initState = SupermonadPluginState { smStateResult = mempty }
+      let initState = SupermonadPluginState 
+            { smStateResult  = mempty
+            , smWarningQueue = [] 
+            }
       bindInsts <- findInstancesInScope bindCls
       eResult <- runExceptT $ flip runStateT initState $ runReaderT smM $ SupermonadPluginEnv
         { smEnvSupermonadModule  = supermonadMdl
@@ -268,11 +274,23 @@ addDerivedResults derived = modify $ \s -> s { smStateResult = smStateResult s <
 getDerivedResults :: SupermonadPluginM [DerivedCt]
 getDerivedResults = gets $ smResultDerived . smStateResult
 
+-- | Add a warning to the queue of warnings that will be displayed when no progress could be made.
+addWarning :: String -> O.SDoc -> SupermonadPluginM ()
+addWarning msg details = modify $ \s -> s { smWarningQueue = (msg, details) : smWarningQueue s }
+
 -- | Execute the given plugin code only if no plugin results were produced so far.
 whenNoResults :: SupermonadPluginM () -> SupermonadPluginM ()
 whenNoResults m = do
   empty <- (uncurry (&&) . (null *** null)) <$> getCurrentResults
   if empty then m else return ()
+
+-- | Displays the queued warning messages if no progress has been made.
+displayWarnings :: SupermonadPluginM ()
+displayWarnings = whenNoResults $ do
+  warns <- gets smWarningQueue
+  forM_ warns $ \(msg, details) -> do
+    printWarn msg
+    internalPrint $ L.smObjMsg $ L.sDocToStr details
 
 -- -----------------------------------------------------------------------------
 -- Plugin debug and error printing
