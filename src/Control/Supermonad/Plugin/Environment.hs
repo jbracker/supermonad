@@ -289,7 +289,7 @@ displayWarnings :: SupermonadPluginM ()
 displayWarnings = whenNoResults $ do
   warns <- gets smWarningQueue
   forM_ warns $ \(msg, details) -> do
-    printErr msg
+    printWarn msg
     internalPrint $ L.smObjMsg $ L.sDocToStr details
 
 -- -----------------------------------------------------------------------------
