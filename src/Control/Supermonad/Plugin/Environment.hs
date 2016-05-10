@@ -23,7 +23,7 @@ module Control.Supermonad.Plugin.Environment
   , throwPluginError, throwPluginErrorSDoc, catchPluginError
     -- * Debug and Error Output
   , assert, assertM
-  , printErr, printMsg, printObj
+  , printErr, printMsg, printObj, printWarn
   , printConstraints
   ) where
 
@@ -125,7 +125,7 @@ data SupermonadPluginState = SupermonadPluginState
   { smStateResult :: SupermonadPluginResult
   -- ^ The current results of the supermonad plugin.
   , smWarningQueue :: [(String, O.SDoc)]
-  -- ^ A queue of warnings that are only important if not progress could be made.
+  -- ^ A queue of warnings that are only displayed if no progress could be made.
   }
 
 -- | Runs the given supermonad plugin solver within the type checker plugin 
@@ -289,7 +289,7 @@ displayWarnings :: SupermonadPluginM ()
 displayWarnings = whenNoResults $ do
   warns <- gets smWarningQueue
   forM_ warns $ \(msg, details) -> do
-    printWarn msg
+    printErr msg
     internalPrint $ L.smObjMsg $ L.sDocToStr details
 
 -- -----------------------------------------------------------------------------
