@@ -33,6 +33,7 @@ import Control.Supermonad.Plugin.Environment
   , getSupermonadFor
   , addDerivedResult, addDerivedResults
   , printMsg, printConstraints, printObj, printErr
+  , addWarning, displayWarnings
   , throwPluginError, throwPluginErrorSDoc
   , whenNoResults )
 import Control.Supermonad.Plugin.Environment.Lift
@@ -56,6 +57,8 @@ import Control.Supermonad.Plugin.Utils
   , collectTyVars
   , associations
   , allM )
+import Control.Supermonad.Plugin.Log 
+  ( formatConstraint )
 
 
 -- | Attempts to solve the given /wanted/ constraints.
@@ -90,11 +93,14 @@ solveConstraints wantedCts = do
   forM_ (fmap (\(tc, g) -> (fromJust tc, g)) monoGroups) solveMonoConstraintGroup
   forM_ (fmap snd polyGroups) solvePolyConstraintGroup
   
-  -- Finally we go through all constraints that have their ambiguous 
+  -- We go through all constraints that have their ambiguous 
   -- top-level type constructors variables solved (they are actual type 
   -- constructor (variable)) and solve their indices by unification with
   -- their 'Bind' and 'Return' instances.
   solveSolvedTyConIndices
+  
+  -- Finally, display warnings if no progress could be made.
+  displayWarnings
 
 
 
@@ -164,7 +170,10 @@ solvePolyConstraintGroup ctGroup = do
     --    we are done with solving. 
     -- 2. There are no associations, because we can't find a solution
     --    to the variables in the group. If this is the case the group 
-    --    is unsolvable.
+    --    is either unsolvable or we need to let the type checker make
+    --    progress using the other solved groups. Therefore, we only queue
+    --    a warning in this case in the hope that the next iteration 
+    --    of the type checker resolves the issue.
     (_, []) -> do
       topTcVars <- concat <$> mapM collectBindReturnTopTcVars ctGroup
       -- The first case:
@@ -173,9 +182,14 @@ solvePolyConstraintGroup ctGroup = do
         printConstraints ctGroup
       -- The second case:
       else do
-        printConstraints ctGroup
-        throwPluginError "There are no possible associations for the current constraint group!"
-    
+        addWarning 
+          "There are no possible associations for the current constraint group!" 
+          ( O.vcat $ 
+            [ O.text "There are two possible reasons for this warning:"
+            , O.text "1. Either the group can not be solved or"
+            , O.text "2. further iterations between the plugin and type checker "
+            , O.text "   have to resolve for sufficient information to arise."
+            ] ++ fmap (O.text . formatConstraint) ctGroup)
     -- There are constraints and exactly one association...
     (_, [appliedAssoc]) -> do
       printMsg "Derived Results:"
@@ -185,8 +199,7 @@ solvePolyConstraintGroup ctGroup = do
         addDerivedResult derivedRes
     
     -- There are constraints and more then one association...
-    (_, _) -> do     
-      printConstraints ctGroup
+    (_, _) -> do
       printMsg "Possible Assocs:"
       forM_ appliedAssocs printObj
       throwPluginError "There is more then one possible association for the current constraint group!"
@@ -237,6 +250,7 @@ determineValidConstraintGroupAssocs ctGroup = do
       assocs = filter (not . null) $ associations $ fmap (\tv -> (tv, tyConBase)) tyConVars
   
   -- Debugging output
+  {-
   printMsg $ "Solving Group..."
   printMsg $ "Size = " ++ show (length ctGroup) ++ "; "
            ++ "Vars = " ++ show (length tyConVars) ++ "; "
@@ -247,7 +261,7 @@ determineValidConstraintGroupAssocs ctGroup = do
   when (length assocs <= 5 && not (null assocs)) $ do
     printMsg "Assocs:"
     forM_ assocs printObj
-  
+  -}
   -- For each association check if all constraints are potentially instantiable 
   -- with that association.
   checkedAssocs <- forM assocs $ \assoc -> do
@@ -311,6 +325,7 @@ solveSolvedTyConIndices :: SupermonadPluginM ()
 solveSolvedTyConIndices = do
   -- Unification solve return constraints that are applied to top-level tycons.
   whenNoResults $ do
+    printMsg "Unification solve return constraints..."
     returnCts <- getTopTyConSolvedConstraints isReturnConstraint
     forM_ returnCts $ \returnCt -> do
       eResult <- withTopTyCon returnCt $ \_topTyCon _bindCtArgs _bindInst returnInst -> do
@@ -326,6 +341,7 @@ solveSolvedTyConIndices = do
   
   -- Unification solve bind constraints that are applied to top-level tycons.
   whenNoResults $ do
+    printMsg "Unification solve bind constraints..."
     bindCts <- getTopTyConSolvedConstraints isBindConstraint
     forM_ bindCts $ \bindCt -> do
       eResult <- withTopTyCon bindCt $ \_topTyCon _bindCtArgs bindInst _returnInst -> do
