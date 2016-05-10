@@ -27,8 +27,9 @@ import qualified Prelude as P
 
 import Data.Functor.Identity ( Identity( Identity, runIdentity ) )
 
+import GHC.Exts ( Constraint )
 
--- To define instances:
+-- To define standard instances:
 import qualified Data.Monoid as Mon ( First, Last, Alt(..) )
 import qualified Data.Proxy as Proxy ( Proxy )
 
@@ -41,7 +42,10 @@ import qualified Text.ParserCombinators.ReadP as Read ( ReadP )
 import qualified Text.ParserCombinators.ReadPrec as Read ( ReadPrec )
 
 import qualified GHC.Conc as STM ( STM )
-import GHC.Exts ( Constraint )
+
+-- To define "transformers" instances:
+import qualified Control.Monad.Trans.State.Lazy as StateL ( StateT(..) )
+
 
 
 -- -----------------------------------------------------------------------------
@@ -107,6 +111,16 @@ instance (Bind m m m, P.Monad m) => Bind (App.WrappedMonad m) (App.WrappedMonad 
 instance Bind STM.STM STM.STM STM.STM where
   (>>=) = (P.>>=)
 
+-- "transformers" package instances: -------------------------------------------
+
+instance (Bind m n p) 
+    => Bind (StateL.StateT s m) (StateL.StateT s n) (StateL.StateT s p) where
+  type BindCts (StateL.StateT s m) (StateL.StateT s n) (StateL.StateT s p) 
+    = (BindCts m n p)
+  m >>= k = StateL.StateT 
+          $ \s -> StateL.runStateT m s >>= 
+            \(a, s') -> StateL.runStateT (k a) s'
+
 -- -----------------------------------------------------------------------------
 -- Return Type Class
 -- -----------------------------------------------------------------------------
@@ -157,6 +171,12 @@ instance (Return m, P.Monad m) => Return (App.WrappedMonad m) where
 
 instance Return STM.STM where
   return = P.return
+  
+-- "transformers" package instances: -------------------------------------------
+
+instance (Return m) => Return (StateL.StateT s m) where
+  type ReturnCts (StateL.StateT s m) = ReturnCts m
+  return x = StateL.StateT $ \s -> return (x, s)
 
 -- -----------------------------------------------------------------------------
 -- Fail Type Class
@@ -204,7 +224,12 @@ instance (Fail m, P.Monad m) => Fail (App.WrappedMonad m) where
 
 instance Fail STM.STM where
   fail = P.fail
-  
+
+-- "transformers" package instances: -------------------------------------------
+
+instance (Fail m) => Fail (StateL.StateT s m) where
+  fail = StateL.StateT . const . fail
+
 -- -----------------------------------------------------------------------------
 -- Convenient type synonyms
 -- -----------------------------------------------------------------------------
