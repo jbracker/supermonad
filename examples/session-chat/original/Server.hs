@@ -3,7 +3,7 @@
 
 module Server 
   ( server
-  , Connection, mkConnection
+  , ServerEnv
   ) where
 
 import Prelude
@@ -32,28 +32,22 @@ import Control.Concurrent.STM.TQueue
 
 import Control.Concurrent.SimpleSession.Implicit 
   ( Session, Cap
-  , Rendezvous, newRendezvous
   , Var, Z
   , accept
-  , io
   , recv, send
   , sel1, sel2, offer
   , close
   , enter, zero
   )
 
+import Utility ( ifThenElse, stm )
 import Types 
   ( User
   , Update(..), Request(..), Response(..)
   , ServerInit, ServerProtocol
+  , Connection(..)
   )
 
-ifThenElse :: Bool -> a -> a -> a
-ifThenElse True  t _ = t
-ifThenElse False _ f = f
-
-stm :: STM a -> Session s s a
-stm = io . atomically
 
 data ServerEnv = ServerEnv
   { serverCommNodes :: TVar [(ServerCommNode, TQueue Update)]

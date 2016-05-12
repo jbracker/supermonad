@@ -7,11 +7,14 @@ module Types
   , Update(..), Request(..), Response(..)
   , UpdateS, RequestS, EndS
   , ServerInit, ServerProtocol
+  , Connection(..), mkConnection
   ) where 
 
 import Control.Concurrent.SimpleSession.SessionTypes 
   ( Eps, Var, Rec, (:&:), (:+:), (:!:), (:?:)
   , Z )
+import Control.Concurrent.SimpleSession.Implicit 
+  ( Rendezvous, newRendezvous )
 
 -- | Type of the user identifier.
 type User = String
