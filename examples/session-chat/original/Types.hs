@@ -40,6 +40,13 @@ data Response
   | UserListResponse [User]
   deriving ( Eq, Show )
 
+-- | Type of a connection between server and client (View from server-side).
+data Connection = Connection { unwrapConnection :: Rendezvous (ServerInit (ServerProtocol (Var Z))) }
+
+-- | Create a new connection.
+mkConnection :: IO Connection
+mkConnection = Connection <$> newRendezvous  
+
 -- | The server send the most current 'Update's to the client.
 type UpdateS r = [Update] :!: r
 

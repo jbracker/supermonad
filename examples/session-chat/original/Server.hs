@@ -52,14 +52,8 @@ ifThenElse :: Bool -> a -> a -> a
 ifThenElse True  t _ = t
 ifThenElse False _ f = f
 
-
 stm :: STM a -> Session s s a
 stm = io . atomically
-
-data Connection = Connection { unwrapConnection :: Rendezvous (ServerInit (ServerProtocol (Var Z))) }
-
-mkConnection :: IO Connection
-mkConnection = Connection <$> newRendezvous
 
 data ServerEnv = ServerEnv
   { serverCommNodes :: TVar [(ServerCommNode, TQueue Update)]
