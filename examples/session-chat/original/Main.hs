@@ -5,7 +5,11 @@ import System.IO
   ( hSetBuffering, stdout
   , BufferMode(NoBuffering) )
 
+import Control.Monad ( when )
 import Control.Concurrent ( forkIO )
+import Control.Concurrent.STM ( atomically )
+import Control.Concurrent.STM.TVar 
+  ( newTVarIO, readTVar, modifyTVar )
 
 import Types ( User, Connection, mkConnection )
 import Server ( server )
@@ -20,7 +24,8 @@ main = do
   
   bots <- sequence 
     $ fmap (\bot -> mkConnection >>= \conn -> bot conn >>= \b -> return (conn, b) ) 
-    $ [ responseBot "RB1" ]
+    $ [ responseBot "RB1"
+      , rageBot "Rage" ]
   
   clientConn <- mkConnection
   
@@ -31,24 +36,38 @@ main = do
   clientShell clientConn
 
 -- | Never use more then one!
+--   Weirdly, he does not respond to users that begin with the letter R.
 responseBot :: User -> Connection -> IO BotClient
 responseBot name conn = mkBotClient conn name
   (const $ return ())
   (\bot u -> sendMessageBot bot $ "Goodbye, " ++ u ++ "!")
-  (\bot u msg -> do
+  (\bot u msg -> when (head u /= 'R') $ do
     if msg == ("die " ++ name) then do
       sendMessageBot bot $ "I obey and die now..."
       terminateBot bot
     else do
-      sendMessageBot bot $ "I don't understand but I still respond, " ++ u ++ "!")
+      sendMessageBot bot $ "I don't understand but I still respond, " ++ u ++ "!"
+  )
   (const $ return ())
-  
-  {-
-  
-  mkBotClient :: User -- ^ The bots username.
-            -> (BotClient -> IO ()) -- ^ Executed when there are no updates.
-            -> (BotClient -> User -> IO ()) -- ^ Executed when a user leaves.
-            -> (BotClient -> User -> Message -> IO ()) -- ^ Excuted when a new message arives.
-            -> (BotClient -> IO ()) -- ^ Executed when the bot terminates. This may happen through the server or the bot itself.
-            -> IO BotClient
-            -}
+
+rageBot :: User -> Connection -> IO BotClient
+rageBot name conn = do
+  counterVar <- newTVarIO (0 :: Int)
+  mkBotClient conn name
+    (const $ return ())
+    (\bot u -> sendMessageBot bot $ "Finally you are gone, " ++ u ++ "!")
+    (\bot u _msg -> do
+      counter <- atomically $ readTVar counterVar
+      if counter >= 5 then do
+        sendMessageBot bot $ "I have had enough of this, " ++ u ++ "!"
+        terminateBot bot
+      else do
+        sendMessageBot bot $ "Be quiet, " ++ u ++ "!"
+        atomically $ modifyTVar counterVar (+1)
+    )
+    (const $ return ())
+
+
+
+
+
