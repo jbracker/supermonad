@@ -7,6 +7,7 @@ module Types
   , Update(..), Request(..), Response(..)
   , UpdateS, RequestS, EndS
   , ServerInit, ServerProtocol
+  , ClientInit, ClientProtocol
   , Connection(..), mkConnection
   ) where 
 
@@ -49,7 +50,7 @@ data Connection = Connection { unwrapConnection :: Rendezvous (ServerInit (Serve
 -- | Create a new connection.
 mkConnection :: IO Connection
 mkConnection = Connection <$> newRendezvous  
-
+  
 -- | The server send the most current 'Update's to the client.
 type UpdateS r = [Update] :!: r
 
@@ -66,6 +67,15 @@ type ServerInit r = User :?: (Rec r)
 --   1. End of communication? 2. Updates from server; 3. Requests from the client;
 type ServerProtocol r = EndS (UpdateS (RequestS r))
 
+type EndC r = Eps :&: (Eps :+: r)
+type RequestC r = Request :!: (Response :?: r)
+type UpdateC r = [Update] :?: r
+
+-- | The client-side version of the 'ServerInit'.
+type ClientInit r = User :!: (Rec r)
+
+-- | The client-side version of the 'ServerProtocol'.
+type ClientProtocol r = EndC (UpdateC (RequestC r))
 
 
 

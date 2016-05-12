@@ -223,8 +223,7 @@ spawnServerCommNode lockUserName updateHandler requestHandler terminationHandler
       terminated <- stm $ readTVar terminateVar
       if terminated then do
         sel1
-        close
-        stm $ terminationHandler userName
+        terminate
       else do
         sel2
         offer terminate $ do
