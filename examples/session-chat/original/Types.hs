@@ -4,26 +4,14 @@
 
 module Types 
   ( Message, User
-  , ClientCommand(..), ServerCommand(..)
-  , ServerInput, ServerOutput
-  , ServerInputLoop, ServerOutputLoop
+  , Update(..), Request(..), Response(..)
+  , UpdateS, RequestS, EndS
+  , ServerInit, ServerProtocol
   ) where 
 
 import Control.Concurrent.SimpleSession.SessionTypes 
   ( Eps, Var, Rec, (:&:), (:+:), (:!:), (:?:)
-  , Z )  
-
-data ClientCommand 
-  = ShutdownServer
-  | SendMessage String
-  | EndSession
-  | DoNothing
-  deriving ( Show, Eq )
-
-data ServerCommand
-  = NewMessage User Message
-  | ClientLeft User
-  deriving ( Show, Eq )
+  , Z )
 
 -- | Type of the user identifier.
 type User = String
@@ -31,30 +19,44 @@ type User = String
 -- | Type of messages.
 type Message = String
 
--- | End of communication.
-type EndSession = Eps
+-- | Updates from the server.
+data Update 
+  = UserLeftChat User
+  | NewMessage User Message
+  | NoUpdate
+  deriving ( Eq, Show )
 
--- | Intial handshake with the server. Send username and see if the server accepts it.
-type ClientOutputInit r = User :!: r
-type ClientInputInit  r = r
+-- | Requests from the client.
+data Request
+  = SendMessage Message
+  | ShutdownServer
+  | FetchUserList
+  | NoRequest
+  deriving ( Eq, Show )
 
--- | Intial handshake from the servers perspective.
-type ServerInputInit  r = User :?: r
-type ServerOutputInit r = r
+-- | Responses from the server to the client 'Request's.
+data Response
+  = EmptyResponse
+  | UserListResponse [User]
+  deriving ( Eq, Show )
 
--- | The input channel of the client is constantly receiving new messages from the server,
---   or the server is shutdown and communication is ended.
-type ClientInputLoop r = EndSession :&: (ServerCommand :?: r)
--- | The output channel of the client first receives notice of the server is shutting down.
---   Afterwards the client can choose to send messages, get the list of users or shutdown the server.
-type ClientOutputLoop r = EndSession :&: (ClientCommand :!: r)
+-- | The server send the most current 'Update's to the client.
+type UpdateS r = [Update] :!: r
 
-type ServerInputLoop  r = EndSession :+: (ClientCommand :?: r)
-type ServerOutputLoop r = EndSession :+: (ServerCommand :!: r)
+-- | The client sends a 'Request' and receives a 'Response' from the server.
+type RequestS r = Request :?: (Response :!: r)
+
+-- | The server and the client have a choice to end communication...
+type EndS r = Eps :+: (Eps :&: r)
+
+-- | Initially the client has to introduce itself by name.
+type ServerInit r = User :?: (Rec r)
+
+-- | After the introduction we repeat the steps: 
+--   1. End of communication? 2. Updates from server; 3. Requests from the client;
+type ServerProtocol r = EndS (UpdateS (RequestS r))
 
 
-type ServerInput  = ServerInputInit  (Rec (ServerInputLoop  (Var Z)))
-type ServerOutput = ServerOutputInit (Rec (ServerOutputLoop (Var Z)))
 
 
 

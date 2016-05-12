@@ -1,11 +1,16 @@
 
 {-# LANGUAGE RebindableSyntax #-}
 
-module Server ( server ) where
+module Server 
+  ( server
+  , Connection, mkConnection
+  ) where
 
 import Prelude
 
-import Control.Monad ( void, when, forM )
+import Data.List ( find )
+
+import Control.Monad ( when, unless, forM_ )
 
 import Control.Monad.Indexed ( (>>>=), ireturn )
 
@@ -14,140 +19,204 @@ import Control.Concurrent.STM ( atomically, STM )
 import Control.Concurrent.STM.TMVar
   ( TMVar
   , newEmptyTMVarIO
-  , takeTMVar, readTMVar, putTMVar
-  , tryTakeTMVar, tryReadTMVar, tryPutTMVar
-  )
+  , takeTMVar, putTMVar )
 import Control.Concurrent.STM.TVar 
   ( TVar
-  , newTVarIO
-  , readTVar, writeTVar, modifyTVar
-  )
+  , newTVar, newTVarIO
+  , readTVar, writeTVar, modifyTVar )
+import Control.Concurrent.STM.TQueue 
+  ( TQueue
+  , newTQueue
+  , writeTQueue
+  , tryReadTQueue )
 
 import Control.Concurrent.SimpleSession.Implicit 
   ( Session, Cap
-  , Rendezvous
-  , Rec, Var
-  , Z, S
+  , Rendezvous, newRendezvous
+  , Var, Z
   , accept
   , io
   , recv, send
-  , sel1, sel2
+  , sel1, sel2, offer
   , close
-  , enter, suc, zero
-  , Eps, Rec, (:+:), (:&:), (:!:), (:?:) 
+  , enter, zero
   )
 
 import Types 
-  ( User, Message
-  , ServerCommand(..), ClientCommand(..)
-  , ServerInput, ServerInputLoop
-  , ServerOutput, ServerOutputLoop
+  ( User
+  , Update(..), Request(..), Response(..)
+  , ServerInit, ServerProtocol
   )
-
-data ServerEnvironment = ServerEnvironment
-  { serverCommNodes :: TVar [ServerCommNode]
-  , serverShutdown :: TVar Bool
-  }
-
-data Connection = Connection 
-  { serverInputConn  :: Rendezvous ServerInput
-  , serverOutputConn :: Rendezvous ServerOutput
-  }
-
-data ServerCommNode = ServerCommNode 
-  { commNodeSendCommand :: TMVar ServerCommand
-  , commNodeRecvCommand :: TMVar ClientCommand
-  , commNodeTerminated :: TVar Bool
-  , commNodeUserName :: User
-  }
 
 ifThenElse :: Bool -> a -> a -> a
 ifThenElse True  t _ = t
 ifThenElse False _ f = f
 
-server :: [Connection] -> IO ServerEnvironment
-server conns = do
-  shutdownVar <- newTVarIO False
-  commNodesVar <- newTVarIO []
-  
-  forkIO $ do
-    forM conns $ \conn -> do
-      commNode <- spawnServerCommNode (lockUserName commNodesVar) (freeUserName commNodesVar) conn
-      
-      undefined
-    
-  
-  return $ ServerEnvironment
-    { serverCommNodes = commNodesVar
-    , serverShutdown = shutdownVar
-    }
-
-serverLoop :: TVar [User] -> TVar Bool -> TVar [ServerCommNode] -> IO ()
-serverLoop = undefined
-
-toUserList :: TVar [ServerCommNode] -> STM [User]
-toUserList commNodesVar = do
-  commNodes <- readTVar commNodesVar
-  return $ fmap commNodeUserName commNodes
-
-lockUserName :: TVar [ServerCommNode] -> User -> STM Bool
-lockUserName commNodesVar user = do
-  userlist <- toUserList commNodesVar
-  if user `elem` userlist then do
-    return False
-  else do
-    writeTVar userlistVar (user : userlist)
-    return True
-  
-freeUserName :: TVar [ServerCommNode] -> User -> STM ()
-freeUserName commNodesVar user = modifyTVar (filter ((/= user) . commNodeUserName)) commNodesVar
 
 stm :: STM a -> Session s s a
 stm = io . atomically
 
-isTerminated :: ServerCommNode -> STM Bool
-isTerminated = readTVar . commNodeTerminated
+data Connection = Connection { unwrapConnection :: Rendezvous (ServerInit (ServerProtocol (Var Z))) }
 
-receiveCommand :: ServerCommNode -> IO (Maybe ClientCommand)
-receiveCommand commNode = undefined
+mkConnection :: IO Connection
+mkConnection = Connection <$> newRendezvous
 
-writeCommand :: ServerCommNode -> ServerCommand -> IO ()
-writeCommand commNode command = undefined
+data ServerEnv = ServerEnv
+  { serverCommNodes :: TVar [(ServerCommNode, TQueue Update)]
+  , serverUserList :: TVar [User]
+  , serverShutdown :: TVar Bool
+  }
 
-spawnServerCommNode :: (User -> STM Bool) -> (User -> STM ()) -> Connection -> IO ServerCommNode
-spawnServerCommNode lockUserName freeUserName conn = do
+mkServerEnv :: IO ServerEnv
+mkServerEnv = atomically $ do
+  shutdownVar <- newTVar False
+  commNodesVar <- newTVar []
+  userListVar <- newTVar []
+  return $ ServerEnv
+    { serverCommNodes = commNodesVar
+    , serverUserList = userListVar
+    , serverShutdown = shutdownVar
+    }
+
+server :: [Connection] -> IO ServerEnv
+server conns = do
+  serverEnv <- mkServerEnv
+  
+  _serverThreadId <- forkIO $ do
+    forM_ conns $ \conn -> do
+      -- Spawn a new communication node for the given connection.
+      commNode <- spawnServerCommNode (lockUserName serverEnv) 
+                                      (updateHandler serverEnv) 
+                                      (requestHandler serverEnv)
+                                      (terminationHandler serverEnv)
+                                      conn
+      -- For every communication node check if it is active (handshake successful)
+      -- and if so add it to the list of communication nodes.
+      atomically $ do
+        terminated <- hasTerminated commNode
+        userList <- readTVar $ serverUserList serverEnv
+        unless (terminated && not (commNodeUserName commNode `elem` userList)) $ do
+          updateVar <- newTQueue
+          modifyTVar (serverCommNodes serverEnv) ((commNode, updateVar) :)
+          
+    serverLoop serverEnv
+    
+  return serverEnv
+  where
+    updateHandler :: ServerEnv -> User -> TVar Bool -> STM [Update]
+    updateHandler serverEnv user _terminateVar = do
+      mCommNode <- getUserCommNode serverEnv user
+      case mCommNode of
+        Just (_commNode, updatesVar) -> readFullTQueue updatesVar
+        Nothing -> return []
+    
+    requestHandler :: ServerEnv -> User -> TVar Bool -> Request -> STM Response
+    requestHandler serverEnv user _terminateVar req = case req of
+      SendMessage msg -> do 
+        broadcastUpdateFrom serverEnv (NewMessage user msg) user
+        return EmptyResponse
+      ShutdownServer -> do
+        writeTVar (serverShutdown serverEnv) True
+        return EmptyResponse
+      FetchUserList -> UserListResponse <$> readTVar (serverUserList serverEnv)
+      NoRequest -> return EmptyResponse
+    
+    terminationHandler :: ServerEnv -> User -> STM ()
+    terminationHandler serverEnv user = do
+      modifyTVar (serverUserList serverEnv) $ filter (user /=)
+      modifyTVar (serverCommNodes serverEnv) $ filter $ (user /=) . commNodeUserName . fst
+    
+    lockUserName :: ServerEnv -> User -> STM Bool
+    lockUserName serverEnv user = do
+      userlist <- readTVar $ serverUserList serverEnv
+      if user `elem` userlist then do
+        return False
+      else do
+        writeTVar (serverUserList serverEnv) (user : userlist)
+        return True
+
+        
+-- This function is dangerous if there are a lot of nodes, because it will iteratve all of them and 
+-- that can lead to live-locks.
+broadcastUpdateFrom :: ServerEnv -> Update -> User -> STM ()
+broadcastUpdateFrom serverEnv update user = do
+  commNodes <- readTVar (serverCommNodes serverEnv)
+  forM_ commNodes $ \(node, updates) -> do
+    unless (commNodeUserName node == user) $ do
+      writeTQueue updates update
+
+readFullTQueue :: TQueue a -> STM [a]
+readFullTQueue q = do
+  mv <- tryReadTQueue q
+  case mv of
+    Just v -> do
+      vs <- readFullTQueue q
+      return $ v : vs
+    Nothing -> return []
+
+getUserCommNode :: ServerEnv -> User -> STM (Maybe (ServerCommNode, TQueue Update))
+getUserCommNode serverEnv user = do
+  commNodes <- readTVar (serverCommNodes serverEnv)
+  return $ find ((user ==) . commNodeUserName . fst) commNodes
+
+serverLoop :: ServerEnv -> IO ()
+serverLoop serverEnv = do
+  atomically $ do
+    shutdown <- readTVar (serverShutdown serverEnv)
+    when shutdown $ do
+      commNodes <- readTVar (serverCommNodes serverEnv)
+      forM_ commNodes $ \(node, _updates) -> do
+        writeTVar (commNodeTerminated node) True
+  
+  serverLoop serverEnv
+
+data ServerCommNode = ServerCommNode 
+  { commNodeTerminated :: TVar Bool
+  , commNodeUserName :: User
+  , commNodeUpdateHandler :: User -> TVar Bool -> STM [Update]
+  , commNodeRequestHandler :: User -> TVar Bool -> Request -> STM Response
+  , commNodeTerminationHandler :: User -> STM ()
+  }
+
+hasTerminated :: ServerCommNode -> STM Bool
+hasTerminated = readTVar . commNodeTerminated
+
+spawnServerCommNode :: (User -> STM Bool) 
+                    -> (User -> TVar Bool -> STM [Update]) 
+                    -> (User -> TVar Bool -> Request -> STM Response) 
+                    -> (User -> STM ())
+                    -> Connection
+                    -> IO ServerCommNode
+spawnServerCommNode lockUserName updateHandler requestHandler terminationHandler conn = do
   
   userNameVar <- newEmptyTMVarIO
-  sendCommandVar <- newEmptyTMVarIO
-  recvCommandVar <- newEmptyTMVarIO
   terminateVar <- newTVarIO False
   
-  _iThreadId <- forkIO $ accept (serverInputConn conn) 
-                       $ inputThread terminateVar recvCommandVar userNameVar
+  _commThreadId <- forkIO $ accept (unwrapConnection conn) 
+                          $ commThread terminateVar userNameVar
   
-  _oThreadId <- forkIO $ accept (serverOutputConn conn) 
-                       $ outputThread terminateVar sendCommandVar
-  
-  userName <- atomically $ readTMVar userNameVar
+  userName <- atomically $ takeTMVar userNameVar
   
   return $ ServerCommNode
-    { commNodeSendCommand = sendCommandVar
-    , commNodeRecvCommand = recvCommandVar
+    { commNodeUpdateHandler = updateHandler
+    , commNodeRequestHandler = requestHandler
+    , commNodeTerminationHandler = terminationHandler
     , commNodeTerminated = terminateVar
     , commNodeUserName = userName
     }
   where
-    inputThread :: TVar Bool -> TMVar ClientCommand -> TMVar User -> Session (Cap () ServerInput) () ()
-    inputThread terminateVar recvCommandVar userNameVar = do
+    commThread :: TVar Bool -> TMVar User -> Session (Cap () (ServerInit (ServerProtocol (Var Z)))) () ()
+    commThread terminateVar userNameVar = do
       userName <- recv
       stm $ let -- TODO: Nested do block
               (>>=) = (Prelude.>>=)
+              (>>) = (Prelude.>>)
         in do
           validUserName <- lockUserName userName
           unless validUserName $ writeTVar terminateVar True
           putTMVar userNameVar userName
       enter -- Enter the recursive loop
-      inputThreadLoop userName terminateVar recvCommandVar
+      commThreadLoop userName terminateVar
       where -- TODO: Bind annotations
         (>>=) :: Session i j a -> (a -> Session j k b) -> Session i k b
         (>>=) = (>>>=)
@@ -158,22 +227,38 @@ spawnServerCommNode lockUserName freeUserName conn = do
         fail :: String -> Session i j a
         fail = error
     
-    inputThreadLoop :: User -> TVar Bool -> TMVar ClientCommand
-                    -> Session (Cap ((ServerInputLoop (Var Z)), ()) (ServerInputLoop (Var Z))) () ()
-    inputThreadLoop userName terminateVar recvCommandVar = do
-      terminate <- stm $ readTVar terminateVar
-      if terminate then do
+    commThreadLoop :: User 
+                   -> TVar Bool
+                   -> Session (Cap ((ServerProtocol (Var Z)), ()) (ServerProtocol (Var Z))) () ()
+    commThreadLoop userName terminateVar = do
+      -- Termination phase
+      terminated <- stm $ readTVar terminateVar
+      if terminated then do
         sel1
         close
+        stm $ terminationHandler userName
       else do
         sel2
-        command <- recv
-        stm $ -- TODO: Nested do block
-          when (command == EndSession) (writeTVar terminateVar True Prelude.>> freeUserName userName)
-          Prelude.>> putTMVar recvCommandVar command
-        zero
-        inputThreadLoop userName terminateVar recvCommandVar
-      where -- TODO: Bind annotations
+        offer terminate $ do
+          -- Update phase
+          update <- stm $ updateHandler userName terminateVar
+          send update
+          -- Request phase
+          request <- recv
+          response <- stm $ requestHandler userName terminateVar request
+          send response
+          -- Recursive step
+          zero
+          commThreadLoop userName terminateVar
+      where
+        terminate = do
+          close
+          stm $ let -- TODO: Nested do block
+              (>>) = (Prelude.>>)
+            in do
+              writeTVar terminateVar True
+              terminationHandler userName
+        -- TODO: Bind annotations
         (>>=) :: Session i j a -> (a -> Session j k b) -> Session i k b
         (>>=) = (>>>=)
         (>>) :: Session i j a -> Session j k b -> Session i k b
@@ -182,46 +267,3 @@ spawnServerCommNode lockUserName freeUserName conn = do
         return = ireturn
         fail :: String -> Session i j a
         fail = error
-    
-    outputThread :: TVar Bool -> TMVar ServerCommand -> Session (Cap () ServerOutput) () ()
-    outputThread terminateVar sendCommandVar = do
-      enter
-      outputThreadLoop terminateVar sendCommandVar
-      where -- TODO: Bind annotations
-        (>>=) :: Session i j a -> (a -> Session j k b) -> Session i k b
-        (>>=) = (>>>=)
-        (>>) :: Session i j a -> Session j k b -> Session i k b
-        a >> b = a >>= const b
-        return :: a -> Session i i a
-        return = ireturn
-    
-    outputThreadLoop :: TVar Bool -> TMVar ServerCommand
-                     -> Session (Cap ((ServerOutputLoop (Var Z)), ()) (ServerOutputLoop (Var Z))) () ()
-    outputThreadLoop terminateVar sendCommandVar = do
-      terminate <- stm $ readTVar terminateVar
-      if terminate then do
-        sel1
-        close
-      else do
-        sel2
-        command <- stm $ takeTMVar sendCommandVar
-        send command
-        zero
-        outputThreadLoop terminateVar sendCommandVar
-      where -- TODO: Bind annotations
-        (>>=) :: Session i j a -> (a -> Session j k b) -> Session i k b
-        (>>=) = (>>>=)
-        (>>) :: Session i j a -> Session j k b -> Session i k b
-        a >> b = a >>= const b
-        return :: a -> Session i i a
-        return = ireturn
-        fail :: String -> Session i j a
-        fail = error
-
-
-
-
-
-
-
-    
