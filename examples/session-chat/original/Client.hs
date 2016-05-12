@@ -3,8 +3,8 @@
 
 module Client 
   ( clientShell
-  , clientBot
-  , BotClient, mkBotClient, terminateBotClient
+  , BotClient, mkBotClient
+  , terminateBot, sendMessageBot, fetchUserListBot
   ) where
 
 import Prelude
@@ -33,7 +33,7 @@ import Control.Concurrent.SimpleSession.Implicit
   , request
   , recv, send
   , sel1, sel2, offer
-  , close
+  , close, io
   , enter, zero )
 
 import Utility 
@@ -97,65 +97,77 @@ clientShell conn = do
 
 data BotClient = BotClient
   { botName :: User
+  , botCommNode :: ClientCommNode
   , botTerminate :: TerminationFlag
-  , botNoUpdateHandler :: TerminationFlag -> IO ()
-  , botUserLeftHandler :: TerminationFlag -> User -> IO ()
-  , botNewMessageHandler :: TerminationFlag -> User -> Message -> IO ()
-  , botTerminateHandler :: IO ()
+  , botNoUpdateHandler :: BotClient -> IO ()
+  , botUserLeftHandler :: BotClient -> User -> IO ()
+  , botNewMessageHandler :: BotClient -> User -> Message -> IO ()
+  , botTerminateHandler :: BotClient -> IO ()
   }
 
-mkBotClient :: User -- ^ The bots username.
-            -> (TerminationFlag -> IO ()) -- ^ Executed when there are no updates.
-            -> (TerminationFlag -> User -> IO ()) -- ^ Executed when a user leaves.
-            -> (TerminationFlag -> User -> Message -> IO ()) -- ^ Excuted when a new message arives.
-            -> IO () -- ^ Executed when the bot terminates. This may happen through the server or the bot itself.
+mkBotClient :: Connection 
+            -> User -- ^ The bots username.
+            -> (BotClient -> IO ()) -- ^ Executed when there are no updates.
+            -> (BotClient -> User -> IO ()) -- ^ Executed when a user leaves.
+            -> (BotClient -> User -> Message -> IO ()) -- ^ Excuted when a new message arives.
+            -> (BotClient -> IO ()) -- ^ Executed when the bot terminates. This may happen through the server or the bot itself.
             -> IO BotClient
-mkBotClient userName noUpdate userLeft newMessage terminateHandler = do
-  terminateVar <- newTVarIO False
-  return $ BotClient
-    { botName = userName
-    , botTerminate = terminateVar
-    , botNoUpdateHandler = noUpdate
-    , botUserLeftHandler = userLeft
-    , botNewMessageHandler = newMessage
-    , botTerminateHandler = terminateHandler
-    }
-
-terminateBotClient :: BotClient -> IO ()
-terminateBotClient bot = atomically $ writeTVar (botTerminate bot) True
-
-clientBot :: Connection -> BotClient -> IO ()
-clientBot conn bot = 
+mkBotClient conn userName noUpdate userLeft newMessage terminateHandler = do
+  botVar <- newEmptyTMVarIO
+  
   void $ forkIO $ do
-    commNode <- spawnClientCommNode (botName bot) conn
-    clientLoop commNode
+    terminateVar <- newTVarIO False
+    commNode <- spawnClientCommNode userName conn
+    let bot = BotClient
+          { botName = userName
+          , botCommNode = commNode
+          , botTerminate = terminateVar
+          , botNoUpdateHandler = noUpdate
+          , botUserLeftHandler = userLeft
+          , botNewMessageHandler = newMessage
+          , botTerminateHandler = terminateHandler }
+    atomically $ putTMVar botVar bot
+    clientLoop commNode bot
+    
+  atomically $ takeTMVar botVar
+  
   where
-    clientLoop :: ClientCommNode -> IO ()
-    clientLoop commNode = do
+    clientLoop :: ClientCommNode -> BotClient -> IO ()
+    clientLoop commNode bot = do
       threadDelay 500
       terminate <- atomically $ readTVar (botTerminate bot)
       if terminate then do
         terminateCommNode commNode
-        botTerminateHandler bot
+        botTerminateHandler bot bot
       else do
         allUpdates <- getUpdates commNode
         case filter (/= NoUpdate) allUpdates of
-          [] -> botNoUpdateHandler bot (botTerminate bot)
+          [] -> botNoUpdateHandler bot bot
           updates -> forM_ updates $ \update -> case update of
-            UserLeftChat usr -> botUserLeftHandler bot (botTerminate bot) usr
-            NewMessage usr msg -> botNewMessageHandler bot (botTerminate bot) usr msg
+            UserLeftChat usr -> botUserLeftHandler bot bot usr
+            NewMessage usr msg -> botNewMessageHandler bot bot usr msg
             NoUpdate -> return ()
         ifTerminated commNode $ do
-          terminateBotClient bot
-          botTerminateHandler bot
+          terminateBot bot
+          botTerminateHandler bot bot
         ifNotTerminated commNode $ do
-          clientLoop commNode
+          clientLoop commNode bot
+
+terminateBot :: BotClient -> IO ()
+terminateBot bot = atomically $ writeTVar (botTerminate bot) True
+
+sendMessageBot :: BotClient -> Message -> IO ()
+sendMessageBot bot msg = 
+  mkRequest (botCommNode bot) (SendMessage msg) (const $ return ())
+
+fetchUserListBot :: BotClient -> IO [User]
+fetchUserListBot bot =
+  mkRequest (botCommNode bot) FetchUserList $ \(UserListResponse userlist) -> return userlist
 
 mkRequest :: ClientCommNode -> Request -> (Response -> IO a) -> IO a
 mkRequest commNode req respHandler = do
-  resp <- atomically $ do
-    putTMVar (commNodeCurrentRequest commNode) req
-    takeTMVar (commNodeCurrentResponse commNode)
+  atomically $ putTMVar (commNodeCurrentRequest commNode) req
+  resp <- atomically $ takeTMVar (commNodeCurrentResponse commNode)
   respHandler resp
 
 getUpdates :: ClientCommNode -> IO [Update]
