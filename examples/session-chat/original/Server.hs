@@ -23,12 +23,7 @@ import Control.Concurrent.STM.TMVar
 import Control.Concurrent.STM.TVar 
   ( TVar
   , newTVar, newTVarIO
-  , readTVar, writeTVar, modifyTVar )
-import Control.Concurrent.STM.TQueue 
-  ( TQueue
-  , newTQueue
-  , writeTQueue
-  , tryReadTQueue )
+  , readTVar, writeTVar, modifyTVar, swapTVar )
 
 import Control.Concurrent.SimpleSession.Implicit 
   ( Session, Cap
@@ -50,7 +45,7 @@ import Types
 
 
 data ServerEnv = ServerEnv
-  { serverCommNodes :: TVar [(ServerCommNode, TQueue Update)]
+  { serverCommNodes :: TVar [(ServerCommNode, TVar [Update])]
   , serverUserList :: TVar [User]
   , serverShutdown :: TVar Bool
   }
@@ -84,7 +79,7 @@ server conns = do
         terminated <- hasTerminated commNode
         userList <- readTVar $ serverUserList serverEnv
         unless (terminated && not (commNodeUserName commNode `elem` userList)) $ do
-          updateVar <- newTQueue
+          updateVar <- newTVar []
           modifyTVar (serverCommNodes serverEnv) ((commNode, updateVar) :)
           
     serverLoop serverEnv
@@ -95,7 +90,7 @@ server conns = do
     updateHandler serverEnv user _terminateVar = do
       mCommNode <- getUserCommNode serverEnv user
       case mCommNode of
-        Just (_commNode, updatesVar) -> readFullTQueue updatesVar
+        Just (_commNode, updatesVar) -> swapTVar updatesVar []
         Nothing -> return []
     
     requestHandler :: ServerEnv -> User -> TVar Bool -> Request -> STM Response
@@ -113,6 +108,7 @@ server conns = do
     terminationHandler serverEnv user = do
       modifyTVar (serverUserList serverEnv) $ filter (user /=)
       modifyTVar (serverCommNodes serverEnv) $ filter $ (user /=) . commNodeUserName . fst
+      broadcastUpdateFrom serverEnv (UserLeftChat user) user
     
     lockUserName :: ServerEnv -> User -> STM Bool
     lockUserName serverEnv user = do
@@ -129,20 +125,11 @@ server conns = do
 broadcastUpdateFrom :: ServerEnv -> Update -> User -> STM ()
 broadcastUpdateFrom serverEnv update user = do
   commNodes <- readTVar (serverCommNodes serverEnv)
-  forM_ commNodes $ \(node, updates) -> do
+  forM_ commNodes $ \(node, updatesVar) -> do
     unless (commNodeUserName node == user) $ do
-      writeTQueue updates update
+      modifyTVar updatesVar (update :)
 
-readFullTQueue :: TQueue a -> STM [a]
-readFullTQueue q = do
-  mv <- tryReadTQueue q
-  case mv of
-    Just v -> do
-      vs <- readFullTQueue q
-      return $ v : vs
-    Nothing -> return []
-
-getUserCommNode :: ServerEnv -> User -> STM (Maybe (ServerCommNode, TQueue Update))
+getUserCommNode :: ServerEnv -> User -> STM (Maybe (ServerCommNode, TVar [Update]))
 getUserCommNode serverEnv user = do
   commNodes <- readTVar (serverCommNodes serverEnv)
   return $ find ((user ==) . commNodeUserName . fst) commNodes

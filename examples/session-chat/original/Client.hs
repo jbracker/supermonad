@@ -33,7 +33,7 @@ import Control.Concurrent.SimpleSession.Implicit
   , request
   , recv, send
   , sel1, sel2, offer
-  , close, io
+  , close
   , enter, zero )
 
 import Utility 
@@ -90,7 +90,7 @@ clientShell conn = do
             updates -> do
               putStrLn ""
               forM_ updates $ \update -> case update of
-                UserLeftChat usr -> putStrLn $ "> User left chat: " ++ usr
+                UserLeftChat usr -> putStrLn $ "User '" ++ usr ++ "' left chat."
                 NewMessage usr msg -> putStrLn $ usr ++ ": " ++ msg
                 NoUpdate -> return ()
               getUserInput True commNode
