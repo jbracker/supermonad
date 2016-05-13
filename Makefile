@@ -21,6 +21,7 @@ clean: init
 	cabal clean
 	rm -fR ./examples/session/dist
 	rm -fR ./examples/session-chat/original/dist
+	rm -fR ./examples/session-chat/supermonad/dist
 	rm -fR ./examples/effect/dist
 	rm -fR ./examples/hmtc/original/dist
 	rm -fR ./examples/hmtc/supermonad/dist
@@ -40,6 +41,9 @@ session-example: install
 
 session-chat-orig-example:
 	cabal install ./examples/session-chat/original
+
+session-chat-supermonad-example:
+	cabal install ./examples/session-chat/supermonad
 
 effect-example: install
 	cabal install ./examples/effect
