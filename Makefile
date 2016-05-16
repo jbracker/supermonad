@@ -22,7 +22,6 @@ clean: init
 	rm -fR ./examples/session/dist
 	rm -fR ./examples/session-chat/original/dist
 	rm -fR ./examples/session-chat/supermonad/dist
-	rm -fR ./examples/session-chat/supermonad-trans/dist
 	rm -fR ./examples/effect/dist
 	rm -fR ./examples/hmtc/original/dist
 	rm -fR ./examples/hmtc/supermonad/dist
@@ -45,9 +44,6 @@ session-chat-orig-example:
 
 session-chat-supermonad-example:
 	cabal install ./examples/session-chat/supermonad
-
-session-chat-supermonad-trans-example:
-	cabal install ./examples/session-chat/supermonad-trans
 
 effect-example: install
 	cabal install ./examples/effect
