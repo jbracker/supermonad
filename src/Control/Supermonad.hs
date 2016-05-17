@@ -6,6 +6,10 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
+{-# LANGUAGE InstanceSigs         #-} -- for 'ListT' instance.
+{-# LANGUAGE ScopedTypeVariables  #-} -- for 'ListT' instance.
+{-# LANGUAGE UndecidableInstances #-} -- for 'ListT' instance.
+
 -- | Representation of supermonads in Haskell.
 module Control.Supermonad
   ( -- * Supermonads
@@ -20,6 +24,7 @@ module Control.Supermonad
 
 import Prelude
   ( String
+  , Maybe(..), Either(..)
   , Functor(..)
   , (.), ($), const
   )
@@ -44,8 +49,18 @@ import qualified Text.ParserCombinators.ReadPrec as Read ( ReadPrec )
 import qualified GHC.Conc as STM ( STM )
 
 -- To define "transformers" instances:
-import qualified Control.Monad.Trans.State.Lazy as StateL ( StateT(..) )
-
+import qualified Control.Monad.Trans.Cont     as Cont     ( ContT(..) )
+import qualified Control.Monad.Trans.Except   as Except   ( ExceptT(..), runExceptT )
+import qualified Control.Monad.Trans.Identity as Identity ( IdentityT(..) )
+import qualified Control.Monad.Trans.List     as List     ( ListT(..) )
+import qualified Control.Monad.Trans.Maybe    as Maybe    ( MaybeT(..) )
+import qualified Control.Monad.Trans.RWS.Lazy      as RWSL    ( RWST(..) )
+import qualified Control.Monad.Trans.RWS.Strict    as RWSS    ( RWST(..) )
+import qualified Control.Monad.Trans.Reader        as Reader  ( ReaderT(..) )
+import qualified Control.Monad.Trans.State.Lazy    as StateL  ( StateT(..) )
+import qualified Control.Monad.Trans.State.Strict  as StateS  ( StateT(..) )
+import qualified Control.Monad.Trans.Writer.Lazy   as WriterL ( WriterT(..) )
+import qualified Control.Monad.Trans.Writer.Strict as WriterS ( WriterT(..) )
 
 
 -- -----------------------------------------------------------------------------
@@ -75,8 +90,8 @@ instance Bind Mon.First Mon.First Mon.First where
   (>>=) = (P.>>=)
 instance Bind Mon.Last Mon.Last Mon.Last where
   (>>=) = (P.>>=)
-instance (Bind f f f) => Bind (Mon.Alt f) (Mon.Alt f) (Mon.Alt f) where
-  type BindCts (Mon.Alt f) (Mon.Alt f) (Mon.Alt f) = BindCts f f f
+instance (Bind m n p) => Bind (Mon.Alt m) (Mon.Alt n) (Mon.Alt p) where
+  type BindCts (Mon.Alt m) (Mon.Alt n) (Mon.Alt p) = BindCts m n p
   m >>= f = Mon.Alt $ (Mon.getAlt m) >>= (Mon.getAlt . f)
 
 instance Bind Proxy.Proxy Proxy.Proxy Proxy.Proxy where
@@ -113,13 +128,96 @@ instance Bind STM.STM STM.STM STM.STM where
 
 -- "transformers" package instances: -------------------------------------------
 
-instance (Bind m n p) 
-    => Bind (StateL.StateT s m) (StateL.StateT s n) (StateL.StateT s p) where
-  type BindCts (StateL.StateT s m) (StateL.StateT s n) (StateL.StateT s p) 
-    = (BindCts m n p)
+-- Continuations are so wierd...
+-- | TODO / FIXME: Still need to figure out how and if we can generalize the continuation implementation.
+instance {- (Bind m n p) => -} Bind (Cont.ContT r m) (Cont.ContT r m) (Cont.ContT r m) where
+  type BindCts (Cont.ContT r m) (Cont.ContT r m) (Cont.ContT r m) = () -- (BindCts m n p)
+  m >>= k = Cont.ContT $ \ c -> Cont.runContT m (\ x -> Cont.runContT (k x) c)
+  {-# INLINE (>>=) #-}
+
+instance (Bind m n p, Return n) => Bind (Except.ExceptT e m) (Except.ExceptT e n) (Except.ExceptT e p) where
+  type BindCts (Except.ExceptT e m) (Except.ExceptT e n) (Except.ExceptT e p) = (BindCts m n p, ReturnCts n)
+  m >>= k = Except.ExceptT $ 
+      Except.runExceptT m >>= 
+      \ a -> case a of
+          Left e -> return (Left e)
+          Right x -> Except.runExceptT (k x)
+  {-# INLINE (>>=) #-}
+
+instance (Bind m n p) => Bind (Identity.IdentityT m) (Identity.IdentityT n) (Identity.IdentityT p) where
+  type BindCts (Identity.IdentityT m) (Identity.IdentityT n) (Identity.IdentityT p) = (BindCts m n p)
+  m >>= k = Identity.IdentityT $ Identity.runIdentityT m >>= (Identity.runIdentityT . k) 
+  {-# INLINE (>>=) #-}
+
+-- Requires undecidable instances.
+instance (Bind m n p, Bind n n n, Return n) => Bind (List.ListT m) (List.ListT n) (List.ListT p) where
+  type BindCts (List.ListT m) (List.ListT n) (List.ListT p) = (BindCts m n p, BindCts n n n, ReturnCts n)
+  (>>=) :: forall a b. (BindCts m n p, BindCts n n n, ReturnCts n) => List.ListT m a -> (a -> List.ListT n b) -> List.ListT p b
+  m >>= f = List.ListT $
+      List.runListT m >>=
+      \ a -> fmap P.concat $ P.foldr k (return []) a
+    where
+      k :: (BindCts n n n) => a -> n [[b]] -> n [[b]]
+      k a r = List.runListT (f a) >>= \ x -> fmap (x :) r
+  {-# INLINE (>>=) #-}
+
+instance (Return n, Bind m n p) => Bind (Maybe.MaybeT m) (Maybe.MaybeT n) (Maybe.MaybeT p) where
+  type BindCts (Maybe.MaybeT m) (Maybe.MaybeT n) (Maybe.MaybeT p) = (ReturnCts n, BindCts m n p)
+  x >>= f = Maybe.MaybeT $
+    Maybe.runMaybeT x >>=
+    \v -> case v of
+      Nothing -> return Nothing
+      Just y  -> Maybe.runMaybeT (f y)
+  {-# INLINE (>>=) #-}
+
+instance (P.Monoid w, Bind m n p) => Bind (RWSL.RWST r w s m) (RWSL.RWST r w s n) (RWSL.RWST r w s p) where
+  type BindCts (RWSL.RWST r w s m) (RWSL.RWST r w s n) (RWSL.RWST r w s p) = (BindCts m n p)
+  m >>= k  = RWSL.RWST $ 
+    \ r s -> RWSL.runRWST m r s >>=
+    \ ~(a, s', w) -> fmap (\ ~(b, s'',w') -> (b, s'', w `P.mappend` w')) $ RWSL.runRWST (k a) r s'
+  {-# INLINE (>>=) #-}
+
+instance (P.Monoid w, Bind m n p) => Bind (RWSS.RWST r w s m) (RWSS.RWST r w s n) (RWSS.RWST r w s p) where
+  type BindCts (RWSS.RWST r w s m) (RWSS.RWST r w s n) (RWSS.RWST r w s p) = (BindCts m n p)
+  m >>= k  = RWSS.RWST $ 
+    \ r s -> RWSS.runRWST m r s >>=
+    \ (a, s', w) -> fmap (\(b, s'',w') -> (b, s'', w `P.mappend` w')) $ RWSS.runRWST (k a) r s'
+  {-# INLINE (>>=) #-}
+
+instance (Bind m n p) => Bind (Reader.ReaderT r m) (Reader.ReaderT r n) (Reader.ReaderT r p) where
+  type BindCts (Reader.ReaderT r m) (Reader.ReaderT r n) (Reader.ReaderT r p) = (BindCts m n p)
+  m >>= k  = Reader.ReaderT $ 
+      \ r -> Reader.runReaderT m r >>=
+      \ a -> Reader.runReaderT (k a) r
+  {-# INLINE (>>=) #-}
+
+instance (Bind m n p) => Bind (StateL.StateT s m) (StateL.StateT s n) (StateL.StateT s p) where
+  type BindCts (StateL.StateT s m) (StateL.StateT s n) (StateL.StateT s p) = (BindCts m n p)
   m >>= k = StateL.StateT 
-          $ \s -> StateL.runStateT m s >>= 
-            \(a, s') -> StateL.runStateT (k a) s'
+          $ \ s -> StateL.runStateT m s >>= 
+            \ ~(a, s') -> StateL.runStateT (k a) s'
+  {-# INLINE (>>=) #-}
+
+instance (Bind m n p) => Bind (StateS.StateT s m) (StateS.StateT s n) (StateS.StateT s p) where
+  type BindCts (StateS.StateT s m) (StateS.StateT s n) (StateS.StateT s p) = (BindCts m n p)
+  m >>= k = StateS.StateT 
+          $ \ s -> StateS.runStateT m s >>= 
+            \ (a, s') -> StateS.runStateT (k a) s'
+  {-# INLINE (>>=) #-}
+
+instance (P.Monoid w, Bind m n p) => Bind (WriterL.WriterT w m) (WriterL.WriterT w n) (WriterL.WriterT w p) where
+  type BindCts (WriterL.WriterT s m) (WriterL.WriterT s n) (WriterL.WriterT s p) = (BindCts m n p)
+  m >>= k  = WriterL.WriterT $
+      WriterL.runWriterT m >>=
+      \ ~(a, w) -> fmap (\ ~(b, w') -> (b, w `P.mappend` w')) $ WriterL.runWriterT (k a)
+  {-# INLINE (>>=) #-}
+
+instance (P.Monoid w, Bind m n p) => Bind (WriterS.WriterT w m) (WriterS.WriterT w n) (WriterS.WriterT w p) where
+  type BindCts (WriterS.WriterT s m) (WriterS.WriterT s n) (WriterS.WriterT s p) = (BindCts m n p)
+  m >>= k  = WriterS.WriterT $
+      WriterS.runWriterT m >>=
+      \ (a, w) -> fmap (\ (b, w') -> (b, w `P.mappend` w')) $ WriterS.runWriterT (k a)
+  {-# INLINE (>>=) #-}
 
 -- -----------------------------------------------------------------------------
 -- Return Type Class
@@ -174,9 +272,66 @@ instance Return STM.STM where
   
 -- "transformers" package instances: -------------------------------------------
 
+-- Continuations are so weird...
+instance {- (Return m) => -} Return (Cont.ContT r m) where
+  type ReturnCts (Cont.ContT r m) = () -- ReturnCts m
+  return x = Cont.ContT ($ x)
+  {-# INLINE return #-}
+
+instance (Return m) => Return (Except.ExceptT e m) where
+  type ReturnCts (Except.ExceptT e m) = ReturnCts m
+  return = Except.ExceptT . return . Right
+  {-# INLINE return #-}
+
+instance (Return m) => Return (Identity.IdentityT m) where
+  type ReturnCts (Identity.IdentityT m) = ReturnCts m
+  return = (Identity.IdentityT) . return
+  {-# INLINE return #-}
+
+instance (Return m) => Return (List.ListT m) where
+  type ReturnCts (List.ListT m) = ReturnCts m
+  return a = List.ListT $ return [a]
+  {-# INLINE return #-}
+
+instance (Return m) => Return (Maybe.MaybeT m) where
+  type ReturnCts (Maybe.MaybeT m) = ReturnCts m
+  return = Maybe.MaybeT . return . Just
+  {-# INLINE return #-}
+
+instance (P.Monoid w, Return m) => Return (RWSL.RWST r w s m) where
+  type ReturnCts (RWSL.RWST r w s m) = ReturnCts m
+  return a = RWSL.RWST $ \ _ s -> return (a, s, P.mempty)
+  {-# INLINE return #-}
+
+instance (P.Monoid w, Return m) => Return (RWSS.RWST r w s m) where
+  type ReturnCts (RWSS.RWST r w s m) = ReturnCts m
+  return a = RWSS.RWST $ \ _ s -> return (a, s, P.mempty)
+  {-# INLINE return #-}
+
+instance (Return m) => Return (Reader.ReaderT r m) where
+  type ReturnCts (Reader.ReaderT s m) = ReturnCts m
+  return = Reader.ReaderT . const . return
+  {-# INLINE return #-}
+
 instance (Return m) => Return (StateL.StateT s m) where
   type ReturnCts (StateL.StateT s m) = ReturnCts m
   return x = StateL.StateT $ \s -> return (x, s)
+  {-# INLINE return #-}
+
+instance (Return m) => Return (StateS.StateT s m) where
+  type ReturnCts (StateS.StateT s m) = ReturnCts m
+  return x = StateS.StateT $ \s -> return (x, s)
+  {-# INLINE return #-}
+
+instance (P.Monoid w, Return m) => Return (WriterL.WriterT w m) where
+  type ReturnCts (WriterL.WriterT w m) = ReturnCts m
+  return a = WriterL.WriterT $ return (a, P.mempty)
+  {-# INLINE return #-}
+
+instance (P.Monoid w, Return m) => Return (WriterS.WriterT w m) where
+  type ReturnCts (WriterS.WriterT w m) = ReturnCts m
+  return a = WriterS.WriterT $ return (a, P.mempty)
+  {-# INLINE return #-}
 
 -- -----------------------------------------------------------------------------
 -- Fail Type Class
@@ -184,7 +339,9 @@ instance (Return m) => Return (StateL.StateT s m) where
 
 -- | TODO
 class Fail m where
-  fail :: String -> m a
+  type FailCts m :: Constraint
+  type FailCts m = ()
+  fail :: (FailCts m) => String -> m a
 
 instance Fail Identity where
   fail = P.fail
@@ -202,6 +359,7 @@ instance Fail Mon.First where
 instance Fail Mon.Last where
   fail = P.fail
 instance (Fail a) => Fail (Mon.Alt a) where
+  type FailCts (Mon.Alt a) = (FailCts a)
   fail a = Mon.Alt $ fail a
 
 instance Fail Proxy.Proxy where
@@ -220,6 +378,7 @@ instance (Arrow.ArrowApply a) => Fail (Arrow.ArrowMonad a) where
   fail = P.fail
 -- | TODO / FIXME: This has the same issue as the 'Bind' instance for 'App.WrappedMonad'.
 instance (Fail m, P.Monad m) => Fail (App.WrappedMonad m) where
+  type FailCts (App.WrappedMonad m) = (FailCts m)
   fail a = App.WrapMonad $ fail a
 
 instance Fail STM.STM where
@@ -227,9 +386,66 @@ instance Fail STM.STM where
 
 -- "transformers" package instances: -------------------------------------------
 
-instance (Fail m) => Fail (StateL.StateT s m) where
-  fail = StateL.StateT . const . fail
+instance (Fail m) => Fail (Cont.ContT r m) where
+  type FailCts (Cont.ContT r m) = (FailCts m)
+  fail = (Cont.ContT) . const . fail
+  {-# INLINE fail #-}
 
+instance (Fail m) => Fail (Except.ExceptT e m) where
+  type FailCts (Except.ExceptT e m) = (FailCts m)
+  fail = Except.ExceptT . fail
+  {-# INLINE fail #-}
+
+instance (Fail m) => Fail (Identity.IdentityT m) where
+  type FailCts (Identity.IdentityT m) = (FailCts m)
+  fail msg = Identity.IdentityT $ fail msg
+  {-# INLINE fail #-}
+
+instance (Return m) => Fail (List.ListT m) where
+  type FailCts (List.ListT m) = (ReturnCts m)
+  fail _ = List.ListT $ return []
+  {-# INLINE fail #-}
+
+instance (Return m) => Fail (Maybe.MaybeT m) where
+  type FailCts (Maybe.MaybeT m) = (ReturnCts m)
+  fail _ = Maybe.MaybeT (return Nothing)
+  {-# INLINE fail #-}
+
+instance (P.Monoid w, Fail m) => Fail (RWSL.RWST r w s m) where
+  type FailCts (RWSL.RWST r w s m) = (FailCts m)
+  fail msg = RWSL.RWST $ \ _ _ -> fail msg
+  {-# INLINE fail #-}
+
+instance (P.Monoid w, Fail m) => Fail (RWSS.RWST r w s m) where
+  type FailCts (RWSS.RWST r w s m) = (FailCts m)
+  fail msg = RWSS.RWST $ \ _ _ -> fail msg
+  {-# INLINE fail #-}
+
+instance (Fail m) => Fail (Reader.ReaderT r m) where
+  type FailCts (Reader.ReaderT r m) = (FailCts m)
+  fail = Reader.ReaderT . const . fail
+  {-# INLINE fail #-}
+
+instance (Fail m) => Fail (StateL.StateT s m) where
+  type FailCts (StateL.StateT s m) = (FailCts m)
+  fail = StateL.StateT . const . fail
+  {-# INLINE fail #-}
+
+instance (Fail m) => Fail (StateS.StateT s m) where
+  type FailCts (StateS.StateT s m) = (FailCts m)
+  fail = StateS.StateT . const . fail
+  {-# INLINE fail #-}
+
+instance (P.Monoid w, Fail m) => Fail (WriterL.WriterT w m) where
+  type FailCts (WriterL.WriterT w m) = (FailCts m)
+  fail msg = WriterL.WriterT $ fail msg
+  {-# INLINE fail #-}
+
+instance (P.Monoid w, Fail m) => Fail (WriterS.WriterT w m) where
+  type FailCts (WriterS.WriterT w m) = (FailCts m)
+  fail msg = WriterS.WriterT $ fail msg
+  {-# INLINE fail #-}
+  
 -- -----------------------------------------------------------------------------
 -- Convenient type synonyms
 -- -----------------------------------------------------------------------------
