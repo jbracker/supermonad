@@ -6,6 +6,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
+-- | Definition of supermonads that support constrained monads.
 module Control.Supermonad.Constrained 
   ( -- * Supermonads
     Bind(..), Return(..), Fail(..)

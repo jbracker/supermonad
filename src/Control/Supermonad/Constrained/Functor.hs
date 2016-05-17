@@ -2,6 +2,8 @@
 {-# LANGUAGE ConstraintKinds #-} -- 'CFunctor' class.
 {-# LANGUAGE TypeFamilies    #-} -- 'CFunctor' class.
 
+-- | Definition of constrained functors as they are required to work with
+--   constrained monads and constrained supermonads.
 module Control.Supermonad.Constrained.Functor 
   ( CFunctor(..)
   ) where

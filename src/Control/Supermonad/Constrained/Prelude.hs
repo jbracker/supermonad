@@ -1,4 +1,5 @@
- 
+
+-- | Custom prelude to use if supermonads need to support constrained monads as well. 
 module Control.Supermonad.Constrained.Prelude 
   ( -- * Supermonads
     module Control.Supermonad.Constrained
