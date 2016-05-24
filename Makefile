@@ -1,19 +1,4 @@
 
-HMTC_BIN=./.cabal-sandbox/bin/hmtc-orig
-
-HMTC_TEST_FILES=\
-	./examples/hmtc/test-files/fac.tam \
-	./examples/hmtc/test-files/incdec.tam \
-	./examples/hmtc/test-files/matmult.tam \
-	./examples/hmtc/test-files/overloading.tam \
-	./examples/hmtc/test-files/records.tam \
-	./examples/hmtc/test-files/sort.tam \
-	./examples/hmtc/test-files/test1.tam \
-	./examples/hmtc/test-files/test2.tam \
-	./examples/hmtc/test-files/test3.tam \
-	./examples/hmtc/test-files/test4.tam \
-	./examples/hmtc/test-files/test6.tam
-
 install: init
 	cabal install
 
@@ -35,6 +20,8 @@ opendoc:
 
 init:
 	[ -f ./cabal.sandbox.config ] || [ -d ./.cabal-sandbox ] || cabal sandbox init
+
+supermonad-examples: session-example session-chat-supermonad-example effect-example constrained-example hmtc-supermonad-example
 
 session-example: install
 	cabal install ./examples/session
@@ -59,12 +46,3 @@ hmtc-supermonad-example: install
 	
 hmtc-monad-param-example:
 	cabal install ./examples/hmtc/monad-param
-
-%.tam: %.mt hmtc-orig-example
-	$(HMTC_BIN) $<
-	$(HMTC_BIN) $@
-	rm $@
-
-hmtc-orig-test-files: hmtc-orig-example $(HMTC_TEST_FILES)
-
-hmtc-supermonad-test-files: hmtc-supermonad-example $(HMTC_TEST_FILES)
