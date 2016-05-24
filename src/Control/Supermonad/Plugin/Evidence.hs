@@ -19,7 +19,7 @@ import Control.Monad ( forM )
 
 import Type
   ( Type, TyVar
-  , mkTopTvSubst, mkTyVarTy, mkAppTys, mkTyConTy
+  , mkTyVarTy, mkAppTys, mkTyConTy
   , substTy, substTys
   , eqType
   , getClassPredTys_maybe, getClassPredTys
@@ -35,12 +35,14 @@ import CoAxiom ( Role(..) )
 import InstEnv
   ( ClsInst(..)
   , instanceSig
-  , lookupInstEnv
   , lookupUniqueInstEnv )
 import Unify ( tcUnifyTys )
 import TcRnTypes ( Ct, isGivenCt, ctPred, ctEvidence, ctEvTerm )
 import TcType ( isAmbiguousTyVar )
-import TcEvidence ( EvTerm(..), TcCoercion(..) )
+import TcEvidence 
+  ( EvTerm( EvDFunApp, EvCoercion )
+  , mkEvCast
+  , mkTcSymCo, mkTcReflCo )
 import TcPluginM
   ( TcPluginM
   , getInstEnvs, getFamInstEnvs )
@@ -48,6 +50,8 @@ import FamInstEnv ( normaliseType )
 import Outputable ( ($$), SDoc )
 import qualified Outputable as O
 
+import Control.Supermonad.Plugin.Wrapper
+  ( mkTypeVarSubst, mkTcCoercion, lookupInstEnv )
 import Control.Supermonad.Plugin.Constraint 
   ( GivenCt
   , constraintClassType
@@ -130,7 +134,7 @@ produceEvidenceFor givenCts inst instArgs = do
   -- number of type arguments and dictionart arguments for the EvDFunApp)
   let (tyVars, instCts, _cls, _tyArgs) = instanceSig inst -- ([TyVar], [Type], Class, [Type])
   -- How the instance variables for the current instance are bound.
-  let varSubst = mkTopTvSubst $ zip tyVars instArgs
+  let varSubst = mkTypeVarSubst $ zip tyVars instArgs
   -- Now go over each constraint and find a suitable instance and evidence.
   -- Don't forget to substitute all variables for their actual values,
   ctEvTerms <- forM (substTys varSubst instCts) $ produceEvidenceForCtType givenCts
@@ -200,7 +204,7 @@ produceEvidenceForCtType givenCts ct =
           -- Produce evidence for the evaluated term
           eEvEvalCt <- produceEvidenceForCtType' evalCt
           -- Add the appropriate cast to the produced evidence
-          return $ (\ev -> EvCast ev (TcSymCo $ TcCoercion coer)) <$> eEvEvalCt
+          return $ (\ev -> mkEvCast ev (mkTcSymCo $ mkTcCoercion coer)) <$> eEvEvalCt
     -- Do we have a type equality constraint?
     _ -> case getEqPredTys_maybe ct of
       -- If there is a synonym or type function in the equality...
@@ -211,7 +215,7 @@ produceEvidenceForCtType givenCts ct =
           -- add the appropriate cast to the produced evidence
           let (ta, tb) = getEqPredTys evalCt
           let r = getEqPredRole evalCt
-          return $ (\ev -> EvCast ev (TcSymCo $ TcCoercion coer)) <$> produceTypeEqEv r ta tb
+          return $ (\ev -> mkEvCast ev (mkTcSymCo $ mkTcCoercion coer)) <$> produceTypeEqEv r ta tb
       -- If there isn't we can just proceed...
       Just (r, ta, tb) -> return $ produceTypeEqEv r ta tb
       -- Do we have a class constraint?
@@ -223,12 +227,12 @@ produceEvidenceForCtType givenCts ct =
           -- Produce evidence for the evaluated term and
           -- add the appropriate cast to the produced evidence
           let (cls, args) = getClassPredTys evalCt
-          res <- fmap (\ev -> EvCast ev (TcSymCo $ TcCoercion coer)) <$> produceClassCtEv cls args
+          res <- fmap (\ev -> mkEvCast ev (mkTcSymCo $ mkTcCoercion coer)) <$> produceClassCtEv cls args
           -- If this failed there may still be a given constraint that matches...
           case res of
             Right _ -> return res
             Left _ -> do
-              newRes <- return $ (\ev -> EvCast ev (TcCoercion coer)) <$> produceGivenCtEv evalCt
+              newRes <- return $ (\ev -> mkEvCast ev (mkTcCoercion coer)) <$> produceGivenCtEv evalCt
               case newRes of
                 Right _ -> return newRes
                 Left _ -> return res
@@ -248,7 +252,7 @@ produceEvidenceForCtType givenCts ct =
           -- Evaluate it...
           (coer, evalCt) <- evaluateType Representational ct
           -- and produce the appropriate cast
-          return $ (\ev -> EvCast ev (TcCoercion coer)) <$> produceGivenCtEv evalCt
+          return $ (\ev -> mkEvCast ev (mkTcCoercion coer)) <$> produceGivenCtEv evalCt
         -- In any other case, lets try if one of the given constraints can help...
         _ -> return $ produceGivenCtEv ct
   where
@@ -265,7 +269,7 @@ produceEvidenceForCtType givenCts ct =
     -- evidence construction.
     produceTypeEqEv :: Role -> Type -> Type -> Either SDoc EvTerm
     produceTypeEqEv r ta tb = if eqType ta tb
-      then Right $ EvCoercion $ TcRefl r ta
+      then Right $ EvCoercion $ mkTcReflCo r ta
       else Left
         $ O.text "Can't produce evidence for this type equality constraint:"
         $$ O.ppr ct
@@ -367,7 +371,7 @@ isPotentiallyInstantiatedCtType  givenCts (ctCls, ctArgs) assocs = do
   appliedAssocs <- either L.pluginFailSDoc return =<< partiallyApplyTyCons assocs
   
   -- Create the substitution for the given associations.
-  let ctSubst = mkTopTvSubst $ fmap (\(tv, t, _) -> (tv, t)) appliedAssocs
+  let ctSubst = mkTypeVarSubst $ fmap (\(tv, t, _) -> (tv, t)) appliedAssocs
   -- Substitute variables in the constraint arguments with the type constructors.
   let ctSubstArgs = substTys ctSubst ctArgs
   -- Calculate set of generated type variables in constraints
@@ -393,7 +397,7 @@ isPotentiallyInstantiatedCtType  givenCts (ctCls, ctArgs) assocs = do
             case matchInstanceTyVars inst ctSubstArgs of
               Just (instArgs, _) -> do
                 let (instVars, instCtTys, _, _) = instanceSig inst
-                let instSubst = mkTopTvSubst $ zip instVars instArgs
+                let instSubst = mkTypeVarSubst $ zip instVars instArgs
                 let instSubstCtTys = substTys instSubst instCtTys
                 flip allM instSubstCtTys $ \substCtTy -> do
                   if not (containsGivenOrAmbiguousTyVar ctGenVars substCtTy) 

@@ -16,13 +16,22 @@ module Control.Supermonad.Plugin.Wrapper
   , baseUnitId
   , moduleUnitId
   , isImportedFrom
+    -- * Evidence Production
+  , mkTcCoercion
+    -- * Instance Environment
+  , lookupInstEnv
   ) where
 
 import qualified Type as T
 import qualified Kind as K
 import qualified Module as M
+import qualified Coercion as C
+import qualified InstEnv as IE
+import qualified Class
 import qualified RdrName as RdrN
 import qualified TcType as TcT
+import qualified TcEvidence as TcEv
+
 
 -- | Type of type variable substitutions.
 #if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
@@ -99,3 +108,40 @@ isImportedFrom rdrElt mdl = case RdrN.gre_prov rdrElt of
   RdrN.Imported [] -> False
   RdrN.Imported impSpecs -> M.moduleName mdl == RdrN.importSpecModule (last impSpecs)
 #endif
+
+-- | Wrap a 'C.Coercion' into a 'TcEv.TcCoercion'.
+mkTcCoercion :: C.Coercion -> TcEv.TcCoercion
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
+mkTcCoercion = id
+#elif MIN_VERSION_GLASGOW_HASKELL(7,10,1,0)
+mkTcCoercion = TcEv.TcCoercion
+#endif
+
+-- | Lookup an instance for the class applied to the type arguments within the 
+--   instance environment
+lookupInstEnv :: IE.InstEnvs -> Class.Class -> [T.Type] -> IE.ClsInstLookupResult
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
+lookupInstEnv instEnv cls tys = IE.lookupInstEnv False instEnv cls tys 
+-- TODO / FIXME: Not really sure if we need to check the safe Haskell overlap restrictions 
+-- or not. For now we don't.
+#elif MIN_VERSION_GLASGOW_HASKELL(7,10,1,0)
+lookupInstEnv instEnv cls tys = IE.lookupInstEnv instEnv cls tys
+#endif
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
