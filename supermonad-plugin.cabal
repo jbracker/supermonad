@@ -33,6 +33,7 @@ library
                  , Control.Supermonad.Constrained.Prelude
                  , Control.Supermonad.Constrained.Functions
   other-modules: Control.Supermonad.Plugin.Utils
+               , Control.Supermonad.Plugin.Wrapper
                , Control.Supermonad.Plugin.Log
                , Control.Supermonad.Plugin.Detect
                , Control.Supermonad.Plugin.Debug
@@ -44,12 +45,14 @@ library
                , Control.Supermonad.Plugin.Separation
                , Control.Supermonad.Plugin.Solving
   other-extensions:
-  build-depends: base         >=4.8 && <5
-               , safe         >=0.3 && <0.4
-               , ghc          >=7.9 && <7.12
-               , containers   >=0.5 && <0.6
-               , mtl          >=2.2 && <3
-               , transformers >=0.4 && <0.6
+  build-depends: base         >=4.8  && <5
+               , ghc          >=7.10.1 && <8.1
+               -- ^ We require version 7.10.1+, because we use the cpp macro:
+               --   MIN_VERSION_GLASGOW_HASKELL(x,y,z,z')
+               --   http://downloads.haskell.org/~ghc/8.0.1/docs/html/users_guide/phases.html#standard-cpp-macros
+               , containers   >=0.5  && <0.6
+               , mtl          >=2.2  && <3
+               , transformers >=0.4  && <0.6
                -- ^ Should match mtl dependency
                , fgl >= 5.5 && <6.0
   hs-source-dirs:      src
