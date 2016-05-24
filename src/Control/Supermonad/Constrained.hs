@@ -97,18 +97,7 @@ instance Bind (STL.ST s) (STL.ST s) (STL.ST s) where
   (>>=) = (P.>>=)
 instance (Arrow.ArrowApply a) => Bind (Arrow.ArrowMonad a) (Arrow.ArrowMonad a) (Arrow.ArrowMonad a) where
   (>>=) = (P.>>=)
--- | TODO / FIXME: The wrapped monad instances for 'Functor' and 'P.Monad' are both 
---   based on @m@ being a monad, although the functor instance should only be 
---   dependend on @m@ being a functor (as can be seen below). This can only be
---   fixed by either giving a custom version of 'App.WrappedMonad' here or by fixing
---   the version of 'App.WrappedMonad' in base.
---   Once this issue is fixed we can replace the 'P.Monad' constraint
---   with a 'Functor' constraint.
---   
---   > instance (Functor m) => Functor (App.WrappedMonad m) where
---   >   fmap f m = App.WrapMonad $ fmap (App.unwrapMonad m) f
---   
-instance (Bind m m m, P.Monad m) => Bind (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) where
+instance (Bind m m m) => Bind (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) where
   type BindCts (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) a b = BindCts m m m a b
   m >>= f = App.WrapMonad $ (App.unwrapMonad m) >>= (App.unwrapMonad . f)
 
@@ -164,8 +153,7 @@ instance Return (STL.ST s) where
   return = P.return
 instance (Arrow.ArrowApply a) => Return (Arrow.ArrowMonad a) where
   return = P.return
--- | TODO / FIXME: This has the same issue as the 'Bind' instance for 'App.WrappedMonad'.
-instance (Return m, P.Monad m) => Return (App.WrappedMonad m) where
+instance (Return m) => Return (App.WrappedMonad m) where
   type ReturnCts (App.WrappedMonad m) a = ReturnCts m a
   return a = App.WrapMonad $ return a
 
@@ -217,8 +205,7 @@ instance Fail (STL.ST s) where
   fail = P.fail
 instance (Arrow.ArrowApply a) => Fail (Arrow.ArrowMonad a) where
   fail = P.fail
--- | TODO / FIXME: This has the same issue as the 'Bind' instance for 'App.WrappedMonad'.
-instance (Fail m, P.Monad m) => Fail (App.WrappedMonad m) where
+instance (Fail m) => Fail (App.WrappedMonad m) where
   fail a = App.WrapMonad $ fail a
 
 instance Fail STM.STM where
