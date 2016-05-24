@@ -47,12 +47,11 @@ import OccName
   , occNameString, mkTcOcc )
 import RdrName
   ( GlobalRdrElt(..)
-  , Parent( NoParent ), Provenance(..)
-  , importSpecModule
+  , Parent( NoParent )
   , lookupGlobalRdrEnv )
 import Module
-  ( Module(..), ModuleName, PackageKey
-  , basePackageKey
+  ( Module, ModuleName
+  , moduleName
   , moduleEnvKeys
   , mkModuleName )
 import Class
@@ -68,6 +67,8 @@ import Outputable ( SDoc, ($$), (<>), text, vcat, ppr )
 --import qualified Outputable as O
 
 --import Control.Supermonad.Plugin.Log ( printObj, printObjTrace )
+import Control.Supermonad.Plugin.Wrapper
+  ( UnitId, baseUnitId, moduleUnitId, isImportedFrom )
 import Control.Supermonad.Plugin.Instance
   ( instanceTyArgs
   , isMonoTyConInstance 
@@ -191,7 +192,7 @@ findReturnClass = findClass isReturnClass
 --   is imported and, if so, returns the module.
 findIdentityModule :: TcPluginM (Either SDoc Module)
 findIdentityModule = do
-  mdls <- findModules [getModule (Just basePackageKey) identityModuleName, findSupermonadModule]
+  mdls <- findModules [getModule (Just baseUnitId) identityModuleName, findSupermonadModule]
   case mdls of
     [] -> return $ Left $ text "Could not find module 'Identity' module."
     (mdl:_) -> return $ Right mdl
@@ -218,7 +219,7 @@ findModules findMdls = do
 
 -- | Checks if the module with the given name is imported and,
 --   if so, returns that module.
-getModule :: Maybe PackageKey -> String -> TcPluginM (Either SDoc Module)
+getModule :: Maybe UnitId -> String -> TcPluginM (Either SDoc Module)
 getModule pkgKeyToFind mdlNameToFind = do
   (gblEnv, _lclEnv) <- getEnvs
   let mdls = moduleEnvKeys $ imp_mods $ tcg_imports $ gblEnv
@@ -226,30 +227,30 @@ getModule pkgKeyToFind mdlNameToFind = do
     Just mdl -> return $ Right mdl
     Nothing  -> return $ Left $ text $ "Could not find module '" ++ mdlNameToFind ++ "'"
   where
-    isModule :: (PackageKey, ModuleName) -> Bool
+    isModule :: (UnitId, ModuleName) -> Bool
     isModule (pkgKey, mdlName) 
       =  maybe True (pkgKey ==) pkgKeyToFind 
       && mdlName == mkModuleName mdlNameToFind
     
-    splitModule :: Module -> (PackageKey, ModuleName)
-    splitModule mdl = (modulePackageKey mdl, moduleName mdl)
+    splitModule :: Module -> (UnitId, ModuleName)
+    splitModule mdl = (moduleUnitId mdl, moduleName mdl)
   
 -- For some reason this version also found modules that are not in the
 -- imports.
 {-
 -- | Checks if the module with the given name is imported and,
 --   if so, returns that module.
-getModule :: Maybe PackageKey -> String -> TcPluginM (Either SDoc Module)
+getModule :: Maybe UnitId -> String -> TcPluginM (Either SDoc Module)
 getModule pkgKeyToFind mdlNameToFind = do
   mdlResult <- findImportedModule (mkModuleName mdlNameToFind) Nothing -- From "TcPluginM"
   case mdlResult of
     Found _mdlLoc mdl ->
-      if maybe True (modulePackageKey mdl ==) pkgKeyToFind then
+      if maybe True (moduleUnitId mdl ==) pkgKeyToFind then
         return $ Right mdl
       else
         return $ Left
           $  text "Package key of found module does not match the requested key:"
-          $$ text "Found:     " <> ppr (modulePackageKey mdl)
+          $$ text "Found:     " <> ppr (moduleUnitId mdl)
           $$ text "Requested: " <> ppr pkgKeyToFind
     NoPackage pkgKey -> return $ Left
       $ text "Found module, but missing its package: " <> ppr pkgKey
@@ -321,13 +322,6 @@ hasNoParent :: GlobalRdrElt -> Bool
 hasNoParent rdrElt = case gre_par rdrElt of
   NoParent -> True
   _ -> False
-
--- | Check if the given element is imported from the given module.
-isImportedFrom :: GlobalRdrElt -> Module -> Bool
-isImportedFrom rdrElt mdl = case gre_prov rdrElt of
-  LocalDef -> False
-  Imported [] -> False
-  Imported impSpecs -> moduleName mdl == importSpecModule (last impSpecs)
 
 -- | Returns a list of all instances for the given class that are currently in scope.
 findInstancesInScope :: Class -> TcPluginM [ClsInst]

@@ -40,8 +40,9 @@ import Type
   , getClassPredTys_maybe
   )
 import TyCon ( TyCon )
-import TcType ( mkTcEqPred )
 
+import Control.Supermonad.Plugin.Wrapper
+  ( mkEqualityCtType )
 import Control.Supermonad.Plugin.Utils
   ( collectTopTyCons
   , collectTopTcVars
@@ -65,7 +66,7 @@ type WantedCt = Ct
 --   and equate the given types with each other.
 mkDerivedTypeEqCtOfTypes :: Ct -> Type -> Type -> Ct
 mkDerivedTypeEqCtOfTypes ct ta tb = mkNonCanonical CtDerived
-  { ctev_pred = mkTcEqPred ta tb
+  { ctev_pred = mkEqualityCtType ta tb
   , ctev_loc = constraintLocation ct }
 
 -- | Create a derived type equality constraint. The constraint

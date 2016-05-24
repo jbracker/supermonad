@@ -38,26 +38,31 @@ import BasicTypes ( Arity )
 import Name ( nameOccName )
 import OccName ( occNameString )
 import Type
-  ( Type, TyVar, TvSubst
+  ( Type, TyVar
   , getTyVar_maybe
   , tyConAppTyCon_maybe
   , splitTyConApp_maybe, splitFunTy_maybe, splitAppTy_maybe
   , getEqPredTys_maybe
   , splitAppTys
   , mkTyConTy, mkTyVarTy, mkAppTys
-  , mkTopTvSubst
   , eqType )
 import TyCon 
   ( TyCon
   , tyConKind, tyConName )
 import Var ( tyVarKind )
 import TcType ( isAmbiguousTyVar )
-import Kind ( Kind, splitKindFunTys )
+import Kind ( Kind )
 import Unify ( BindFlag(..) )
 import InstEnv ( instanceBindFun )
 import TcPluginM ( TcPluginM, newFlexiTyVar )
 import Outputable ( ($$) )
 import qualified Outputable as O
+
+import Control.Supermonad.Plugin.Wrapper 
+  ( TypeVarSubst
+  , mkTypeVarSubst
+  , splitKindFunTys
+  )
 
 -- -----------------------------------------------------------------------------
 -- Constraint and type inspection
@@ -123,8 +128,8 @@ collectTyVars t =
 
 -- | Create a substitution that replaces the given type variables with their
 --   associated type constructors.
-mkTcVarSubst :: [(TyVar, TyCon)] -> TvSubst
-mkTcVarSubst substs = mkTopTvSubst $ fmap (second mkTyConTy) substs
+mkTcVarSubst :: [(TyVar, TyCon)] -> TypeVarSubst
+mkTcVarSubst substs = mkTypeVarSubst $ fmap (second mkTyConTy) substs
 
 -- -----------------------------------------------------------------------------
 -- General utilities
@@ -198,7 +203,7 @@ partiallyApplyTyCons ((tv, tc) : assocs) = do
     let (tcKindArgs, tcKindRes) = splitKindFunOfTcTv tc
     
     let checkKindLength = length tcKindArgs >= length tvKindArgs
-    let checkKindMatch = and (uncurry (==) <$> zip (reverse tvKindArgs) (reverse tcKindArgs)) && tcKindRes == tvKindRes
+    let checkKindMatch = and (uncurry eqType <$> zip (reverse tvKindArgs) (reverse tcKindArgs)) && eqType tcKindRes tvKindRes
     case (checkKindLength, checkKindMatch) of
       (False, _) -> return $ Left $ O.text "Kind mismatch between type constructor and type variable: " 
                                  $$ O.ppr tcKindArgs $$ O.ppr tvKindArgs
