@@ -16,7 +16,7 @@ import Control.Monad ( when, forM, forM_, filterM, liftM2 )
 import TcRnTypes ( Ct(..) )
 import TyCon ( TyCon )
 import Type 
-  ( Type, TyVar, TvSubst
+  ( Type, TyVar
   , substTyVar
   , eqType )
 import TcType ( isAmbiguousTyVar )
@@ -26,6 +26,7 @@ import qualified Outputable as O
 
 
 import Control.Supermonad.Plugin.Debug ( sDocToStr )
+import Control.Supermonad.Plugin.Wrapper ( TypeVarSubst )
 import Control.Supermonad.Plugin.Environment 
   ( SupermonadPluginM
   , getGivenConstraints, getWantedConstraints
@@ -417,7 +418,7 @@ solveSolvedTyConIndices = do
     mkEqStarGroup :: Ct -> [(TyVar, [Type])] -> [DerivedCt]
     mkEqStarGroup baseCt eqGroups = concatMap (\(tv, tys) -> fmap (mkDerivedTypeEqCt baseCt tv) tys) eqGroups
     
-    collectEqualityGroup :: [TvSubst] -> [TyVar] -> [(TyVar, [Type])]
+    collectEqualityGroup :: [TypeVarSubst] -> [TyVar] -> [(TyVar, [Type])]
     collectEqualityGroup substs tvs = [ (tv, nubBy eqType $ filter (all (tv /=) . collectTyVars) 
                                                           $ [ substTyVar subst tv | subst <- substs]
                                         ) | tv <- tvs]

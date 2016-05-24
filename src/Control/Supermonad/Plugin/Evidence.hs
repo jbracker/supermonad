@@ -1,4 +1,6 @@
 
+{-# LANGUAGE CPP #-}
+
 -- | Provides functions to check if a given instance together with some
 --   arguments to instantiate it, is actually instantiated by those arguments.
 --   Also provides functions to produce evidence for the instantiations if
@@ -30,7 +32,7 @@ import TyCon
   ( TyCon
   , isTupleTyCon, isTypeFamilyTyCon, isTypeSynonymTyCon )
 import Class ( Class, classTyCon )
-import Coercion ( Coercion(..) )
+import Coercion ( Coercion )
 import CoAxiom ( Role(..) )
 import InstEnv
   ( ClsInst(..)
@@ -51,7 +53,9 @@ import Outputable ( ($$), SDoc )
 import qualified Outputable as O
 
 import Control.Supermonad.Plugin.Wrapper
-  ( mkTypeVarSubst, mkTcCoercion, lookupInstEnv )
+  ( mkTypeVarSubst
+  , mkTcCoercion
+  , lookupInstEnv )
 import Control.Supermonad.Plugin.Constraint 
   ( GivenCt
   , constraintClassType
@@ -175,6 +179,8 @@ produceEvidenceForCtType :: [GivenCt] -- ^ The given constraints to be used when
                          -> TcPluginM (Either SDoc EvTerm)
 produceEvidenceForCtType givenCts ct =
   case splitTyConApp_maybe ct of
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
+#elif MIN_VERSION_GLASGOW_HASKELL(7,10,1,0)
     -- Do we have a tuple of constraints?
     Just (tc, tcArgs) | isTupleTyCon tc -> do
       -- Produce evidence for each element of the tuple
@@ -186,7 +192,8 @@ produceEvidenceForCtType givenCts ct =
           $$ O.text "Reason:"
           $$ O.vcat (fromLeft <$> filter isLeft tupleEvs)
         -- And put together evidence for the complete tuple.
-        else Right $ EvTupleMk $ fmap fromRight tupleEvs
+        else Right $ TcEvidence.EvTupleMk $ zip tcArgs $ fmap fromRight tupleEvs
+#endif
     -- Do we have a type family application?
     Just (tc, _tcArgs) | isTyFunCon tc -> do
       -- Evaluate it...
