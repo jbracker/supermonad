@@ -11,13 +11,12 @@ module Control.Supermonad.Plugin.Environment
   , getSupermonadModule
   , getIdentityTyCon, getIdentityModule
   , getGivenConstraints, getWantedConstraints
-  , getCurrentResults
   , getInstEnvs
   , getBindInstances
   , getSupermonadFor
-  , addEvidenceResult, addEvidenceResults
-  , addDerivedResult, addDerivedResults
-  , getDerivedResults
+  , addTypeEqualities, addTypeEquality
+  , addTyVarEqualities, addTyVarEquality
+  , getTypeEqualities, getTyVarEqualities
   , whenNoResults
   , addWarning, displayWarnings
   , throwPluginError, throwPluginErrorSDoc, catchPluginError
@@ -28,11 +27,9 @@ module Control.Supermonad.Plugin.Environment
   ) where
 
 import Data.List ( groupBy )
-import Data.Monoid ( (<>) )
 import Data.Map ( Map )
 import qualified Data.Map as M
 
-import Control.Arrow ( (***) )
 import Control.Monad ( unless, forM_ )
 import Control.Monad.Reader ( ReaderT, runReaderT, asks )
 import Control.Monad.State  ( StateT , runStateT , gets, modify )
@@ -42,10 +39,10 @@ import Control.Monad.Trans.Class ( lift )
 import Class ( Class )
 import Module ( Module )
 import InstEnv ( InstEnvs, ClsInst )
+import Type ( TyVar, Type )
 import TyCon ( TyCon )
-import TcRnTypes ( Ct, TcPluginResult(..) )
+import TcRnTypes ( Ct )
 import TcPluginM ( TcPluginM, tcPluginIO )
-import TcEvidence ( EvTerm )
 import qualified TcPluginM
 import Outputable ( Outputable )
 import SrcLoc ( srcSpanFileName_maybe )
@@ -54,7 +51,7 @@ import qualified Outputable as O
 
 import qualified Control.Supermonad.Plugin.Log as L
 import Control.Supermonad.Plugin.Constraint
-  ( GivenCt, WantedCt, DerivedCt
+  ( GivenCt, WantedCt
   , constraintSourceLocation )
 import Control.Supermonad.Plugin.Detect
   ( findSupermonadModule
@@ -104,27 +101,13 @@ data SupermonadPluginEnv = SupermonadPluginEnv
   --   'Control.Supermonad.Return' instance.
   }
 
--- | The write-only result of the plugin.
-data SupermonadPluginResult = SupermonadPluginResult 
-  { smResultEvidence :: [(EvTerm, Ct)]
-  -- ^ The produced result evidence of the plugin.
-  , smResultDerived  :: [Ct]
-  -- ^ The produced derived constraints produced by the plugin.
-  }
-
-instance Monoid SupermonadPluginResult where
-  mappend a b = SupermonadPluginResult 
-    { smResultEvidence = smResultEvidence a ++ smResultEvidence b
-    , smResultDerived  = smResultDerived  a ++ smResultDerived  b }
-  mempty = SupermonadPluginResult 
-    { smResultEvidence = []
-    , smResultDerived  = [] }
-
 -- | The modifiable state of the plugin.
 data SupermonadPluginState = SupermonadPluginState 
-  { smStateResult :: SupermonadPluginResult
-  -- ^ The current results of the supermonad plugin.
-  , smWarningQueue :: [(String, O.SDoc)]
+  { smStateTyVarEqualities :: [(Ct, TyVar, Type)]
+  -- ^ Equalities between type variables and types that have been derived by the plugin.
+  , smStateTypeEqualities :: [(Ct, Type, Type)]
+  -- ^ Eqaulities between types that have been derived by the plugin.
+  , smStateWarningQueue :: [(String, O.SDoc)]
   -- ^ A queue of warnings that are only displayed if no progress could be made.
   }
 
@@ -134,7 +117,7 @@ runSupermonadPlugin
   :: [GivenCt] -- ^ /Given/ and /derived/ constraints. 
   -> [WantedCt] -- ^ /Wanted/ constraints.
   -> SupermonadPluginM a -- ^ Plugin code to run.
-  -> TcPluginM (Either SupermonadError TcPluginResult) -- ^ Either an error message or an actual plugin result.
+  -> TcPluginM (Either SupermonadError a) -- ^ Either an error message or an actual plugin result.
 runSupermonadPlugin givenCts wantedCts smM = do
   mSupermonadMdl <- findSupermonadModule
   mBindCls <- findBindClass
@@ -152,8 +135,9 @@ runSupermonadPlugin givenCts wantedCts smM = do
   case (mSupermonadMdl, mBindCls, mReturnCls, mIdMdl, mIdTyCon, smErrors) of
     (Right supermonadMdl, Just bindCls, Just returnCls, Right idMdl, Just idTyCon, []) -> do
       let initState = SupermonadPluginState 
-            { smStateResult  = mempty
-            , smWarningQueue = [] 
+            { smStateTyVarEqualities = []
+            , smStateTypeEqualities  = []
+            , smStateWarningQueue    = [] 
             }
       bindInsts <- findInstancesInScope bindCls
       eResult <- runExceptT $ flip runStateT initState $ runReaderT smM $ SupermonadPluginEnv
@@ -169,7 +153,7 @@ runSupermonadPlugin givenCts wantedCts smM = do
         }
       return $ case eResult of
         Left  err -> Left err
-        Right (_a, res) -> Right $ TcPluginOk (smResultEvidence $ smStateResult res) (smResultDerived $ smStateResult res)
+        Right (a, _res) -> Right a
     (Left mdlErrMsg, _, _, _, _, _) -> do
       let msg = "Could not find supermonad module:"
       L.printErr msg
@@ -245,49 +229,52 @@ getBindInstances = asks smEnvBindInstances
 getInstEnvs :: SupermonadPluginM InstEnvs
 getInstEnvs = runTcPlugin TcPluginM.getInstEnvs
 
--- | Returns all collected results of the plugin so far.
-getCurrentResults :: SupermonadPluginM ([(EvTerm, WantedCt)], [DerivedCt])
-getCurrentResults = (\res -> (smResultEvidence res, smResultDerived res)) <$> gets smStateResult
-
 -- | Retrieves the supermonad bind and return instance (in that order) of the given type constructor,
 --   if the type constructor represents a supermonad in scope.
 getSupermonadFor :: TyCon -> SupermonadPluginM (Maybe (ClsInst, ClsInst))
 getSupermonadFor tc = (return . M.lookup tc) =<< asks smEnvSupermonads
 
--- | Add the given evidence to the list of results.
-addEvidenceResult :: (EvTerm, WantedCt) -> SupermonadPluginM ()
-addEvidenceResult evidence = addEvidenceResults [evidence]
+-- | Add another type variable equality to the derived equalities.
+addTyVarEquality :: Ct -> TyVar -> Type -> SupermonadPluginM ()
+addTyVarEquality ct tv ty = modify $ \s -> s { smStateTyVarEqualities = (ct, tv, ty) : smStateTyVarEqualities s }
 
--- | Add the given evidence to the list of results.
-addEvidenceResults :: [(EvTerm, WantedCt)] -> SupermonadPluginM ()
-addEvidenceResults evidence = modify $ \s -> s { smStateResult = smStateResult s <> (SupermonadPluginResult evidence []) } 
+-- | Add a list of type variable equalities to the derived equalities.
+addTyVarEqualities :: [(Ct, TyVar, Type)] -> SupermonadPluginM ()
+addTyVarEqualities = mapM_ (\(ct, tv, ty) -> addTyVarEquality ct tv ty)
 
--- | Add the given derived result to the list of results.
-addDerivedResult :: DerivedCt -> SupermonadPluginM ()
-addDerivedResult derived = addDerivedResults [derived]
+-- | Add another type equality to the derived equalities.
+addTypeEquality :: Ct -> Type -> Type -> SupermonadPluginM ()
+addTypeEquality ct ta tb = modify $ \s -> s { smStateTypeEqualities = (ct, ta, tb) : smStateTypeEqualities s }
 
--- | Add the given derived results to the list of results.
-addDerivedResults :: [DerivedCt] -> SupermonadPluginM ()
-addDerivedResults derived = modify $ \s -> s { smStateResult = smStateResult s <> (SupermonadPluginResult [] derived) }
+-- | Add a list of type equality to the derived equalities.
+addTypeEqualities :: [(Ct, Type, Type)] -> SupermonadPluginM ()
+addTypeEqualities = mapM_ (\(ct, ta, tb) -> addTypeEquality ct ta tb)
 
--- | Returns all derived constraints that were added to the results thus far.
-getDerivedResults :: SupermonadPluginM [DerivedCt]
-getDerivedResults = gets $ smResultDerived . smStateResult
+-- | Returns all derived type variable equalities that were added to the results thus far.
+getTyVarEqualities :: SupermonadPluginM [(Ct, TyVar, Type)]
+getTyVarEqualities = gets $ smStateTyVarEqualities
+
+-- | Returns all derived type variable equalities that were added to the results thus far.
+getTypeEqualities :: SupermonadPluginM [(Ct, Type, Type)]
+getTypeEqualities = gets $ smStateTypeEqualities
 
 -- | Add a warning to the queue of warnings that will be displayed when no progress could be made.
 addWarning :: String -> O.SDoc -> SupermonadPluginM ()
-addWarning msg details = modify $ \s -> s { smWarningQueue = (msg, details) : smWarningQueue s }
+addWarning msg details = modify $ \s -> s { smStateWarningQueue = (msg, details) : smStateWarningQueue s }
 
 -- | Execute the given plugin code only if no plugin results were produced so far.
 whenNoResults :: SupermonadPluginM () -> SupermonadPluginM ()
 whenNoResults m = do
-  empty <- (uncurry (&&) . (null *** null)) <$> getCurrentResults
-  if empty then m else return ()
+  tyVarEqs <- getTyVarEqualities
+  tyEqs <- getTypeEqualities
+  if null tyVarEqs && null tyEqs 
+    then m 
+    else return ()
 
 -- | Displays the queued warning messages if no progress has been made.
 displayWarnings :: SupermonadPluginM ()
 displayWarnings = whenNoResults $ do
-  warns <- gets smWarningQueue
+  warns <- gets smStateWarningQueue
   forM_ warns $ \(msg, details) -> do
     printWarn msg
     internalPrint $ L.smObjMsg $ L.sDocToStr details

@@ -32,7 +32,8 @@ import Control.Supermonad.Plugin.Environment
   , getGivenConstraints, getWantedConstraints
   , getReturnClass, getBindClass
   , getSupermonadFor
-  , addDerivedResult, addDerivedResults
+  , addTyVarEquality, addTyVarEqualities
+  , addTypeEqualities
   , printMsg, printConstraints, printObj, printErr
   , addWarning, displayWarnings
   , throwPluginError, throwPluginErrorSDoc
@@ -42,8 +43,7 @@ import Control.Supermonad.Plugin.Environment.Lift
   , isBindConstraint, isReturnConstraint
   , partiallyApplyTyCons )
 import Control.Supermonad.Plugin.Constraint 
-  ( WantedCt, DerivedCt
-  , mkDerivedTypeEqCt, mkDerivedTypeEqCtOfTypes
+  ( WantedCt
   , isClassConstraint
   , constraintClassType
   , constraintClassTyArgs
@@ -116,7 +116,6 @@ solveMonoConstraintGroup :: (TyCon, [WantedCt]) -> SupermonadPluginM ()
 solveMonoConstraintGroup (_, []) = return ()
 solveMonoConstraintGroup (tyCon, ctGroup) = do
   printMsg "Solve mono group..."
-  --printConstraints ctGroup
   smCtGroup <- filterM (\ct -> liftM2 (||) (isReturnConstraint ct) (isBindConstraint ct)) ctGroup
   forM_ smCtGroup $ \ct -> do
     let ctAmbVars = S.filter isAmbiguousTyVar 
@@ -128,8 +127,8 @@ solveMonoConstraintGroup (tyCon, ctGroup) = do
       case nubBy tyConAssocEq appliedTyCon of
         [] -> do
           throwPluginError "How did this become an empty list?"
-        [(tv, t, _)] -> do
-          addDerivedResult $ mkDerivedTypeEqCt ct tv t
+        [(tv, ty, _)] -> do
+          addTyVarEquality ct tv ty
         _ -> do
           throwPluginError "How did this become a list with more then one element?"
   where
@@ -195,9 +194,8 @@ solvePolyConstraintGroup ctGroup = do
     (_, [appliedAssoc]) -> do
       printMsg "Derived Results:"
       forM_ appliedAssoc $ \(tv, ty, _flexVars) -> do
-        let derivedRes = mkDerivedTypeEqCt (head ctGroup) tv ty
-        printObj derivedRes
-        addDerivedResult derivedRes
+        printObj (head ctGroup, tv, ty)
+        addTyVarEquality (head ctGroup) tv ty
     
     -- There are constraints and more then one association...
     (_, _) -> do
@@ -333,9 +331,11 @@ solveSolvedTyConIndices = do
         case deriveUnificationConstraints returnCt returnInst of
           Left err -> do
             printErr err
-          Right eqCts -> do 
-            printConstraints eqCts
-            addDerivedResults eqCts
+          Right (tvTyEqs, tyEqs) -> do 
+            printObj tvTyEqs
+            printObj tyEqs
+            addTyVarEqualities tvTyEqs
+            addTypeEqualities tyEqs
       case eResult of
         Left err -> printErr $ sDocToStr err
         Right () -> return ()
@@ -349,9 +349,11 @@ solveSolvedTyConIndices = do
         case deriveUnificationConstraints bindCt bindInst of
           Left err -> do
             printErr err
-          Right eqCts -> do 
-            printConstraints eqCts
-            addDerivedResults eqCts
+          Right (tvTyEqs, tyEqs) -> do 
+            printObj tvTyEqs
+            printObj tyEqs
+            addTyVarEqualities tvTyEqs
+            addTypeEqualities tyEqs
       case eResult of
         Left err -> printErr $ sDocToStr err
         Right () -> return ()
@@ -392,7 +394,7 @@ solveSolvedTyConIndices = do
                  $ O.text "Constraint misses a unqiue top-level type constructor:"
                  O.$$ O.ppr ct
     
-    deriveUnificationConstraints :: WantedCt -> ClsInst -> Either String [DerivedCt]
+    deriveUnificationConstraints :: WantedCt -> ClsInst -> Either String ([(Ct, TyVar, Type)], [(Ct, Type, Type)])
     deriveUnificationConstraints ct inst = do
       let (instVars, _instCls, instArgs) = instanceHead inst
       let Just ctArgs = constraintClassTyArgs ct
@@ -409,14 +411,14 @@ solveSolvedTyConIndices = do
         -- with constants. Also create type equalities for these.
         let ctVarEqGroups = collectEqualityGroup substs $ filter isAmbiguousTyVar ctVars
         let ctVarEqCts = mkEqStarGroup ct ctVarEqGroups
-        return $ instVarEqGroupsCt ++ ctVarEqCts
+        return (ctVarEqCts, instVarEqGroupsCt)
     
-    mkEqGroup ::  Ct -> [Type] -> [DerivedCt]
+    mkEqGroup ::  Ct -> [Type] -> [(Ct, Type, Type)]
     mkEqGroup _ [] = []
-    mkEqGroup baseCt (ty : tys) = fmap (mkDerivedTypeEqCtOfTypes baseCt ty) tys
+    mkEqGroup baseCt (ty : tys) = fmap (\ty' -> (baseCt, ty, ty')) tys
     
-    mkEqStarGroup :: Ct -> [(TyVar, [Type])] -> [DerivedCt]
-    mkEqStarGroup baseCt eqGroups = concatMap (\(tv, tys) -> fmap (mkDerivedTypeEqCt baseCt tv) tys) eqGroups
+    mkEqStarGroup :: Ct -> [(TyVar, [Type])] -> [(Ct, TyVar, Type)]
+    mkEqStarGroup baseCt eqGroups = concatMap (\(tv, tys) -> fmap (\ty -> (baseCt, tv, ty)) tys) eqGroups
     
     collectEqualityGroup :: [TypeVarSubst] -> [TyVar] -> [(TyVar, [Type])]
     collectEqualityGroup substs tvs = [ (tv, nubBy eqType $ filter (all (tv /=) . collectTyVars) 
