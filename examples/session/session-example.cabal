@@ -38,4 +38,4 @@ executable session-example-pm-trans
   main-is:             MainSupermonadTrans.hs
   hs-source-dirs:      .
   default-language:    Haskell2010
-  ghc-options:         -Wall -dynamic -dcore-lint -fconstraint-solver-iterations=10
+  ghc-options:         -Wall -dynamic -dcore-lint 
