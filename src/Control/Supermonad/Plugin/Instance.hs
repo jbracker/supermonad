@@ -2,8 +2,7 @@
 -- | Functions and utilities to work with and inspect class instances
 --   of the GHC API.
 module Control.Supermonad.Plugin.Instance
-  ( --eqInstance
-    instanceClass
+  ( instanceClass
   , instanceClassTyCon
   , instanceTyArgs
   , isClassInstance
@@ -14,35 +13,14 @@ module Control.Supermonad.Plugin.Instance
 import qualified Data.Set as S
 
 import InstEnv
-  ( ClsInst(..) --, IsOrphan(..)
+  ( ClsInst(..)
   , instanceHead )
-import Type
-  ( Type
-  , eqTypes )
+import Type ( Type )
 import Class ( Class, classTyCon )
 import TyCon ( TyCon )
 
 import Control.Supermonad.Plugin.Utils ( collectTopTyCons )
-{-
--- | Check as best as possible if two class instances are equal.
-eqInstance :: ClsInst -> ClsInst -> Bool
-eqInstance instA instB
-  =  is_cls_nm instA == is_cls_nm instB
-  && is_tcs instA == is_tcs instB
-  && is_tvs instA == is_tvs instB
-  && is_cls instA == is_cls instB
-  && length (is_tys instA) == length (is_tys instB)
-  && eqTypes (is_tys instA) (is_tys instB)
-  && is_dfun instA == is_dfun instB
-  && is_flag instA == is_flag instB
-  && eqOrphan (is_orphan instA) (is_orphan instB)
 
--- | Check equality of two 'IsOrphan' values.
-eqOrphan :: IsOrphan -> IsOrphan -> Bool
-eqOrphan IsOrphan IsOrphan = True
-eqOrphan (NotOrphan nameA) (NotOrphan nameB) = nameA == nameB
-eqOrphan _ _ = False
--}
 -- | Checks if the given instance is of the given type class.
 isClassInstance :: Class -> ClsInst -> Bool
 isClassInstance cls inst = instanceClass inst == cls

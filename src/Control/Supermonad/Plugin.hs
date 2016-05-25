@@ -6,8 +6,6 @@
 module Control.Supermonad.Plugin
   ( plugin ) where
 
-import Control.Monad ( forM )
-
 import Plugins ( Plugin(tcPlugin), defaultPlugin )
 import TcRnTypes
   ( Ct(..)

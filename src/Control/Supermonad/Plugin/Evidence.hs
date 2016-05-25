@@ -30,7 +30,7 @@ import Type
   , splitTyConApp_maybe, splitFunTy_maybe, splitAppTy_maybe )
 import TyCon
   ( TyCon
-  , isTupleTyCon, isTypeFamilyTyCon, isTypeSynonymTyCon )
+  , isTypeFamilyTyCon, isTypeSynonymTyCon )
 import Class ( Class, classTyCon )
 import Coercion ( Coercion )
 import CoAxiom ( Role(..) )
@@ -185,7 +185,7 @@ produceEvidenceForCtType givenCts ct =
     -- https://git.haskell.org/ghc.git/commitdiff/ffc21506894c7887d3620423aaf86bc6113a1071
 #elif MIN_VERSION_GLASGOW_HASKELL(7,10,1,0)
     -- Do we have a tuple of constraints?
-    Just (tc, tcArgs) | isTupleTyCon tc -> do
+    Just (tc, tcArgs) | TyCon.isTupleTyCon tc -> do
       -- Produce evidence for each element of the tuple
       tupleEvs <- mapM produceEvidenceForCtType' tcArgs
       return $ if any isLeft tupleEvs

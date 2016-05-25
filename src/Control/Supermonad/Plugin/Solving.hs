@@ -39,8 +39,7 @@ import Control.Supermonad.Plugin.Environment
   , getTyVarEqualities
   , printMsg, printConstraints, printObj, printErr
   , addWarning, displayWarnings
-  , throwPluginError, throwPluginErrorSDoc
-  , whenNoResults )
+  , throwPluginError, throwPluginErrorSDoc )
 import Control.Supermonad.Plugin.Environment.Lift
   ( isPotentiallyInstantiatedCt
   , isBindConstraint, isReturnConstraint
@@ -49,9 +48,7 @@ import Control.Supermonad.Plugin.Constraint
   ( WantedCt
   , isClassConstraint
   , constraintClassType
-  , constraintClassTyArgs
-  , constraintTopTcVars
-  , constraintTopTyCons )
+  , constraintClassTyArgs )
 import Control.Supermonad.Plugin.Separation 
   ( separateContraints
   , componentTopTyCons, componentTopTcVars
@@ -391,7 +388,7 @@ solveSolvedTyConIndices = do
                  -> (TyCon -> SupermonadPluginM (Maybe ClsInst)) 
                  -> (TyCon -> [Type] -> ClsInst -> SupermonadPluginM a) 
                  -> SupermonadPluginM (Either O.SDoc a)
-    withTopTyCon (ct, ctClsTyCon, ctArgs) getTyConInst process = do
+    withTopTyCon (ct, _ctClsTyCon, ctArgs) getTyConInst process = do
       -- Get the top-level type constructor for this bind constraint.
       let mTopTyCon = S.toList $ collectTopTyCons ctArgs
       -- Begin error handling.
@@ -413,7 +410,7 @@ solveSolvedTyConIndices = do
                    O.$$ O.ppr ct
     
     deriveUnificationConstraints :: (Ct, TyCon, [Type]) -> ClsInst -> Either O.SDoc ([(Ct, TyVar, Type)], [(Ct, Type, Type)])
-    deriveUnificationConstraints (ct, ctClsTyCon, ctArgs) inst = do
+    deriveUnificationConstraints (ct, _ctClsTyCon, ctArgs) inst = do
       let (instVars, _instCls, instArgs) = instanceHead inst
       -- let Just ctArgs = constraintClassTyArgs ct
       let ctVars = S.toList $ S.unions $ fmap collectTyVars ctArgs
