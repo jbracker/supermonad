@@ -15,9 +15,10 @@ import Control.Monad ( when, forM, forM_, filterM, liftM2 )
 
 import TcRnTypes ( Ct(..) )
 import TyCon ( TyCon )
+import Class ( classTyCon )
 import Type 
   ( Type, TyVar
-  , substTyVar
+  , substTyVar, substTys
   , eqType )
 import TcType ( isAmbiguousTyVar )
 import InstEnv ( ClsInst, instanceHead )
@@ -26,7 +27,8 @@ import qualified Outputable as O
 
 
 import Control.Supermonad.Plugin.Debug ( sDocToStr )
-import Control.Supermonad.Plugin.Wrapper ( TypeVarSubst )
+import Control.Supermonad.Plugin.Wrapper 
+  ( TypeVarSubst, mkTypeVarSubst )
 import Control.Supermonad.Plugin.Environment 
   ( SupermonadPluginM
   , getGivenConstraints, getWantedConstraints
@@ -34,6 +36,7 @@ import Control.Supermonad.Plugin.Environment
   , getSupermonadFor
   , addTyVarEquality, addTyVarEqualities
   , addTypeEqualities
+  , getTyVarEqualities
   , printMsg, printConstraints, printObj, printErr
   , addWarning, displayWarnings
   , throwPluginError, throwPluginErrorSDoc
@@ -319,56 +322,69 @@ determineValidConstraintGroupAssocs ctGroup = do
 
 
 
--- |
+-- | Solves the indices of constraints that have been associated a type 
+--   constructor.
 solveSolvedTyConIndices :: SupermonadPluginM ()
 solveSolvedTyConIndices = do
+  -- Get the type equalities that were determined up until now 
+  -- and create a substitution from them.
+  tyVarEqs <- getTyVarEqualities
+  let tvSubst = mkTypeVarSubst $ fmap (\(_ct, tv, ty) -> (tv, ty)) tyVarEqs
+  
+  -- Get all of the wanted constraints and prepare them for processing
+  -- by spliting out there arguments and substiuting the already determined 
+  -- type variable equalities.
+  wantedCts <- getWantedConstraints
+  let prepWantedCts = catMaybes $ fmap (prepCt tvSubst) wantedCts
+  
   -- Unification solve return constraints that are applied to top-level tycons.
-  whenNoResults $ do
-    printMsg "Unification solve return constraints..."
-    returnCts <- getTopTyConSolvedConstraints isReturnConstraint
-    forM_ returnCts $ \returnCt -> do
-      eResult <- withTopTyCon returnCt $ \_topTyCon _bindCtArgs _bindInst returnInst -> do
-        case deriveUnificationConstraints returnCt returnInst of
-          Left err -> do
-            printErr err
-          Right (tvTyEqs, tyEqs) -> do 
-            printObj tvTyEqs
-            printObj tyEqs
-            addTyVarEqualities tvTyEqs
-            addTypeEqualities tyEqs
-      case eResult of
-        Left err -> printErr $ sDocToStr err
-        Right () -> return ()
+  printMsg "Unification solve return constraints..."
+  unificationSolve prepWantedCts isReturnConstraint (\tc -> fmap snd <$> getSupermonadFor tc)
   
   -- Unification solve bind constraints that are applied to top-level tycons.
-  whenNoResults $ do
-    printMsg "Unification solve bind constraints..."
-    bindCts <- getTopTyConSolvedConstraints isBindConstraint
-    forM_ bindCts $ \bindCt -> do
-      eResult <- withTopTyCon bindCt $ \_topTyCon _bindCtArgs bindInst _returnInst -> do
-        case deriveUnificationConstraints bindCt bindInst of
-          Left err -> do
-            printErr err
-          Right (tvTyEqs, tyEqs) -> do 
-            printObj tvTyEqs
-            printObj tyEqs
-            addTyVarEqualities tvTyEqs
-            addTypeEqualities tyEqs
-      case eResult of
-        Left err -> printErr $ sDocToStr err
-        Right () -> return ()
+  printMsg "Unification solve bind constraints..."
+  unificationSolve prepWantedCts isBindConstraint (\tc -> fmap fst <$> getSupermonadFor tc)
   
   where
-    getTopTyConSolvedConstraints :: (WantedCt -> SupermonadPluginM Bool) -> SupermonadPluginM [WantedCt]
-    getTopTyConSolvedConstraints p = do
+    unificationSolve :: [(Ct, TyCon, [Type])] 
+                     -- ^ Prepared and substituted constraints.
+                     -> (Ct -> SupermonadPluginM Bool) 
+                     -- ^ Filter predicate to filter the relevant constraints.
+                     -> (TyCon -> SupermonadPluginM (Maybe ClsInst)) 
+                     -- ^ Lookup of the instances that is used to solve the relevant constraints.
+                     -> SupermonadPluginM ()
+    unificationSolve prepWantedCts isRequiredConstraint getTyConInst = do
+      cts <- filterTopTyConSolvedConstraints prepWantedCts isRequiredConstraint
+      forM_ cts $ \(ct, tc, args) -> do
+        eResult <- withTopTyCon ct getTyConInst $ \_topTyCon _ctArgs inst -> do
+          case deriveUnificationConstraints ct inst of
+            Left err -> do
+              printErr err
+            Right (tvTyEqs, tyEqs) -> do 
+              printObj tvTyEqs
+              printObj tyEqs
+              addTyVarEqualities tvTyEqs
+              addTypeEqualities tyEqs
+        case eResult of
+          Left err -> printErr $ sDocToStr err
+          Right () -> return ()
+    
+    
+    filterTopTyConSolvedConstraints :: [(WantedCt, TyCon, [Type])] 
+                                    -> (WantedCt -> SupermonadPluginM Bool) 
+                                    -> SupermonadPluginM [(WantedCt, TyCon, [Type])]
+    filterTopTyConSolvedConstraints cts p = do
       -- Get all wanted bind constraints.
-      bindCts <- filterM p =<< getWantedConstraints
+      bindCts <- filterM (\(ct, _tc, _args) -> p ct) cts
       -- Get all bind constraints that already have been assigned their top-level
       -- type constructors and process them to solve the type constructor arguments...
-      return $ filter (S.null . constraintTopTcVars) bindCts
+      return $ filter (S.null . constraintTopTcVars . (\(ct, _tc, _args) -> ct)) bindCts
     
-    withTopTyCon :: WantedCt -> ( TyCon -> [Type] -> ClsInst -> ClsInst -> SupermonadPluginM a ) -> SupermonadPluginM (Either O.SDoc a)
-    withTopTyCon ct process = do
+    withTopTyCon :: WantedCt 
+                 -> (TyCon -> SupermonadPluginM (Maybe ClsInst)) 
+                 -> ( TyCon -> [Type] -> ClsInst -> SupermonadPluginM a ) 
+                 -> SupermonadPluginM (Either O.SDoc a)
+    withTopTyCon ct getTyConInst process = do
       let mCtArgs = constraintClassTyArgs ct
       -- Get the top-level type constructor for this bind constraint.
       let mTopTyCon = S.toList $ constraintTopTyCons ct
@@ -376,14 +392,14 @@ solveSolvedTyConIndices = do
       case (mCtArgs, mTopTyCon) of
         (Just ctArgs, [topTyCon]) -> do
           -- Get the bind instance for the current type constructor.
-          mSupermonadInst <- getSupermonadFor topTyCon
+          mSupermonadInst <- getTyConInst topTyCon
           case mSupermonadInst of
-            Just (bindInst, returnInst) -> Right <$> process topTyCon ctArgs bindInst returnInst
+            Just inst -> Right <$> process topTyCon ctArgs inst
             -- We could not find a bind and return instance associated with the 
             -- given type constructor.
             Nothing -> do
               return $ Left
-                     $ O.text "Constraints top type constructor does not form a supermonad:"
+                     $ O.text "Constraints top type constructor does not have an associated instance:"
                        O.$$ O.ppr topTyCon
         (Nothing, _) -> do
           return $ Left 
@@ -424,3 +440,12 @@ solveSolvedTyConIndices = do
     collectEqualityGroup substs tvs = [ (tv, nubBy eqType $ filter (all (tv /=) . collectTyVars) 
                                                           $ [ substTyVar subst tv | subst <- substs]
                                         ) | tv <- tvs]
+                                        
+    prepCt :: TypeVarSubst -> Ct -> Maybe (Ct, TyCon, [Type])
+    prepCt subst ct = fmap (\(cls, args) -> (ct, classTyCon cls, substTys subst args)) $ constraintClassType ct
+    
+    
+    
+    
+    
+    
