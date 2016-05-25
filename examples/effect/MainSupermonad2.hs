@@ -1,4 +1,6 @@
 
+{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE RebindableSyntax #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE DataKinds #-}
@@ -6,6 +8,11 @@
 
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
+-- Required for the 'Bind' instance since GHC 8.0.1
+{-# LANGUAGE UndecidableInstances #-}
+#endif
 
 -- Ignore our orphan instance in this file.
 {-# OPTIONS_GHC -fno-warn-orphans #-}
