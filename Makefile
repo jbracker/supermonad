@@ -11,6 +11,7 @@ clean: init
 	rm -fR ./examples/hmtc/original/dist
 	rm -fR ./examples/hmtc/supermonad/dist
 	rm -fR ./examples/hmtc/monad-param/dist
+	rm -fR ./examples/constrained/dist
 
 doc: init
 	cabal configure && cabal haddock --internal --executables
