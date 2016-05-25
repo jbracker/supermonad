@@ -6,6 +6,8 @@
 module Control.Supermonad.Plugin
   ( plugin ) where
 
+import Control.Monad ( forM )
+
 import Plugins ( Plugin(tcPlugin), defaultPlugin )
 import TcRnTypes
   ( Ct(..)
@@ -19,9 +21,12 @@ import Control.Supermonad.Plugin.Solving
 import Control.Supermonad.Plugin.Environment
   ( SupermonadPluginM, runSupermonadPlugin
   , getWantedConstraints
+  , getTypeEqualities, getTyVarEqualities
   , printMsg
   -- , printObj, printConstraints
   )
+import Control.Supermonad.Plugin.Constraint 
+  ( mkDerivedTypeEqCt, mkDerivedTypeEqCtOfTypes )
 
 -- -----------------------------------------------------------------------------
 -- The Plugin
@@ -60,7 +65,16 @@ supermonadSolve s given derived wanted = do
     if not $ null wanted then do
       printMsg "Invoke supermonad plugin..."
       supermonadSolve' s
-    else return ()
+      
+      tyVarEqs <- getTyVarEqualities
+      let tyVarEqCts = fmap (\(baseCt, tv, ty) -> mkDerivedTypeEqCt baseCt tv ty) tyVarEqs
+      
+      tyEqs <- getTypeEqualities
+      let tyEqCts = fmap (\(baseCt, ta, tb) -> mkDerivedTypeEqCtOfTypes baseCt ta tb) tyEqs
+      
+      return $ TcPluginOk [] $ tyVarEqCts ++ tyEqCts
+    else 
+      return noResult
   case res of
     Left err -> do
       L.printErr $ sDocToStr err
