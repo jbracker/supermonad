@@ -58,6 +58,7 @@ import Control.Supermonad.Plugin.Separation
   , componentMonoTyCon )
 import Control.Supermonad.Plugin.Utils 
   ( collectTopTcVars
+  , collectTopTyCons
   , collectTyVars
   , associations
   , allM )
@@ -355,7 +356,7 @@ solveSolvedTyConIndices = do
                      -> SupermonadPluginM ()
     unificationSolve prepWantedCts isRequiredConstraint getTyConInst = do
       cts <- filterTopTyConSolvedConstraints prepWantedCts isRequiredConstraint
-      forM_ cts $ \(ct, tc, args) -> do
+      forM_ cts $ \ct -> do
         eResult <- withTopTyCon ct getTyConInst $ \_topTyCon _ctArgs inst -> do
           case deriveUnificationConstraints ct inst of
             Left err -> do
@@ -380,11 +381,11 @@ solveSolvedTyConIndices = do
       -- type constructors and process them to solve the type constructor arguments...
       return $ filter (S.null . constraintTopTcVars . (\(ct, _tc, _args) -> ct)) bindCts
     
-    withTopTyCon :: WantedCt 
+    withTopTyCon :: (Ct, TyCon, [Type]) 
                  -> (TyCon -> SupermonadPluginM (Maybe ClsInst)) 
-                 -> ( TyCon -> [Type] -> ClsInst -> SupermonadPluginM a ) 
+                 -> (TyCon -> [Type] -> ClsInst -> SupermonadPluginM a) 
                  -> SupermonadPluginM (Either O.SDoc a)
-    withTopTyCon ct getTyConInst process = do
+    withTopTyCon (ct, ctClsTyCon, ctArgs) getTyConInst process = do
       let mCtArgs = constraintClassTyArgs ct
       -- Get the top-level type constructor for this bind constraint.
       let mTopTyCon = S.toList $ constraintTopTyCons ct
@@ -410,8 +411,8 @@ solveSolvedTyConIndices = do
                  $ O.text "Constraint misses a unqiue top-level type constructor:"
                  O.$$ O.ppr ct
     
-    deriveUnificationConstraints :: WantedCt -> ClsInst -> Either String ([(Ct, TyVar, Type)], [(Ct, Type, Type)])
-    deriveUnificationConstraints ct inst = do
+    deriveUnificationConstraints :: (Ct, TyCon, [Type]) -> ClsInst -> Either String ([(Ct, TyVar, Type)], [(Ct, Type, Type)])
+    deriveUnificationConstraints (ct, ctClsTyCon, ctArgs) inst = do
       let (instVars, _instCls, instArgs) = instanceHead inst
       let Just ctArgs = constraintClassTyArgs ct
       let ctVars = S.toList $ S.unions $ fmap collectTyVars ctArgs
