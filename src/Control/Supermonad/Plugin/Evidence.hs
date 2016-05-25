@@ -180,6 +180,9 @@ produceEvidenceForCtType :: [GivenCt] -- ^ The given constraints to be used when
 produceEvidenceForCtType givenCts ct =
   case splitTyConApp_maybe ct of
 #if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
+    -- From GHC 8.0.1 onward there is no necessity to solve constraint 
+    -- tuples in a special way anymore, because:
+    -- https://git.haskell.org/ghc.git/commitdiff/ffc21506894c7887d3620423aaf86bc6113a1071
 #elif MIN_VERSION_GLASGOW_HASKELL(7,10,1,0)
     -- Do we have a tuple of constraints?
     Just (tc, tcArgs) | isTupleTyCon tc -> do
