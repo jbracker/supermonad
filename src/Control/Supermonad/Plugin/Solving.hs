@@ -11,7 +11,7 @@ import Data.Maybe
 import Data.List ( partition, nubBy )
 import qualified Data.Set as S
 
-import Control.Monad ( when, forM, forM_, filterM, liftM2 )
+import Control.Monad ( forM, forM_, filterM, liftM2 )
 
 import TcRnTypes ( Ct(..) )
 import TyCon ( TyCon )
@@ -37,7 +37,7 @@ import Control.Supermonad.Plugin.Environment
   , addTyVarEquality, addTyVarEqualities
   , addTypeEqualities
   , getTyVarEqualities
-  , printMsg, printConstraints, printObj, printErr
+  , printMsg, printObj, printErr --, printConstraints
   , addWarning, displayWarnings
   , throwPluginError, throwPluginErrorSDoc )
 import Control.Supermonad.Plugin.Environment.Lift
@@ -153,7 +153,6 @@ solveMonoConstraintGroup (tyCon, ctGroup) = do
 solvePolyConstraintGroup :: [WantedCt] -> SupermonadPluginM ()
 solvePolyConstraintGroup ctGroup = do
   printMsg "Solve poly group..."
-  printConstraints ctGroup
   -- Find a valid associations for each of the constraint groups.
   (_, assocs) <- determineValidConstraintGroupAssocs ctGroup
   
@@ -180,28 +179,27 @@ solvePolyConstraintGroup ctGroup = do
       topTcVars <- concat <$> mapM collectBindReturnTopTcVars ctGroup
       -- The first case:
       if null topTcVars then do
-        printMsg "Group does not require solving:"
-        printConstraints ctGroup
+        --printMsg "Group does not require solving:"
+        --printConstraints ctGroup
+        return ()
       -- The second case:
       else do
         addWarning 
           "There are no possible associations for the current constraint group!" 
-          ( O.vcat $ 
-            [ O.text "There are two possible reasons for this warning:"
-            , O.text "1. Either the group can not be solved or"
+          ( O.hang (O.text "There are two possible reasons for this warning:") 2 
+          $ O.vcat $ 
+            [ O.text "1. Either the group can not be solved or"
             , O.text "2. further iterations between the plugin and type checker "
             , O.text "   have to resolve for sufficient information to arise."
             ] ++ fmap (O.text . formatConstraint) ctGroup)
     -- There are constraints and exactly one association...
     (_, [appliedAssoc]) -> do
-      printMsg "Derived Results:"
       forM_ appliedAssoc $ \(tv, ty, _flexVars) -> do
-        printObj (head ctGroup, tv, ty)
         addTyVarEquality (head ctGroup) tv ty
     
     -- There are constraints and more then one association...
     (_, _) -> do
-      printMsg "Possible Assocs:"
+      printMsg "Possible associations:"
       forM_ appliedAssocs printObj
       throwPluginError "There is more then one possible association for the current constraint group!"
   where
@@ -272,14 +270,13 @@ determineValidConstraintGroupAssocs ctGroup = do
   
   -- Only keep those associations that could be satisfiable. 
   let validAssocs = fmap fst $ filter snd checkedAssocs
-  
-  -- Output for debugging:
+  {- Output for debugging:
   when (length validAssocs >= 1) $ do
     printMsg "Current Constraint Group:"
     printConstraints ctGroup
     printMsg "Satisfiable associations:"
     forM_ validAssocs printObj
-  
+  -}
   return (ctGroup, validAssocs)
   where
     -- | Only keep supermonad constraints ('Bind' and 'Return').
