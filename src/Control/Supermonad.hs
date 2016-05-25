@@ -10,6 +10,10 @@
 {-# LANGUAGE ScopedTypeVariables  #-} -- for 'ListT' instance.
 {-# LANGUAGE UndecidableInstances #-} -- for 'ListT' instance.
 
+-- Some of the constraints may be unnecessary, but they are intentional.
+-- This is especially true for the 'Fail' instances.
+{-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+
 -- | Representation of supermonads in Haskell.
 module Control.Supermonad
   ( -- * Supermonads
