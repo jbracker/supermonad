@@ -1,4 +1,6 @@
 
+{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE MultiParamTypeClasses  #-} -- for 'Bind' class.
 {-# LANGUAGE ConstraintKinds        #-} -- for 'Bind' class.
 {-# LANGUAGE TypeFamilies           #-} -- for 'Bind' class.
@@ -10,9 +12,11 @@
 {-# LANGUAGE ScopedTypeVariables  #-} -- for 'ListT' instance.
 {-# LANGUAGE UndecidableInstances #-} -- for 'ListT' instance.
 
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 -- Some of the constraints may be unnecessary, but they are intentional.
 -- This is especially true for the 'Fail' instances.
 {-# OPTIONS_GHC -fno-warn-redundant-constraints #-}
+#endif
 
 -- | Representation of supermonads in Haskell.
 module Control.Supermonad

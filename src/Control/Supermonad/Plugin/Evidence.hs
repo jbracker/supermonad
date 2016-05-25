@@ -1,6 +1,4 @@
 
-{-# LANGUAGE CPP #-}
-
 -- | Provides functions to check if a given instance together with some
 --   arguments to instantiate it, is actually instantiated by those arguments.
 --   Also provides functions to produce evidence for the instantiations if
@@ -55,7 +53,9 @@ import qualified Outputable as O
 import Control.Supermonad.Plugin.Wrapper
   ( mkTypeVarSubst
   , mkTcCoercion
-  , lookupInstEnv )
+  , lookupInstEnv
+  , produceTupleEvidence
+  , isTupleTyCon )
 import Control.Supermonad.Plugin.Constraint 
   ( GivenCt
   , constraintClassType
@@ -179,24 +179,9 @@ produceEvidenceForCtType :: [GivenCt] -- ^ The given constraints to be used when
                          -> TcPluginM (Either SDoc EvTerm)
 produceEvidenceForCtType givenCts ct =
   case splitTyConApp_maybe ct of
-#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
-    -- From GHC 8.0.1 onward there is no necessity to solve constraint 
-    -- tuples in a special way anymore, because:
-    -- https://git.haskell.org/ghc.git/commitdiff/ffc21506894c7887d3620423aaf86bc6113a1071
-#elif MIN_VERSION_GLASGOW_HASKELL(7,10,1,0)
     -- Do we have a tuple of constraints?
-    Just (tc, tcArgs) | TyCon.isTupleTyCon tc -> do
-      -- Produce evidence for each element of the tuple
-      tupleEvs <- mapM produceEvidenceForCtType' tcArgs
-      return $ if any isLeft tupleEvs
-        then Left
-          $ O.text "Can't find evidence for this tuple constraint:"
-          $$ O.ppr ct
-          $$ O.text "Reason:"
-          $$ O.vcat (fromLeft <$> filter isLeft tupleEvs)
-        -- And put together evidence for the complete tuple.
-        else Right $ TcEvidence.EvTupleMk $ zip tcArgs $ fmap fromRight tupleEvs
-#endif
+    Just (tc, tcArgs) | isTupleTyCon tc -> do
+      produceTupleEvidence ct tc tcArgs produceEvidenceForCtType'
     -- Do we have a type family application?
     Just (tc, _tcArgs) | isTyFunCon tc -> do
       -- Evaluate it...

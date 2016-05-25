@@ -5,7 +5,9 @@
 
 -- | Provides version safe wrappers around GHC functions.
 module Control.Supermonad.Plugin.Wrapper 
-  ( -- * Type Variable Substitutions
+  ( -- * General Utilities (To avoid import loop)
+    fromLeft, fromRight
+  , -- * Type Variable Substitutions
     TypeVarSubst
   , mkTypeVarSubst
     -- * Types
@@ -19,22 +21,39 @@ module Control.Supermonad.Plugin.Wrapper
   , isImportedFrom
     -- * Evidence Production
   , mkTcCoercion
+  , produceTupleEvidence, isTupleTyCon
     -- * Instance Environment
   , lookupInstEnv
   ) where
 
+import Data.Either ( isLeft )
+
+import Control.Monad ( mapM )
+
 import qualified Type as T
+import qualified TyCon as TC
 import qualified Kind as K
 import qualified Module as M
 import qualified Coercion as C
+import qualified Outputable as O
 import qualified InstEnv as IE
 import qualified Class
 import qualified RdrName as RdrN
 import qualified TcType as TcT
 import qualified TcRnTypes as TcRnT
 import qualified TcEvidence as TcEv
+import qualified TcPluginM
 import qualified SrcLoc
 
+-- | Return the 'Left' value. If no 'Left' value is given, an error is raised.
+fromLeft :: Either a b -> a
+fromLeft (Left a) = a
+fromLeft (Right _) = error "fromLeft: Applied to 'Right'"
+
+-- | Return the 'Right' value. If no 'Right' value is given, an error is raised.
+fromRight :: Either a b -> b
+fromRight (Left _) = error "fromRight: Applied to 'Left'"
+fromRight (Right b) = b
 
 -- | Type of type variable substitutions.
 #if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
@@ -126,6 +145,41 @@ mkTcCoercion :: C.Coercion -> TcEv.TcCoercion
 mkTcCoercion = id
 #elif MIN_VERSION_GLASGOW_HASKELL(7,10,1,0)
 mkTcCoercion = TcEv.TcCoercion
+#endif
+
+-- | Evidence production step for "Control.Supermonad.Plugin.Evidence" module to produce
+--   evidence for tuple constraints (prior to GHC 8.0.1).
+produceTupleEvidence :: T.Type
+                     -> TC.TyCon -> [T.Type] 
+                     -> (T.Type -> TcPluginM.TcPluginM (Either O.SDoc TcEv.EvTerm))
+                     -> TcPluginM.TcPluginM (Either O.SDoc TcEv.EvTerm)
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
+-- From GHC 8.0.1 onward there is no necessity to solve constraint 
+-- tuples in a special way anymore, because:
+-- https://git.haskell.org/ghc.git/commitdiff/ffc21506894c7887d3620423aaf86bc6113a1071
+produceTupleEvidence ct _tc _tcArgs _cont = return $ Left $ 
+  O.text "Production of tuple evidence not necessary anymore! How did we get here?"
+  O.$$ O.ppr ct
+#elif MIN_VERSION_GLASGOW_HASKELL(7,10,1,0)
+produceTupleEvidence ct _tc tcArgs cont = do
+  -- Produce evidence for each element of the tuple
+  tupleEvs <- mapM cont tcArgs
+  return $ if any isLeft tupleEvs
+    then Left
+      $ O.text "Can't find evidence for this tuple constraint:"
+      O.$$ O.ppr ct
+      O.$$ O.text "Reason:"
+      O.$$ O.vcat (fromLeft <$> filter isLeft tupleEvs)
+    -- And put together evidence for the complete tuple.
+    else Right $ TcEv.EvTupleMk $ fmap fromRight tupleEvs
+#endif
+
+-- | Check if a given type constructor is a tuple constructor.
+isTupleTyCon :: TC.TyCon -> Bool
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
+isTupleTyCon _tc = False
+#elif MIN_VERSION_GLASGOW_HASKELL(7,10,1,0)
+isTupleTyCon = TC.isTupleTyCon
 #endif
 
 -- | Lookup an instance for the class applied to the type arguments within the 
