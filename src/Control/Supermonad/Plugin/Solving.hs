@@ -65,7 +65,7 @@ import Control.Supermonad.Plugin.Utils
 import Control.Supermonad.Plugin.Log 
   ( formatConstraint )
 
-
+  
 -- | Attempts to solve the given /wanted/ constraints.
 solveConstraints :: [WantedCt] -> SupermonadPluginM ()
 solveConstraints wantedCts = do
@@ -136,6 +136,7 @@ solveMonoConstraintGroup (tyCon, ctGroup) = do
         _ -> do
           throwPluginError "How did this become a list with more then one element?"
   where
+    -- Check if the two associations between a type variable and a type are the same association.
     tyConAssocEq :: (TyVar, Type, [TyVar]) -> (TyVar, Type, [TyVar]) -> Bool
     tyConAssocEq (tv, t, tvs) (tv', t', tvs') = tv == tv' && tvs == tvs' && eqType t t'
 
@@ -361,9 +362,7 @@ solveSolvedTyConIndices = do
           case deriveUnificationConstraints ct inst of
             Left err -> do
               printErr err
-            Right (tvTyEqs, tyEqs) -> do 
-              printObj tvTyEqs
-              printObj tyEqs
+            Right (tvTyEqs, tyEqs) -> do
               addTyVarEqualities tvTyEqs
               addTypeEqualities tyEqs
         case eResult of
@@ -375,26 +374,25 @@ solveSolvedTyConIndices = do
                                     -> (WantedCt -> SupermonadPluginM Bool) 
                                     -> SupermonadPluginM [(WantedCt, TyCon, [Type])]
     filterTopTyConSolvedConstraints cts p = do
-      -- Get all wanted bind constraints.
+      -- Get all wanted constraints that meet the predicate.
       bindCts <- filterM (\(ct, _tc, _args) -> p ct) cts
-      -- Get all bind constraints that already have been assigned their top-level
+      -- Get all constraints that already have been assigned their top-level
       -- type constructors and process them to solve the type constructor arguments...
-      return $ filter (S.null . constraintTopTcVars . (\(ct, _tc, _args) -> ct)) bindCts
+      return $ filter (S.null . collectTopTcVars . (\(_ct, _tc, args) -> args)) bindCts
     
     withTopTyCon :: (Ct, TyCon, [Type]) 
                  -> (TyCon -> SupermonadPluginM (Maybe ClsInst)) 
                  -> (TyCon -> [Type] -> ClsInst -> SupermonadPluginM a) 
                  -> SupermonadPluginM (Either O.SDoc a)
     withTopTyCon (ct, ctClsTyCon, ctArgs) getTyConInst process = do
-      let mCtArgs = constraintClassTyArgs ct
       -- Get the top-level type constructor for this bind constraint.
-      let mTopTyCon = S.toList $ constraintTopTyCons ct
+      let mTopTyCon = S.toList $ collectTopTyCons ctArgs
       -- Begin error handling.
-      case (mCtArgs, mTopTyCon) of
-        (Just ctArgs, [topTyCon]) -> do
+      case mTopTyCon of
+        [topTyCon] -> do
           -- Get the bind instance for the current type constructor.
-          mSupermonadInst <- getTyConInst topTyCon
-          case mSupermonadInst of
+          mInst <- getTyConInst topTyCon
+          case mInst of
             Just inst -> Right <$> process topTyCon ctArgs inst
             -- We could not find a bind and return instance associated with the 
             -- given type constructor.
@@ -402,19 +400,15 @@ solveSolvedTyConIndices = do
               return $ Left
                      $ O.text "Constraints top type constructor does not have an associated instance:"
                        O.$$ O.ppr topTyCon
-        (Nothing, _) -> do
-          return $ Left 
-                 $ O.text "Constraint is not a class constraint:"
-                 O.$$ O.ppr ct
-        (_, _) -> do
+        _ -> do
           return $ Left
                  $ O.text "Constraint misses a unqiue top-level type constructor:"
-                 O.$$ O.ppr ct
+                   O.$$ O.ppr ct
     
     deriveUnificationConstraints :: (Ct, TyCon, [Type]) -> ClsInst -> Either String ([(Ct, TyVar, Type)], [(Ct, Type, Type)])
     deriveUnificationConstraints (ct, ctClsTyCon, ctArgs) inst = do
       let (instVars, _instCls, instArgs) = instanceHead inst
-      let Just ctArgs = constraintClassTyArgs ct
+      -- let Just ctArgs = constraintClassTyArgs ct
       let ctVars = S.toList $ S.unions $ fmap collectTyVars ctArgs
       let mSubsts = zipWith tcUnifyTy instArgs ctArgs
       if any isNothing mSubsts then do
