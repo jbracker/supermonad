@@ -361,7 +361,7 @@ solveSolvedTyConIndices = do
         eResult <- withTopTyCon ct getTyConInst $ \_topTyCon _ctArgs inst -> do
           case deriveUnificationConstraints ct inst of
             Left err -> do
-              printErr err
+              printErr $ sDocToStr err
             Right (tvTyEqs, tyEqs) -> do
               addTyVarEqualities tvTyEqs
               addTypeEqualities tyEqs
@@ -375,10 +375,17 @@ solveSolvedTyConIndices = do
                                     -> SupermonadPluginM [(WantedCt, TyCon, [Type])]
     filterTopTyConSolvedConstraints cts p = do
       -- Get all wanted constraints that meet the predicate.
-      bindCts <- filterM (\(ct, _tc, _args) -> p ct) cts
+      predFilteredCts <- filterM (\(ct, _tc, _args) -> p ct) cts
+      -- Also remove constraints that don't constain any ambiguous type variables.
+      -- There is nothing to solve in them.
+      let filterNoVarCts = filter (\(_ct, _tc, args) -> not $ S.null 
+                                                            $ S.filter isAmbiguousTyVar 
+                                                            $ S.unions 
+                                                            $ fmap collectTyVars args) 
+                                  predFilteredCts
       -- Get all constraints that already have been assigned their top-level
       -- type constructors and process them to solve the type constructor arguments...
-      return $ filter (S.null . collectTopTcVars . (\(_ct, _tc, args) -> args)) bindCts
+      return $ filter (S.null . collectTopTcVars . (\(_ct, _tc, args) -> args)) filterNoVarCts
     
     withTopTyCon :: (Ct, TyCon, [Type]) 
                  -> (TyCon -> SupermonadPluginM (Maybe ClsInst)) 
@@ -405,14 +412,17 @@ solveSolvedTyConIndices = do
                  $ O.text "Constraint misses a unqiue top-level type constructor:"
                    O.$$ O.ppr ct
     
-    deriveUnificationConstraints :: (Ct, TyCon, [Type]) -> ClsInst -> Either String ([(Ct, TyVar, Type)], [(Ct, Type, Type)])
+    deriveUnificationConstraints :: (Ct, TyCon, [Type]) -> ClsInst -> Either O.SDoc ([(Ct, TyVar, Type)], [(Ct, Type, Type)])
     deriveUnificationConstraints (ct, ctClsTyCon, ctArgs) inst = do
       let (instVars, _instCls, instArgs) = instanceHead inst
       -- let Just ctArgs = constraintClassTyArgs ct
       let ctVars = S.toList $ S.unions $ fmap collectTyVars ctArgs
       let mSubsts = zipWith tcUnifyTy instArgs ctArgs
       if any isNothing mSubsts then do
-        Left "Missing substitution!"
+        Left $ O.hang (O.text "Unification constraint solving not possible, because instance and constraint are not unifiable!") 2 
+             $ (O.hang (O.text "Instance:") 2 $ O.ppr inst) O.$$
+               (O.hang (O.text "Constraint:") 2 $ O.ppr ct) O.$$
+               (O.hang (O.text "Constraint arguments:") 2 $ O.ppr ctArgs)
       else do
         let substs = catMaybes mSubsts
         let instVarEqGroups = collectEqualityGroup substs instVars
