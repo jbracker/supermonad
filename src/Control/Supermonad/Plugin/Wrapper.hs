@@ -11,6 +11,7 @@ module Control.Supermonad.Plugin.Wrapper
     -- * Types
   , splitKindFunTys
   , mkEqualityCtType
+  , constraintSourceLocation
     -- * Modules
   , UnitId
   , baseUnitId
@@ -30,7 +31,9 @@ import qualified InstEnv as IE
 import qualified Class
 import qualified RdrName as RdrN
 import qualified TcType as TcT
+import qualified TcRnTypes as TcRnT
 import qualified TcEvidence as TcEv
+import qualified SrcLoc
 
 
 -- | Type of type variable substitutions.
@@ -68,6 +71,14 @@ mkEqualityCtType :: T.Type -> T.Type -> T.Type
 mkEqualityCtType = T.mkPrimEqPred -- Maybe we should use 'mkHeteroPrimEqPred' instead?
 #elif MIN_VERSION_GLASGOW_HASKELL(7,10,1,0)
 mkEqualityCtType = TcT.mkTcEqPred
+#endif
+
+-- | Returns the source code location of the given constraint.
+constraintSourceLocation :: TcRnT.Ct -> SrcLoc.SrcSpan
+#if MIN_VERSION_GLASGOW_HASKELL(7,10,2,0)
+constraintSourceLocation = SrcLoc.RealSrcSpan . TcRnT.tcl_loc . TcRnT.ctl_env . TcRnT.ctev_loc . TcRnT.cc_ev
+#else
+constraintSourceLocation = TcRnT.tcl_loc . TcRnT.ctl_env . TcRnT.ctev_loc . TcRnT.cc_ev
 #endif
 
 -- | Type of package identifiers.

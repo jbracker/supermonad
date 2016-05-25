@@ -28,10 +28,8 @@ import Data.List ( sortBy )
 import Data.Set ( Set )
 import qualified Data.Set as S
 
-import SrcLoc ( SrcSpan(..) )
 import TcRnTypes
   ( Ct(..), CtLoc(..), CtEvidence(..)
-  , TcLclEnv( tcl_loc )
   , mkNonCanonical )
 import Class ( Class(..) )
 import Type
@@ -42,7 +40,7 @@ import Type
 import TyCon ( TyCon )
 
 import Control.Supermonad.Plugin.Wrapper
-  ( mkEqualityCtType )
+  ( mkEqualityCtType, constraintSourceLocation )
 import Control.Supermonad.Plugin.Utils
   ( collectTopTyCons
   , collectTopTcVars
@@ -134,14 +132,6 @@ constraintLocation ct = ctev_loc $ cc_ev ct
 -- | Retrieves the type that represents the constraint.
 constraintPredicateType :: Ct -> Type
 constraintPredicateType ct = ctev_pred $ cc_ev ct
-
--- | Returns the source code location of the given constraint.
-constraintSourceLocation :: Ct -> SrcSpan
-#if MIN_VERSION_ghc(7,10,2)
-constraintSourceLocation = RealSrcSpan . tcl_loc . ctl_env . constraintLocation
-#else
-constraintSourceLocation = tcl_loc . ctl_env . constraintLocation
-#endif
 
 -- | Collect all type variables in the given constraint.
 constraintTyVars :: Ct -> Set TyVar
