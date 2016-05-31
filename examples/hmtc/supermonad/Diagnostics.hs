@@ -383,8 +383,8 @@ instance (Applicative m, Monad m) => Monad (DFT m) where
             Nothing -> return Nothing
             Just a  -> unDFT (f a)
 -}
-instance (Bind m m m, Return m) => Bind (DFT m) (DFT m) (DFT m) where
-  type BindCts (DFT m) (DFT m) (DFT m) = (BindCts m m m, ReturnCts m)
+instance (Bind m n p, Return n) => Bind (DFT m) (DFT n) (DFT p) where
+  type BindCts (DFT m) (DFT n) (DFT p) = (BindCts m n p, ReturnCts n)
   m >>= f = DFT $
         unDFT m >>= \ma ->
         case ma of
