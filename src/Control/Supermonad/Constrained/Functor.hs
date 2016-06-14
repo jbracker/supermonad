@@ -1,4 +1,6 @@
 
+{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE ConstraintKinds #-} -- 'CFunctor' class.
 {-# LANGUAGE TypeFamilies    #-} -- 'CFunctor' class.
 
@@ -22,8 +24,14 @@ import qualified Prelude as P
 -- To define instances:
 import Data.Functor.Identity ( Identity )
 
-import qualified Data.Monoid as Mon ( First, Last, Alt(..) )
+import qualified Data.Monoid as Mon ( First, Last, Sum, Product, Dual, Alt(..) )
 import qualified Data.Proxy as Proxy ( Proxy )
+import qualified Data.Complex as Complex ( Complex )
+import qualified Data.Functor.Product as Product ( Product(..) )
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
+import qualified Data.Semigroup as Semigroup ( Min, Max, Option, First, Last )
+import qualified Data.List.NonEmpty as NonEmpty ( NonEmpty )
+#endif
 
 import qualified Control.Arrow as Arrow ( ArrowMonad, ArrowApply )
 import qualified Control.Applicative as App ( WrappedMonad(..) )
@@ -68,6 +76,9 @@ class CFunctor f where
 
 -- Unconstrained instances -----------------------------------------------------
 
+instance CFunctor ((->) r) where
+  fmap = P.fmap
+  (<$) = (P.<$)
 instance CFunctor Identity where
   fmap = P.fmap
   (<$) = (P.<$)
@@ -90,14 +101,54 @@ instance CFunctor Mon.First where
 instance CFunctor Mon.Last where
   fmap = P.fmap
   (<$) = (P.<$)
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
+instance CFunctor Mon.Sum where
+  fmap = P.fmap
+  (<$) = (P.<$)
+instance CFunctor Mon.Product where
+  fmap = P.fmap
+  (<$) = (P.<$)
+instance CFunctor Mon.Dual where
+  fmap = P.fmap
+  (<$) = (P.<$)
+#endif
 instance (CFunctor f) => CFunctor (Mon.Alt f) where
   type CFunctorCts (Mon.Alt f) a b = CFunctorCts f a b
   fmap f (Mon.Alt ma) = Mon.Alt $ fmap f ma
   a <$ (Mon.Alt mb) = Mon.Alt $ a <$ mb
 
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
+instance CFunctor Semigroup.Min where
+  fmap = P.fmap
+  (<$) = (P.<$)
+instance CFunctor Semigroup.Max where
+  fmap = P.fmap
+  (<$) = (P.<$)
+instance CFunctor Semigroup.Option where
+  fmap = P.fmap
+  (<$) = (P.<$)
+instance CFunctor Semigroup.First where
+  fmap = P.fmap
+  (<$) = (P.<$)
+instance CFunctor Semigroup.Last where
+  fmap = P.fmap
+  (<$) = (P.<$)
+#endif
+
 instance CFunctor Proxy.Proxy where
   fmap = P.fmap
   (<$) = (P.<$)
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
+instance CFunctor Complex.Complex where
+  fmap = P.fmap
+  (<$) = (P.<$)
+instance CFunctor NonEmpty.NonEmpty where
+  fmap = P.fmap
+  (<$) = (P.<$)
+#endif
+instance (CFunctor f, CFunctor g) => CFunctor (Product.Product f g) where
+  type CFunctorCts (Product.Product f g) a b = (CFunctorCts f a b, CFunctorCts g a b)
+  fmap f (Product.Pair fa fb) = Product.Pair (fmap f fa) (fmap f fb)
 
 instance CFunctor Read.ReadP where
   fmap = P.fmap
