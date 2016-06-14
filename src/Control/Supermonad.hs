@@ -83,6 +83,8 @@ class (Functor m, Functor n, Functor p) => Bind m n p where
   (>>)  :: (BindCts m n p) => m a -> n b -> p b
   ma >> mb = ma >>= const mb
 
+instance Bind ((->) r) ((->) r) ((->) r) where
+  (>>=) = (P.>>=)
 instance Bind Identity Identity Identity where
   (>>=) = (P.>>=)
 instance Bind [] [] [] where
@@ -237,6 +239,8 @@ class (Functor m) => Return m where
   type ReturnCts m = ()
   return :: (ReturnCts m) => a -> m a
 
+instance Return ((->) r) where
+  return = P.return
 instance Return Identity where
   return = P.return
 instance Return [] where
@@ -351,6 +355,8 @@ class Fail m where
   type FailCts m = ()
   fail :: (FailCts m) => String -> m a
 
+instance Fail ((->) r) where
+  fail = P.fail
 instance Fail Identity where
   fail = P.fail
 instance Fail [] where
