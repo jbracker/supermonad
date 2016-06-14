@@ -46,10 +46,12 @@ import Data.Functor.Identity ( Identity(..) )
 
 import qualified Data.Monoid as Mon ( First, Last, Sum, Product, Dual, Alt(..) )
 import qualified Data.Proxy as Proxy ( Proxy )
-import qualified Data.Semigroup as Semigroup ( Min, Max, Option, First, Last )
 import qualified Data.Complex as Complex ( Complex )
-import qualified Data.List.NonEmpty as NonEmpty ( NonEmpty )
 import qualified Data.Functor.Product as Product ( Product(..) )
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
+import qualified Data.Semigroup as Semigroup ( Min, Max, Option, First, Last )
+import qualified Data.List.NonEmpty as NonEmpty ( NonEmpty )
+#endif
 
 import qualified Control.Arrow as Arrow ( ArrowMonad, ArrowApply )
 import qualified Control.Applicative as App ( WrappedMonad(..) )
@@ -111,16 +113,19 @@ instance Bind Mon.First Mon.First Mon.First where
   (>>=) = (P.>>=)
 instance Bind Mon.Last Mon.Last Mon.Last where
   (>>=) = (P.>>=)
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 instance Bind Mon.Sum Mon.Sum Mon.Sum where
   (>>=) = (P.>>=)
 instance Bind Mon.Product Mon.Product Mon.Product where
   (>>=) = (P.>>=)
 instance Bind Mon.Dual Mon.Dual Mon.Dual where
   (>>=) = (P.>>=)
+#endif
 instance (Bind f f f) => Bind (Mon.Alt f) (Mon.Alt f) (Mon.Alt f) where
   type BindCts (Mon.Alt f) (Mon.Alt f) (Mon.Alt f) a b = BindCts f f f a b
   m >>= f = Mon.Alt $ (Mon.getAlt m) >>= (Mon.getAlt . f)
 
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 instance Bind Semigroup.Min Semigroup.Min Semigroup.Min where
   (>>=) = (P.>>=)
 instance Bind Semigroup.Max Semigroup.Max Semigroup.Max where
@@ -131,13 +136,16 @@ instance Bind Semigroup.First Semigroup.First Semigroup.First where
   (>>=) = (P.>>=)
 instance Bind Semigroup.Last Semigroup.Last Semigroup.Last where
   (>>=) = (P.>>=)
+#endif
 
 instance Bind Proxy.Proxy Proxy.Proxy Proxy.Proxy where
   (>>=) = (P.>>=)
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 instance Bind Complex.Complex Complex.Complex Complex.Complex where
   (>>=) = (P.>>=)
 instance Bind NonEmpty.NonEmpty NonEmpty.NonEmpty NonEmpty.NonEmpty where
   (>>=) = (P.>>=)
+#endif
 instance (Bind m1 n1 p1, Bind m2 n2 p2) => Bind (Product.Product m1 m2) (Product.Product n1 n2) (Product.Product p1 p2) where
   type BindCts (Product.Product m1 m2) (Product.Product n1 n2) (Product.Product p1 p2) a b = (BindCts m1 n1 p1 a b, BindCts m2 n2 p2 a b)
   Product.Pair m1 m2 >>= f = Product.Pair (m1 >>= (fstP . f)) (m2 >>= (sndP . f))
@@ -289,16 +297,19 @@ instance Return Mon.First where
   return = P.return
 instance Return Mon.Last where
   return = P.return
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 instance Return Mon.Sum where
   return = P.return
 instance Return Mon.Product where
   return = P.return
 instance Return Mon.Dual where
   return = P.return
+#endif
 instance (Return m) => Return (Mon.Alt m) where
   type ReturnCts (Mon.Alt m) a = ReturnCts m a
   return a = Mon.Alt $ return a
 
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 instance Return Semigroup.Min where
   return = P.return
 instance Return Semigroup.Max where
@@ -309,13 +320,16 @@ instance Return Semigroup.First where
   return = P.return
 instance Return Semigroup.Last where
   return = P.return
+#endif
 
 instance Return Proxy.Proxy where
   return = P.return
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 instance Return Complex.Complex where
   return = P.return
 instance Return NonEmpty.NonEmpty where
   return = P.return
+#endif
 instance (Return m1, Return m2) => Return (Product.Product m1 m2) where
   type ReturnCts (Product.Product m1 m2) a = (ReturnCts m1 a, ReturnCts m2 a)
   return a = Product.Pair (return a) (return a)
@@ -433,16 +447,19 @@ instance Fail Mon.First where
   fail = P.fail
 instance Fail Mon.Last where
   fail = P.fail
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 instance Fail Mon.Sum where
   fail = P.fail
 instance Fail Mon.Product where
   fail = P.fail
 instance Fail Mon.Dual where
   fail = P.fail
+#endif
 instance (Fail m) => Fail (Mon.Alt m) where
   type FailCts (Mon.Alt m) a = FailCts m a
   fail a = Mon.Alt $ fail a
 
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 instance Fail Semigroup.Min where
   fail = P.fail
 instance Fail Semigroup.Max where
@@ -453,13 +470,16 @@ instance Fail Semigroup.First where
   fail = P.fail
 instance Fail Semigroup.Last where
   fail = P.fail
+#endif
 
 instance Fail Proxy.Proxy where
   fail = P.fail
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 instance Fail Complex.Complex where
   fail = P.fail
 instance Fail NonEmpty.NonEmpty where
   fail = P.fail
+#endif
 instance (Fail m1, Fail m2) => Fail (Product.Product m1 m2) where
   type FailCts (Product.Product m1 m2) a = (FailCts m1 a, FailCts m2 a)
   fail a = Product.Pair (fail a) (fail a)
