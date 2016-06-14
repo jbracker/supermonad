@@ -13,6 +13,10 @@ clean: init
 	rm -fR ./examples/hmtc/monad-param/dist
 	rm -fR ./examples/constrained/dist
 
+clean-sandbox:
+	rm -fR ./.cabal-sandbox
+	rm -f ./cabal.sandbox.config
+
 doc: init
 	cabal configure && cabal haddock --internal --executables
 
