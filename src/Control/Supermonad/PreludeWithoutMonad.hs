@@ -32,7 +32,7 @@ module Control.Supermonad.PreludeWithoutMonad
   , P.Monoid(..)
     -- *** (Monads and) functors
   , P.Functor(..), (P.<$>)
-  , P.Applicative(..)
+  -- , P.Applicative(..) -- Nope not this one!
   -- , P.Monad(..) -- Nope not this one!
     -- *** Folds and traversals
   , P.Foldable(..)
