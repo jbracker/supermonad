@@ -11,8 +11,7 @@ module Control.Supermonad.Applicative
   ) where
 
 import Prelude
-  ( String
-  , Maybe(..), Either(..)
+  ( Maybe(..), Either(..)
   , Functor(..)
   , (.), ($), const, id
   )
@@ -41,6 +40,20 @@ import qualified Text.ParserCombinators.ReadP as Read ( ReadP )
 import qualified Text.ParserCombinators.ReadPrec as Read ( ReadPrec )
 
 import qualified GHC.Conc as STM ( STM )
+
+-- To define "transformers" instances:
+import qualified Control.Monad.Trans.Cont     as Cont     ( ContT(..) )
+import qualified Control.Monad.Trans.Except   as Except   ( ExceptT(..) )
+import qualified Control.Monad.Trans.Identity as Identity ( IdentityT(..) )
+import qualified Control.Monad.Trans.List     as List     ( ListT(..) )
+import qualified Control.Monad.Trans.Maybe    as Maybe    ( MaybeT(..) )
+import qualified Control.Monad.Trans.RWS.Lazy      as RWSL    ( RWST(..) )
+import qualified Control.Monad.Trans.RWS.Strict    as RWSS    ( RWST(..) )
+import qualified Control.Monad.Trans.Reader        as Reader  ( ReaderT(..) )
+import qualified Control.Monad.Trans.State.Lazy    as StateL  ( StateT(..) )
+import qualified Control.Monad.Trans.State.Strict  as StateS  ( StateT(..) )
+import qualified Control.Monad.Trans.Writer.Lazy   as WriterL ( WriterT(..) )
+import qualified Control.Monad.Trans.Writer.Strict as WriterS ( WriterT(..) )
 
 -- -----------------------------------------------------------------------------
 -- Super-Applicative Type Class
@@ -84,7 +97,7 @@ instance Applicative P.IO P.IO P.IO where
   (<*>) = (P.<*>)
   (<*)  = (P.<*)
   (*>)  = (P.*>)
-instance Applicative (P.Either e) (P.Either e) (P.Either e) where
+instance Applicative (Either e) (Either e) (Either e) where
   (<*>) = (P.<*>)
   (<*)  = (P.<*)
   (*>)  = (P.*>)
@@ -203,3 +216,72 @@ instance Applicative STM.STM STM.STM STM.STM where
   (<*>) = (P.<*>)
   (<*)  = (P.<*)
   (*>)  = (P.*>)
+
+-- "transformers" package instances: -------------------------------------------
+
+-- Continuations are so wierd...
+-- | TODO / FIXME: Still need to figure out how and if we can generalize the continuation implementation.
+instance Applicative (Cont.ContT r m) (Cont.ContT r m) (Cont.ContT r m) where
+  type ApplicativeCts (Cont.ContT r m) (Cont.ContT r m) (Cont.ContT r m) = ()
+  f <*> a = Cont.ContT $ \ c -> Cont.runContT f $ \ g -> Cont.runContT a (c . g)
+  {-# INLINE (<*>) #-}
+
+instance (Applicative m n p) => Applicative (Except.ExceptT e m) (Except.ExceptT e n) (Except.ExceptT e p) where
+  type ApplicativeCts (Except.ExceptT e m) (Except.ExceptT e n) (Except.ExceptT e p) = (ApplicativeCts m n p)
+  Except.ExceptT f <*> Except.ExceptT v = Except.ExceptT $ fmap (<*>) f <*> v
+  {-# INLINEABLE (<*>) #-}
+
+instance (Applicative m n p) => Applicative (Identity.IdentityT m) (Identity.IdentityT n) (Identity.IdentityT p) where
+  type ApplicativeCts (Identity.IdentityT m) (Identity.IdentityT n) (Identity.IdentityT p) = (ApplicativeCts m n p)
+  Identity.IdentityT m <*> Identity.IdentityT k = Identity.IdentityT $ m <*> k
+  {-# INLINE (<*>) #-}
+
+-- Requires undecidable instances.
+instance (Applicative m n p) => Applicative (List.ListT m) (List.ListT n) (List.ListT p) where
+  type ApplicativeCts (List.ListT m) (List.ListT n) (List.ListT p) = (ApplicativeCts m n p)
+  List.ListT fs <*> List.ListT as = List.ListT $ fmap (<*>) fs <*> as
+  {-# INLINE (<*>) #-}
+
+instance (Applicative m n p) => Applicative (Maybe.MaybeT m) (Maybe.MaybeT n) (Maybe.MaybeT p) where
+  type ApplicativeCts (Maybe.MaybeT m) (Maybe.MaybeT n) (Maybe.MaybeT p) = (ApplicativeCts m n p)
+  Maybe.MaybeT f <*> Maybe.MaybeT x = Maybe.MaybeT $ fmap (<*>) f <*> x
+  {-# INLINE (<*>) #-}
+
+instance (P.Monoid w, Bind m n p) => Applicative (RWSL.RWST r w s m) (RWSL.RWST r w s n) (RWSL.RWST r w s p) where
+  type ApplicativeCts (RWSL.RWST r w s m) (RWSL.RWST r w s n) (RWSL.RWST r w s p) = (BindCts m n p)
+  RWSL.RWST mf <*> RWSL.RWST ma  = RWSL.RWST $ \r s -> mf r s >>= \ ~(f, s', w) -> fmap (\ ~(a, s'', w') -> (f a, s'', P.mappend w w')) (ma r s')
+  {-# INLINE (<*>) #-}
+
+instance (P.Monoid w, Bind m n p) => Applicative (RWSS.RWST r w s m) (RWSS.RWST r w s n) (RWSS.RWST r w s p) where
+  type ApplicativeCts (RWSS.RWST r w s m) (RWSS.RWST r w s n) (RWSS.RWST r w s p) = (BindCts m n p)
+  RWSS.RWST mf <*> RWSS.RWST ma = RWSS.RWST $ \r s -> mf r s >>= \ (f, s', w) -> fmap (\ (a, s'', w') -> (f a, s'', P.mappend w w')) (ma r s')
+  {-# INLINE (<*>) #-}
+
+instance (Applicative m n p) => Applicative (Reader.ReaderT r m) (Reader.ReaderT r n) (Reader.ReaderT r p) where
+  type ApplicativeCts (Reader.ReaderT r m) (Reader.ReaderT r n) (Reader.ReaderT r p) = (ApplicativeCts m n p)
+  Reader.ReaderT mf <*> Reader.ReaderT ma  = Reader.ReaderT $ \r -> mf r <*> ma r
+  {-# INLINE (<*>) #-}
+
+instance (Bind m n p) => Applicative (StateL.StateT s m) (StateL.StateT s n) (StateL.StateT s p) where
+  type ApplicativeCts (StateL.StateT s m) (StateL.StateT s n) (StateL.StateT s p) = (BindCts m n p)
+  StateL.StateT mf <*> StateL.StateT ma = StateL.StateT $ \s -> mf s >>= \ ~(f, s') -> fmap (\ ~(a, s'') -> (f a, s'')) (ma s')
+  {-# INLINE (<*>) #-}
+
+instance (Bind m n p) => Applicative (StateS.StateT s m) (StateS.StateT s n) (StateS.StateT s p) where
+  type ApplicativeCts (StateS.StateT s m) (StateS.StateT s n) (StateS.StateT s p) = (BindCts m n p)
+  StateS.StateT mf <*> StateS.StateT ma = StateS.StateT $ \s -> mf s >>= \ (f, s') -> fmap (\ (a, s'') -> (f a, s'')) (ma s')
+  {-# INLINE (<*>) #-}
+
+instance (P.Monoid w, Applicative m n p) => Applicative (WriterL.WriterT w m) (WriterL.WriterT w n) (WriterL.WriterT w p) where
+  type ApplicativeCts (WriterL.WriterT s m) (WriterL.WriterT s n) (WriterL.WriterT s p) = (ApplicativeCts m n p)
+  WriterL.WriterT mf <*> WriterL.WriterT ma = WriterL.WriterT $ fmap (\ ~(f, w) ~(a, w') -> (f a, P.mappend w w')) mf <*> ma
+  {-# INLINE (<*>) #-}
+
+instance (P.Monoid w, Applicative m n p) => Applicative (WriterS.WriterT w m) (WriterS.WriterT w n) (WriterS.WriterT w p) where
+  type ApplicativeCts (WriterS.WriterT s m) (WriterS.WriterT s n) (WriterS.WriterT s p) = (ApplicativeCts m n p)
+  WriterS.WriterT mf <*> WriterS.WriterT ma = WriterS.WriterT $ fmap (\ (f, w) (a, w') -> (f a, P.mappend w w')) mf <*> ma
+  {-# INLINE (<*>) #-}
+
+
+
+
