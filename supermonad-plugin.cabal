@@ -25,7 +25,6 @@ source-repository head
 library
   exposed-modules: Control.Supermonad
                  , Control.Supermonad.Prelude
-                 , Control.Supermonad.Applicative
                  , Control.Supermonad.Functions
                  , Control.Supermonad.Plugin
                  , Control.Supermonad.PreludeWithoutMonad
