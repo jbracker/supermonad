@@ -1,7 +1,9 @@
 
 {-# LANGUAGE CPP #-}
 
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiParamTypeClasses #-} -- For 'Applicative' class.
+{-# LANGUAGE TypeFamilies          #-} -- For 'Applicative' class.
+{-# LANGUAGE ConstraintKinds       #-} -- For 'Applicative' class.
 
 module Control.Supermonad.Applicative
   ( Applicative(..)
@@ -17,6 +19,8 @@ import Prelude
 import qualified Prelude as P
 
 import Control.Supermonad
+
+import GHC.Exts ( Constraint )
 
 -- To define standard instances:
 import qualified Data.Monoid as Mon ( First, Last, Sum, Product, Dual, Alt(..) )
@@ -44,11 +48,14 @@ import qualified GHC.Conc as STM ( STM )
 
 -- | TODO
 class (Functor m, Functor n, Functor p) => Applicative m n p where
-  (<*>) :: m (a -> b) -> n a -> p b
+  type ApplicativeCts m n p :: Constraint
+  type ApplicativeCts m n p = ()
   
-  (*>) :: m a -> n b -> p b
+  (<*>) :: (ApplicativeCts m n p) => m (a -> b) -> n a -> p b
+  
+  (*>) :: (ApplicativeCts m n p) => m a -> n b -> p b
   ma *> nb = (id <$ ma) <*> nb
-  (<*) :: m a -> n b -> p a
+  (<*) :: (ApplicativeCts m n p) => m a -> n b -> p a
   ma <* nb = fmap const ma <*> nb
 
 -- | 'pure' is defined in terms of return.
@@ -105,7 +112,7 @@ instance Applicative Mon.Dual Mon.Dual Mon.Dual where
   (*>)  = (P.*>)
 #endif
 instance (Applicative m n p) => Applicative (Mon.Alt m) (Mon.Alt n) (Mon.Alt p) where
-  -- type BindCts (Mon.Alt m) (Mon.Alt n) (Mon.Alt p) = BindCts m n p
+  type ApplicativeCts (Mon.Alt m) (Mon.Alt n) (Mon.Alt p) = ApplicativeCts m n p
   mf <*> na = Mon.Alt $ (Mon.getAlt mf) <*> (Mon.getAlt na)
   mf *> na = Mon.Alt $ (Mon.getAlt mf) *> (Mon.getAlt na)
   mf <* na = Mon.Alt $ (Mon.getAlt mf) <* (Mon.getAlt na)
@@ -148,7 +155,7 @@ instance Applicative NonEmpty.NonEmpty NonEmpty.NonEmpty NonEmpty.NonEmpty where
   (*>)  = (P.*>)
 #endif
 instance (Applicative m1 n1 p1, Applicative m2 n2 p2) => Applicative (Product.Product m1 m2) (Product.Product n1 n2) (Product.Product p1 p2) where
-  --type ApplicativeCts (Product.Product m1 m2) (Product.Product n1 n2) (Product.Product p1 p2) = (ApplicativeCts m1 n1 p1, ApplicativeCts m2 n2 p2)
+  type ApplicativeCts (Product.Product m1 m2) (Product.Product n1 n2) (Product.Product p1 p2) = (ApplicativeCts m1 n1 p1, ApplicativeCts m2 n2 p2)
   Product.Pair m1 m2 <*> Product.Pair n1 n2 = Product.Pair (m1 <*> n1) (m2 <*> n2)
   Product.Pair m1 m2 *> Product.Pair n1 n2 = Product.Pair (m1 *> n1) (m2 *> n2)
   Product.Pair m1 m2 <* Product.Pair n1 n2 = Product.Pair (m1 <* n1) (m2 <* n2)
@@ -187,7 +194,7 @@ instance (Arrow.Arrow a) => Applicative (Arrow.ArrowMonad a) (Arrow.ArrowMonad a
 --   >   fmap f m = App.WrapMonad $ fmap (App.unwrapMonad m) f
 --   
 instance (Applicative m m m, P.Monad m) => Applicative (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) where
-  --type BindCts (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) = BindCts m m m
+  type ApplicativeCts (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) = ApplicativeCts m m m
   mf <*> na = App.WrapMonad $ (App.unwrapMonad mf) <*> (App.unwrapMonad na)
   mf *> na = App.WrapMonad $ (App.unwrapMonad mf) *> (App.unwrapMonad na)
   mf <* na = App.WrapMonad $ (App.unwrapMonad mf) <* (App.unwrapMonad na)
