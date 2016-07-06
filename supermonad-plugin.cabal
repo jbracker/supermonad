@@ -44,6 +44,7 @@ library
                , Control.Supermonad.Plugin.Environment.Lift
                , Control.Supermonad.Plugin.Separation
                , Control.Supermonad.Plugin.Solving
+               , Control.Supermonad.Plugin.SupermonadDict
   other-extensions:
   build-depends: base         >=4.8  && <5
                , ghc          >=7.10.1 && <8.1
