@@ -17,6 +17,7 @@ module Control.Supermonad.Plugin.Utils (
   , applyTyCon
   , splitKindFunOfTcTv
   , atIndex
+  , t1st, t2nd, t3rd
   , associations
   , subsets
   , removeDup
@@ -175,6 +176,15 @@ getTyConName = occNameString . nameOccName . tyConName
 -- | Get the element of a list at a given index (If that element exists).
 atIndex :: [a] -> Int -> Maybe a
 atIndex xs i = listToMaybe $ drop i xs
+
+t1st :: (a, b, c) -> a
+t1st (a, _, _) = a
+
+t2nd :: (a, b, c) -> b
+t2nd (_, b, _) = b
+
+t3rd :: (a, b, c) -> c
+t3rd (_, _, c) = c
 
 -- | Checks if the given type is an ambiguous type variable.
 isAmbiguousType :: Type -> Bool
