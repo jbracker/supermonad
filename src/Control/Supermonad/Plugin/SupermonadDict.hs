@@ -24,6 +24,10 @@ import TyCon ( TyCon )
 --   type constructor may only be a superapplicative, but not a supermonad.
 newtype SupermonadDict = SDict (M.Map TyCon (Maybe BindInst, ApplicativeInst, ReturnInst))
 
+instance Monoid SupermonadDict where
+  mappend (SDict a) (SDict b) = SDict $ mappend a b
+  mempty = emptyDict
+
 -- | Class instances of 'Control.Supermonad.Bind'.
 type BindInst        = ClsInst
 
