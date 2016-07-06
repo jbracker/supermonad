@@ -2,20 +2,16 @@
 -- | Functions and utilities to detect the importent modules, classes
 --   and types of the plugin.
 module Control.Supermonad.Plugin.Detect
-  ( -- * Supermonad Class Detection
+  ( -- * Supermonad class detection
     supermonadModuleName
-  , bindClassName, returnClassName
+  , bindClassName, returnClassName, applicativeClassName
   , findSupermonadModule
   , isBindClass, isReturnClass
   , isSupermonadModule
   , findBindClass, findReturnClass
   , findSupermonads
   , checkSupermonadInstances
-    -- * Identity Type Detection
-  , identityModuleName
-  , identityTyConName
-  , findIdentityModule
-  , findIdentityTyCon
+    -- * Functor class detection
   , functorClassName, functorModuleName
     -- * General detection utilities
   , findInstancesInScope
@@ -96,13 +92,13 @@ bindClassName = "Bind"
 returnClassName :: String
 returnClassName = "Return"
 
--- | Name of the "Data.Functor.Identity" module.
-identityModuleName :: String
-identityModuleName = "Data.Functor.Identity"
+-- | Name of the 'Data.Functor.Functor' class.
+functorClassName :: String
+functorClassName = "Functor"
 
--- | Name of the 'Data.Functor.Identity.Identity' type constructor.
-identityTyConName :: String
-identityTyConName = "Identity"
+-- | Name of the 'Control.Supermonad.Applicative' type class.
+applicativeClassName :: String
+applicativeClassName = "Applicative"
 
 -- | Name of the "Control.Supermonad.Prelude" module.
 supermonadPreludeModuleName :: String
@@ -111,10 +107,6 @@ supermonadPreludeModuleName = "Control.Supermonad.Prelude"
 -- | Name of the "Control.Supermonad.Constrained.Prelude" module.
 supermonadCtPreludeModuleName :: String
 supermonadCtPreludeModuleName = "Control.Supermonad.Constrained.Prelude"
-
--- | Name of the 'Data.Functor.Functor' class.
-functorClassName :: String
-functorClassName = "Functor"
 
 -- | Name of the "Data.Functor" module.
 functorModuleName :: String
@@ -183,28 +175,6 @@ findBindClass = findClass isBindClass
 --   'Control.Supermonad.Return' type class is in scope.
 findReturnClass :: TcPluginM (Maybe Class)
 findReturnClass = findClass isReturnClass
-
--- -----------------------------------------------------------------------------
--- Identity Type Detection
--- -----------------------------------------------------------------------------
-
--- | Checks if the module "Data.Functor.Identity"
---   is imported and, if so, returns the module.
-findIdentityModule :: TcPluginM (Either SDoc Module)
-findIdentityModule = do
-  mdls <- findModules [getModule (Just baseUnitId) identityModuleName, findSupermonadModule]
-  case mdls of
-    [] -> return $ Left $ text "Could not find module 'Identity' module."
-    (mdl:_) -> return $ Right mdl
-
--- | Tries to find the 'Data.Functor.Identity.Identity' type constructor in the imported
---   modules. Only looks for imports through specific modules.
-findIdentityTyCon :: TcPluginM (Maybe TyCon)
-findIdentityTyCon = do
-  mdls <- findModules [findIdentityModule, findSupermonadModule]
-  case mdls of
-    [] -> return Nothing
-    _ -> findTyConByNameAndModule (mkTcOcc identityTyConName) mdls
 
 -- -----------------------------------------------------------------------------
 -- Local Utility Functions
