@@ -58,7 +58,7 @@ import Control.Supermonad.Plugin.Detect
   , bindClassName, returnClassName, applicativeClassName
   , findSupermonads
   , checkSupermonadInstances )
-import Control.Supermonad.Plugin.SupermonadDict
+import Control.Supermonad.Plugin.Dict
   ( SupermonadDict
   , BindInst, ApplicativeInst, ReturnInst
   , lookupDict

@@ -1,6 +1,6 @@
 
 -- | Provides the type for supermonad dictionaries.
-module Control.Supermonad.Plugin.SupermonadDict 
+module Control.Supermonad.Plugin.Dict 
   ( SupermonadDict
   , BindInst, ApplicativeInst, ReturnInst
   , emptyDict, insertDict, lookupDict

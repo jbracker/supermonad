@@ -18,32 +18,25 @@ module Control.Supermonad.Plugin.Detect
   ) where
 
 import Data.List  ( find )
-import Data.Maybe ( catMaybes, listToMaybe )
+import Data.Maybe ( catMaybes )
 import qualified Data.Set as S
-
-import Control.Monad ( forM, liftM )
 
 import BasicTypes ( Arity )
 import TcRnTypes
   ( TcGblEnv(..)
-  , TcTyThing(..)
   , ImportAvails( imp_mods ) )
-import Type ( TyThing(..) )
 import TyCon ( TyCon )
 import TcPluginM
   ( TcPluginM
-  , getEnvs, getInstEnvs
-  , tcLookup )
+  , getEnvs, getInstEnvs )
 import Name
   ( nameModule
   , getOccName )
 import OccName
-  ( OccName
-  , occNameString )
+  ( occNameString )
 import RdrName
   ( GlobalRdrElt(..)
-  , Parent( NoParent )
-  , lookupGlobalRdrEnv )
+  , Parent( NoParent ) )
 import Module
   ( Module, ModuleName
   , moduleName
@@ -63,14 +56,14 @@ import Outputable ( SDoc, ($$), (<>), text, vcat, ppr )
 
 --import Control.Supermonad.Plugin.Log ( printObj, printObjTrace )
 import Control.Supermonad.Plugin.Wrapper
-  ( UnitId, moduleUnitId, isImportedFrom )
+  ( UnitId, moduleUnitId )
 import Control.Supermonad.Plugin.Instance
   ( instanceTyArgs
   , isMonoTyConInstance 
   , isPolyTyConInstance )
 import Control.Supermonad.Plugin.Utils
   ( collectTopTyCons )
-import Control.Supermonad.Plugin.SupermonadDict
+import Control.Supermonad.Plugin.Dict
   ( SupermonadDict
   , BindInst, ApplicativeInst, ReturnInst
   , insertDict, emptyDict )
