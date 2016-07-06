@@ -178,7 +178,7 @@ findReturnClass :: TcPluginM (Maybe Class)
 findReturnClass = findClass isReturnClass
 
 -- | Checks if a type class matching the shape and name of the 
---   'Control.Supermonad.Return' type class is in scope.
+--   'Control.Supermonad.Applicative' type class is in scope.
 findApplicativeClass :: TcPluginM (Maybe Class)
 findApplicativeClass = findClass isApplicativeClass
 
