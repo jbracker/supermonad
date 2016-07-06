@@ -20,7 +20,6 @@ module Control.Supermonad.Plugin.Detect
 import Data.List  ( find )
 import Data.Maybe ( catMaybes, listToMaybe )
 import qualified Data.Set as S
-import qualified Data.Map as M
 
 import Control.Monad ( forM, liftM )
 
@@ -40,7 +39,7 @@ import Name
   , getOccName )
 import OccName
   ( OccName
-  , occNameString, mkTcOcc )
+  , occNameString )
 import RdrName
   ( GlobalRdrElt(..)
   , Parent( NoParent )
@@ -64,13 +63,17 @@ import Outputable ( SDoc, ($$), (<>), text, vcat, ppr )
 
 --import Control.Supermonad.Plugin.Log ( printObj, printObjTrace )
 import Control.Supermonad.Plugin.Wrapper
-  ( UnitId, baseUnitId, moduleUnitId, isImportedFrom )
+  ( UnitId, moduleUnitId, isImportedFrom )
 import Control.Supermonad.Plugin.Instance
   ( instanceTyArgs
   , isMonoTyConInstance 
   , isPolyTyConInstance )
 import Control.Supermonad.Plugin.Utils
   ( collectTopTyCons )
+import Control.Supermonad.Plugin.SupermonadDict
+  ( SupermonadDict
+  , BindInst, ApplicativeInst, ReturnInst
+  , insertDict, emptyDict )
 
 -- -----------------------------------------------------------------------------
 -- Constant Names (Magic Numbers...)
@@ -268,35 +271,6 @@ isClass cls isModule targetClassName targetArity =
      && clsNameStr == targetClassName
      && clsArity == targetArity
 
--- | Try to find a type constructor given its name and the modules it
---   is exported from. The type constructor needs to be imported from
---   one of these modules.
-findTyConByNameAndModule :: OccName -> [Module] -> TcPluginM (Maybe TyCon)
-findTyConByNameAndModule occName mdls = do
-  -- Look at the global environment of names that are in scope.
-  rdrEnv <- tcg_rdr_env . fst <$> getEnvs
-  -- Search for things that have the same name as what we are looking for.
-  let envResultElem = lookupGlobalRdrEnv rdrEnv occName
-  -- Only keep things that are originally from our module and have no parents,
-  -- because type constructors are declared on top-level.
-  let relResults = filter
-        (\e -> any (e `isImportedFrom`) mdls && hasNoParent e)
-        envResultElem
-  -- Find all the typed things that have the same name as the stuff we found.
-  -- Also directly convert them into type constructors if possible
-  mTyCons <- forM relResults $ liftM tcTyThingToTyCon . tcLookup . gre_name
-  -- Only keep those things that actually were type constructors.
-  let tyCons = catMaybes mTyCons
-  -- In theory, we should not find more then one type constructor,
-  -- because that would lead to a name clash in the source module
-  -- and we made sure to only look at one module.
-  return $ listToMaybe tyCons
-
--- | Try to convert the given typed thing into a type constructor.
-tcTyThingToTyCon :: TcTyThing -> Maybe TyCon
-tcTyThingToTyCon (AGlobal (ATyCon tc)) = Just tc
-tcTyThingToTyCon _ = Nothing
-
 -- | Check if the given element has no parents.
 hasNoParent :: GlobalRdrElt -> Bool
 hasNoParent rdrElt = case gre_par rdrElt of
@@ -313,51 +287,65 @@ findInstancesInScope cls = do
 --   do not belong to a specific supermonad.
 checkSupermonadInstances 
   :: Class -- ^ 'Control.Supermonad.Bind' type class.
+  -> Class -- ^ 'Control.Supermonad.Applicative' type class.
   -> Class -- ^ 'Control.Supermonad.Return' type class.
   -> TcPluginM [(ClsInst, SDoc)]
-checkSupermonadInstances bindCls returnCls = do
-    bindInsts   <- findInstancesInScope bindCls
-    returnInsts <- findInstancesInScope returnCls
-    
-    let polyBindInsts   = filter (isPolyTyConInstance bindCls  ) bindInsts
-    let polyReturnInsts = filter (isPolyTyConInstance returnCls) returnInsts
-    
-    return $  fmap (\inst -> (inst, text "Not a valid supermonad instance: " $$ ppr inst)) polyBindInsts 
-           ++ fmap (\inst -> (inst, text "Not a valid supermonad instance: " $$ ppr inst)) polyReturnInsts
+checkSupermonadInstances bindCls applicativeCls returnCls = do
+  bindInsts        <- findInstancesInScope bindCls
+  applicativeInsts <- findInstancesInScope applicativeCls
+  returnInsts      <- findInstancesInScope returnCls
+  
+  let polyBindInsts        = filter (isPolyTyConInstance bindCls       ) bindInsts
+  let polyApplicativeInsts = filter (isPolyTyConInstance applicativeCls) applicativeInsts
+  let polyReturnInsts      = filter (isPolyTyConInstance returnCls     ) returnInsts
+  
+  return $ mconcat $
+    [ fmap (\inst -> (inst, text "Not a valid supermonad instance: " $$ ppr inst)) polyBindInsts
+    , fmap (\inst -> (inst, text "Not a valid supermonad instance: " $$ ppr inst)) polyApplicativeInsts
+    , fmap (\inst -> (inst, text "Not a valid supermonad instance: " $$ ppr inst)) polyReturnInsts
+    ]
 
--- | Constructs the map between type constructors and their supermonad instance.
+-- | Constructs the map between type constructors and their supermonad instances.
 findSupermonads 
   :: Class -- ^ 'Control.Supermonad.Bind' type class.
+  -> Class -- ^ 'Control.Supermonad.Applicative' type class.
   -> Class -- ^ 'Control.Supermonad.Return' type class.
-  -> TcPluginM (M.Map TyCon (ClsInst, ClsInst), [(TyCon, SDoc)])
-  -- ^ Association between type constructor and its 
-  --   'Control.Supermonad.Bind' and 'Control.Supermonad.Return' 
-  --   instance in that order.
-findSupermonads bindCls returnCls = do
-  bindInsts   <- findInstancesInScope bindCls
-  returnInsts <- findInstancesInScope returnCls
+  -> TcPluginM (SupermonadDict, [(TyCon, SDoc)])
+  -- ^ Association between type constructors and their supermonad instances.
+findSupermonads bindCls applicativeCls returnCls = do
+  bindInsts        <- findInstancesInScope bindCls
+  applicativeInsts <- findInstancesInScope applicativeCls
+  returnInsts      <- findInstancesInScope returnCls
   -- Collect all type constructors that are used for supermonads
-  let supermonadTyCons = S.unions $ fmap instTopTyCons $ bindInsts ++ returnInsts
+  let supermonadTyCons = S.unions 
+                       $ fmap (S.unions . fmap instTopTyCons) 
+                       $ [bindInsts, applicativeInsts, returnInsts]
   -- Find the supermonad instances of each type constructor
   return $ mconcat 
-          $ fmap (findSupermonad bindInsts returnInsts)
-          $ S.toList supermonadTyCons
+         $ fmap (findSupermonad bindInsts applicativeInsts returnInsts) 
+         $ S.toList supermonadTyCons
   where
-    findSupermonad :: [ClsInst] -> [ClsInst] -> TyCon -> (M.Map TyCon (ClsInst, ClsInst), [(TyCon, SDoc)])
-    findSupermonad bindInsts returnInsts tc = 
+    findSupermonad :: [BindInst] -> [ApplicativeInst] -> [ReturnInst] -> TyCon 
+                   -> (SupermonadDict, [(TyCon, SDoc)])
+    findSupermonad bindInsts applicativeInsts returnInsts tc = 
       case ( filter (isMonoTyConInstance tc bindCls) bindInsts
+           , filter (isMonoTyConInstance tc applicativeCls) applicativeInsts
            , filter (isMonoTyConInstance tc returnCls) returnInsts ) of
-        ([bindInst], [returnInst]) -> (M.singleton tc (bindInst, returnInst), [])
-        ([], _) -> findError tc 
-          $ text "Missing 'Bind' instance for supermonad '" <> ppr tc <> text "'."
-        (_, []) -> findError tc 
+        ([bindInst], [applicativeInst], [returnInst]) -> 
+          (insertDict tc (Just bindInst) applicativeInst returnInst emptyDict, [])
+        ([], [applicativeInst], [returnInst]) -> 
+          (insertDict tc Nothing applicativeInst returnInst emptyDict, [])
+        (_, [], _) -> findError tc 
+          $ text "Missing 'Applicative' instance for supermonad '" <> ppr tc <> text "'."
+        (_, _, []) -> findError tc 
           $ text "Missing 'Return' instance for supermonad '" <> ppr tc <> text "'."
-        (bindInsts', returnInsts') -> findError tc 
+        (bindInsts', applicativeInsts', returnInsts') -> findError tc 
           $ text "Multiple 'Bind' instances for supermonad '" <> ppr tc <> text "':" $$ vcat (fmap ppr bindInsts')
+          $$ text "Multiple 'Applicative' instances for supermonad '" <> ppr tc <> text "':" $$ vcat (fmap ppr applicativeInsts')
           $$ text "Multiple 'Return' instances for supermonad '" <> ppr tc <> text "':" $$ vcat (fmap ppr returnInsts')
     
-    findError :: TyCon -> SDoc -> (M.Map TyCon (ClsInst, ClsInst), [(TyCon, SDoc)])
-    findError tc msg = (M.empty, [(tc, msg)])
+    findError :: TyCon -> SDoc -> (SupermonadDict, [(TyCon, SDoc)])
+    findError tc msg = (emptyDict, [(tc, msg)])
     
     -- | Collect the top-level type constructors in the arguments 
     --   of the given instance.

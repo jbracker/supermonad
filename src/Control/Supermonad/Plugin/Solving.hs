@@ -33,7 +33,7 @@ import Control.Supermonad.Plugin.Environment
   ( SupermonadPluginM
   , getGivenConstraints, getWantedConstraints
   , getReturnClass, getBindClass
-  , getSupermonadFor
+  , getSupermonadBindFor, getSupermonadReturnFor
   , addTyVarEquality, addTyVarEqualities
   , addTypeEqualities
   , getTyVarEqualities
@@ -335,11 +335,11 @@ solveSolvedTyConIndices = do
   
   -- Unification solve return constraints that are applied to top-level tycons.
   printMsg "Unification solve return constraints..."
-  unificationSolve prepWantedCts isReturnConstraint (\tc -> fmap snd <$> getSupermonadFor tc)
+  unificationSolve prepWantedCts isReturnConstraint (\tc -> getSupermonadReturnFor tc)
   
   -- Unification solve bind constraints that are applied to top-level tycons.
   printMsg "Unification solve bind constraints..."
-  unificationSolve prepWantedCts isBindConstraint (\tc -> fmap fst <$> getSupermonadFor tc)
+  unificationSolve prepWantedCts isBindConstraint (\tc -> getSupermonadBindFor tc)
   
   where
     unificationSolve :: [(Ct, TyCon, [Type])] 
