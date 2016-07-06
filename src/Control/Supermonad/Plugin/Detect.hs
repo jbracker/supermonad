@@ -6,9 +6,9 @@ module Control.Supermonad.Plugin.Detect
     supermonadModuleName
   , bindClassName, returnClassName, applicativeClassName
   , findSupermonadModule
-  , isBindClass, isReturnClass
+  , isBindClass, isReturnClass, isApplicativeClass
   , isSupermonadModule
-  , findBindClass, findReturnClass
+  , findBindClass, findReturnClass, findApplicativeClass
   , findSupermonads
   , checkSupermonadInstances
     -- * Functor class detection
@@ -166,6 +166,11 @@ isBindClass cls = isClass cls isSupermonadModule bindClassName 3
 isReturnClass :: Class -> Bool
 isReturnClass cls = isClass cls isSupermonadModule returnClassName 1
 
+-- | Checks if the given class matches the shape of the 'Control.Supermonad.Applicative'
+--   type class and is defined in the right module.
+isApplicativeClass :: Class -> Bool
+isApplicativeClass cls = isClass cls isSupermonadModule applicativeClassName 3
+
 -- | Checks if a type class matching the shape and name of the
 --   'Control.Supermonad.Bind' type class is in scope.
 findBindClass :: TcPluginM (Maybe Class)
@@ -175,6 +180,11 @@ findBindClass = findClass isBindClass
 --   'Control.Supermonad.Return' type class is in scope.
 findReturnClass :: TcPluginM (Maybe Class)
 findReturnClass = findClass isReturnClass
+
+-- | Checks if a type class matching the shape and name of the 
+--   'Control.Supermonad.Return' type class is in scope.
+findApplicativeClass :: TcPluginM (Maybe Class)
+findApplicativeClass = findClass isApplicativeClass
 
 -- -----------------------------------------------------------------------------
 -- Local Utility Functions
