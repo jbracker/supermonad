@@ -96,18 +96,38 @@ class (CFunctor m, CFunctor n, CFunctor p) => Applicative m n p where
   type ApplicativeCts m n p (a :: *) (b :: *) :: Constraint
   type ApplicativeCts m n p a b = ()
   
+  type ApplicativeCtsR m n p (a :: *) (b :: *) :: Constraint
+  type ApplicativeCtsR m n p a b = ApplicativeCts m n p a b
+  
+  type ApplicativeCtsL m n p (a :: *) (b :: *) :: Constraint
+  type ApplicativeCtsL m n p a b = ApplicativeCts m n p a b 
+  
   (<*>) :: (ApplicativeCts m n p a b) => m (a -> b) -> n a -> p b
   
   -- TODO: Cannot give standard instances, because they would require 
   -- different constraints.
-  (*>) :: (ApplicativeCts m n p a b) => m a -> n b -> p b
+  (*>) :: (ApplicativeCtsR m n p a b) => m a -> n b -> p b
+  --ma *> nb = (P.id <$ ma) <*> nb
   --ma *> nb = (pure P.id <*> ma) <*> nb
-  (<*) :: (ApplicativeCts m n p a b) => m a -> n b -> p a
+  
+  (<*) :: (ApplicativeCtsL m n p a b) => m a -> n b -> p a
+  --ma <* nb = fmap const ma <*> nb
   --ma <* nb = (pure const <*> ma) <*> nb
+  
 
 -- | 'pure' is defined in terms of return.
 pure :: (Return f, ReturnCts f a) => a -> f a
 pure = return
+
+defaultAppR :: ( Applicative m n p
+               , ApplicativeCts m n p b b, CFunctorCts m a (b -> b)
+               ) => m a -> n b -> p b
+defaultAppR ma nb = (P.id <$ ma) <*> nb
+
+defaultAppL :: ( Applicative m n p
+               , ApplicativeCts m n p b a, CFunctorCts m a (b -> a)
+               ) => m a -> n b -> p a
+defaultAppL ma nb = fmap const ma <*> nb
 
 -- Standard Instances ----------------------------------------------------------
 
@@ -160,6 +180,8 @@ instance Applicative Mon.Dual Mon.Dual Mon.Dual where
 #endif
 instance (Applicative m n p) => Applicative (Mon.Alt m) (Mon.Alt n) (Mon.Alt p) where
   type ApplicativeCts (Mon.Alt m) (Mon.Alt n) (Mon.Alt p) a b = ApplicativeCts m n p a b
+  type ApplicativeCtsR (Mon.Alt m) (Mon.Alt n) (Mon.Alt p) a b = ApplicativeCtsR m n p a b
+  type ApplicativeCtsL (Mon.Alt m) (Mon.Alt n) (Mon.Alt p) a b = ApplicativeCtsL m n p a b
   mf <*> na = Mon.Alt $ (Mon.getAlt mf) <*> (Mon.getAlt na)
   mf *> na = Mon.Alt $ (Mon.getAlt mf) *> (Mon.getAlt na)
   mf <* na = Mon.Alt $ (Mon.getAlt mf) <* (Mon.getAlt na)
@@ -203,6 +225,8 @@ instance Applicative NonEmpty.NonEmpty NonEmpty.NonEmpty NonEmpty.NonEmpty where
 #endif
 instance (Applicative m1 n1 p1, Applicative m2 n2 p2) => Applicative (Product.Product m1 m2) (Product.Product n1 n2) (Product.Product p1 p2) where
   type ApplicativeCts (Product.Product m1 m2) (Product.Product n1 n2) (Product.Product p1 p2) a b = (ApplicativeCts m1 n1 p1 a b, ApplicativeCts m2 n2 p2 a b)
+  type ApplicativeCtsR (Product.Product m1 m2) (Product.Product n1 n2) (Product.Product p1 p2) a b = (ApplicativeCtsR m1 n1 p1 a b, ApplicativeCtsR m2 n2 p2 a b)
+  type ApplicativeCtsL (Product.Product m1 m2) (Product.Product n1 n2) (Product.Product p1 p2) a b = (ApplicativeCtsL m1 n1 p1 a b, ApplicativeCtsL m2 n2 p2 a b)
   Product.Pair m1 m2 <*> Product.Pair n1 n2 = Product.Pair (m1 <*> n1) (m2 <*> n2)
   Product.Pair m1 m2 *> Product.Pair n1 n2 = Product.Pair (m1 *> n1) (m2 *> n2)
   Product.Pair m1 m2 <* Product.Pair n1 n2 = Product.Pair (m1 <* n1) (m2 <* n2)
@@ -242,6 +266,8 @@ instance (Arrow.Arrow a, Arrow.ArrowApply a) => Applicative (Arrow.ArrowMonad a)
 --   
 instance (Applicative m m m, P.Monad m) => Applicative (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) where
   type ApplicativeCts (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) a b = ApplicativeCts m m m a b
+  type ApplicativeCtsR (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) a b = ApplicativeCtsR m m m a b
+  type ApplicativeCtsL (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) a b = ApplicativeCtsL m m m a b
   mf <*> na = App.WrapMonad $ (App.unwrapMonad mf) <*> (App.unwrapMonad na)
   mf *> na = App.WrapMonad $ (App.unwrapMonad mf) *> (App.unwrapMonad na)
   mf <* na = App.WrapMonad $ (App.unwrapMonad mf) <* (App.unwrapMonad na)
@@ -250,7 +276,12 @@ instance Applicative STM.STM STM.STM STM.STM where
   (<*>) = (P.<*>)
   (<*)  = (P.<*)
   (*>)  = (P.*>)
-  
+
+-- Constrained Instances -------------------------------------------------------
+
+instance Applicative S.Set S.Set S.Set where
+  type ApplicativeCts S.Set S.Set S.Set a b = Ord b
+  fs <*> as = S.foldr (\f r -> S.foldr (\a r' -> (S.singleton $ f a) `S.union` r') S.empty as `S.union` r) S.empty fs
 
 -- "transformers" package instances: -------------------------------------------
 
@@ -262,7 +293,9 @@ instance Applicative (Cont.ContT r m) (Cont.ContT r m) (Cont.ContT r m) where
   {-# INLINE (<*>) #-}
 
 instance (Applicative m n p) => Applicative (Except.ExceptT e m) (Except.ExceptT e n) (Except.ExceptT e p) where
-  type ApplicativeCts (Except.ExceptT e m) (Except.ExceptT e n) (Except.ExceptT e p) a b = (ApplicativeCts m n p a b)
+  type ApplicativeCts (Except.ExceptT e m) (Except.ExceptT e n) (Except.ExceptT e p) a b = 
+        ( ApplicativeCts m n p (Either e a) (Either e b)
+        , CFunctorCts m (Either e (a -> b)) (Either e a -> Either e b) )
   Except.ExceptT f <*> Except.ExceptT v = Except.ExceptT $ fmap (<*>) f <*> v
   {-# INLINEABLE (<*>) #-}
 
@@ -273,22 +306,30 @@ instance (Applicative m n p) => Applicative (Identity.IdentityT m) (Identity.Ide
 
 -- Requires undecidable instances.
 instance (Applicative m n p) => Applicative (List.ListT m) (List.ListT n) (List.ListT p) where
-  type ApplicativeCts (List.ListT m) (List.ListT n) (List.ListT p) a b = (ApplicativeCts m n p a b)
+  type ApplicativeCts (List.ListT m) (List.ListT n) (List.ListT p) a b = 
+        ( ApplicativeCts m n p [a] [b]
+        , CFunctorCts m [a -> b] ([a] -> [b]) )
   List.ListT fs <*> List.ListT as = List.ListT $ fmap (<*>) fs <*> as
   {-# INLINE (<*>) #-}
 
 instance (Applicative m n p) => Applicative (Maybe.MaybeT m) (Maybe.MaybeT n) (Maybe.MaybeT p) where
-  type ApplicativeCts (Maybe.MaybeT m) (Maybe.MaybeT n) (Maybe.MaybeT p) a b = (ApplicativeCts m n p a b)
+  type ApplicativeCts (Maybe.MaybeT m) (Maybe.MaybeT n) (Maybe.MaybeT p) a b = 
+        ( ApplicativeCts m n p (Maybe a) (Maybe b)
+        , CFunctorCts m (Maybe (a -> b)) (Maybe a -> Maybe b) )
   Maybe.MaybeT f <*> Maybe.MaybeT x = Maybe.MaybeT $ fmap (<*>) f <*> x
   {-# INLINE (<*>) #-}
 
 instance (P.Monoid w, Bind m n p) => Applicative (RWSL.RWST r w s m) (RWSL.RWST r w s n) (RWSL.RWST r w s p) where
-  type ApplicativeCts (RWSL.RWST r w s m) (RWSL.RWST r w s n) (RWSL.RWST r w s p) a b = (BindCts m n p a b)
+  type ApplicativeCts (RWSL.RWST r w s m) (RWSL.RWST r w s n) (RWSL.RWST r w s p) a b = 
+        ( BindCts m n p (a -> b, s, w) (b, s, w)
+        , CFunctorCts n (a, s, w) (b, s, w) )
   RWSL.RWST mf <*> RWSL.RWST ma  = RWSL.RWST $ \r s -> mf r s >>= \ ~(f, s', w) -> fmap (\ ~(a, s'', w') -> (f a, s'', P.mappend w w')) (ma r s')
   {-# INLINE (<*>) #-}
 
 instance (P.Monoid w, Bind m n p) => Applicative (RWSS.RWST r w s m) (RWSS.RWST r w s n) (RWSS.RWST r w s p) where
-  type ApplicativeCts (RWSS.RWST r w s m) (RWSS.RWST r w s n) (RWSS.RWST r w s p) a b = (BindCts m n p a b)
+  type ApplicativeCts (RWSS.RWST r w s m) (RWSS.RWST r w s n) (RWSS.RWST r w s p) a b = 
+        ( BindCts m n p (a -> b, s, w) (b, s, w)
+        , CFunctorCts n (a, s, w) (b, s, w) )
   RWSS.RWST mf <*> RWSS.RWST ma = RWSS.RWST $ \r s -> mf r s >>= \ (f, s', w) -> fmap (\ (a, s'', w') -> (f a, s'', P.mappend w w')) (ma r s')
   {-# INLINE (<*>) #-}
 
@@ -298,22 +339,30 @@ instance (Applicative m n p) => Applicative (Reader.ReaderT r m) (Reader.ReaderT
   {-# INLINE (<*>) #-}
 
 instance (Bind m n p) => Applicative (StateL.StateT s m) (StateL.StateT s n) (StateL.StateT s p) where
-  type ApplicativeCts (StateL.StateT s m) (StateL.StateT s n) (StateL.StateT s p) a b = (BindCts m n p a b)
+  type ApplicativeCts (StateL.StateT s m) (StateL.StateT s n) (StateL.StateT s p) a b = 
+        ( BindCts m n p (a -> b, s) (b, s)
+        , CFunctorCts n (a, s) (b, s) )
   StateL.StateT mf <*> StateL.StateT ma = StateL.StateT $ \s -> mf s >>= \ ~(f, s') -> fmap (\ ~(a, s'') -> (f a, s'')) (ma s')
   {-# INLINE (<*>) #-}
 
 instance (Bind m n p) => Applicative (StateS.StateT s m) (StateS.StateT s n) (StateS.StateT s p) where
-  type ApplicativeCts (StateS.StateT s m) (StateS.StateT s n) (StateS.StateT s p) a b = (BindCts m n p a b)
+  type ApplicativeCts (StateS.StateT s m) (StateS.StateT s n) (StateS.StateT s p) a b = 
+        ( BindCts m n p (a -> b, s) (b, s)
+        , CFunctorCts n (a, s) (b, s) )
   StateS.StateT mf <*> StateS.StateT ma = StateS.StateT $ \s -> mf s >>= \ (f, s') -> fmap (\ (a, s'') -> (f a, s'')) (ma s')
   {-# INLINE (<*>) #-}
 
 instance (P.Monoid w, Applicative m n p) => Applicative (WriterL.WriterT w m) (WriterL.WriterT w n) (WriterL.WriterT w p) where
-  type ApplicativeCts (WriterL.WriterT w m) (WriterL.WriterT w n) (WriterL.WriterT w p) a b = (ApplicativeCts m n p a b)
+  type ApplicativeCts (WriterL.WriterT w m) (WriterL.WriterT w n) (WriterL.WriterT w p) a b = 
+        ( ApplicativeCts m n p (a, w) (b, w)
+        , CFunctorCts m (a -> b, w) ((a, w) -> (b, w)) )
   WriterL.WriterT mf <*> WriterL.WriterT ma = WriterL.WriterT $ fmap (\ ~(f, w) ~(a, w') -> (f a, P.mappend w w')) mf <*> ma
   {-# INLINE (<*>) #-}
 
 instance (P.Monoid w, Applicative m n p) => Applicative (WriterS.WriterT w m) (WriterS.WriterT w n) (WriterS.WriterT w p) where
-  type ApplicativeCts (WriterS.WriterT w m) (WriterS.WriterT w n) (WriterS.WriterT w p) a b = (ApplicativeCts m n p a b)
+  type ApplicativeCts (WriterS.WriterT w m) (WriterS.WriterT w n) (WriterS.WriterT w p) a b = 
+        ( ApplicativeCts m n p (a, w) (b, w)
+        , CFunctorCts m (a -> b, w) ((a, w) -> (b, w)) )
   WriterS.WriterT mf <*> WriterS.WriterT ma = WriterS.WriterT $ fmap (\ (f, w) (a, w') -> (f a, P.mappend w w')) mf <*> ma
   {-# INLINE (<*>) #-}
   
