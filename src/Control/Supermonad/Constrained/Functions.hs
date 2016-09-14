@@ -28,11 +28,11 @@ module Control.Supermonad.Constrained.Functions
     -- ** Generalizations of list functions
   , join
   -- , msum, mfilter -- FIXME: Requires an alternative of 'MonadPlus'.
-  , filterM -- FIXME / TODO: Plugin does not support without type annotation
+  , filterM
   , mapAndUnzipM
   , zipWithM, zipWithM_
   , foldM, foldM_
-  , replicateM, replicateM_ -- FIXME / TODO: Plugin does not support without type annotation
+  , replicateM, replicateM_
     -- ** Conditional execution of monadic expressions
   -- , guard -- FIXME: Requires an alternative of 'Alternative'
   , when, unless
