@@ -9,7 +9,6 @@ module Control.Supermonad.Plugin.Environment
     -- * Polymonad Plugin Environment Access
   , getBindClass, getReturnClass
   , getSupermonadModule
-  , getIdentityTyCon, getIdentityModule
   , getGivenConstraints, getWantedConstraints
   , getInstEnvs
   , getBindInstances
@@ -56,11 +55,8 @@ import Control.Supermonad.Plugin.Constraint
 import Control.Supermonad.Plugin.Detect
   ( findSupermonadModule
   , findBindClass, findReturnClass
-  , findIdentityModule, findIdentityTyCon
   , findInstancesInScope
-  , identityModuleName
   , bindClassName, returnClassName
-  , identityTyConName
   , findSupermonads
   , checkSupermonadInstances )
 
@@ -85,10 +81,6 @@ data SupermonadPluginEnv = SupermonadPluginEnv
   -- ^ The 'Bind' class.
   , smEnvReturnClass :: Class
   -- ^ The 'Return' class.
-  , smEnvIdentityModule :: Module
-  -- ^ The 'Data.Functor.Identity' module.
-  , smEnvIdentityTyCon :: TyCon
-  -- ^ The 'Identity' type constructor.
   , smEnvBindInstances :: [ClsInst]
   -- ^ Collection of all 'Bind' instances.
   , smEnvGivenConstraints  :: [GivenCt]
@@ -122,8 +114,6 @@ runSupermonadPlugin givenCts wantedCts smM = do
   mSupermonadMdl <- findSupermonadModule
   mBindCls <- findBindClass
   mReturnCls <- findReturnClass
-  mIdMdl <- findIdentityModule
-  mIdTyCon <- findIdentityTyCon
   -- Calculate the supermonads in scope and check for rogue bind and return instances.
   (smInsts, smErrors) <- case (mBindCls, mReturnCls) of
       (Just bindCls, Just returnCls) -> do
@@ -132,8 +122,8 @@ runSupermonadPlugin givenCts wantedCts smM = do
         return $ (smInsts, fmap snd smErrors ++ fmap snd smCheckErrors) 
       (_, _) -> return mempty
   -- Try to construct the environment or throw errors
-  case (mSupermonadMdl, mBindCls, mReturnCls, mIdMdl, mIdTyCon, smErrors) of
-    (Right supermonadMdl, Just bindCls, Just returnCls, Right idMdl, Just idTyCon, []) -> do
+  case (mSupermonadMdl, mBindCls, mReturnCls, smErrors) of
+    (Right supermonadMdl, Just bindCls, Just returnCls, []) -> do
       let initState = SupermonadPluginState 
             { smStateTyVarEqualities = []
             , smStateTypeEqualities  = []
@@ -144,8 +134,6 @@ runSupermonadPlugin givenCts wantedCts smM = do
         { smEnvSupermonadModule  = supermonadMdl
         , smEnvBindClass         = bindCls
         , smEnvReturnClass       = returnCls
-        , smEnvIdentityModule    = idMdl
-        , smEnvIdentityTyCon     = idTyCon
         , smEnvBindInstances     = bindInsts
         , smEnvGivenConstraints  = givenCts
         , smEnvWantedConstraints = wantedCts
@@ -154,29 +142,20 @@ runSupermonadPlugin givenCts wantedCts smM = do
       return $ case eResult of
         Left  err -> Left err
         Right (a, _res) -> Right a
-    (Left mdlErrMsg, _, _, _, _, _) -> do
+    (Left mdlErrMsg, _, _, _) -> do
       let msg = "Could not find supermonad module:"
       L.printErr msg
       L.printErr $ L.sDocToStr mdlErrMsg
       return $ Left $ stringToSupermonadError msg O.$$ mdlErrMsg
-    (_, Nothing, _, _, _, _) -> do
+    (_, Nothing, _, _) -> do
       let msg = "Could not find " ++ bindClassName ++ " class!"
       L.printErr msg
       return $ Left $ stringToSupermonadError msg
-    (_, _, Nothing, _, _, _) -> do
+    (_, _, Nothing, _) -> do
       let msg = "Could not find " ++ returnClassName ++ " class!"
       L.printErr msg
       return $ Left $ stringToSupermonadError msg
-    (_, _, _, Left mdlErrMsg, _, _) -> do
-      let msg = "Could not find " ++ identityModuleName ++ " module:"
-      L.printErr msg
-      L.printErr $ L.sDocToStr mdlErrMsg
-      return $ Left $ stringToSupermonadError msg O.$$ mdlErrMsg
-    (_, _, _, _, Nothing, _) -> do
-      let msg = "Could not find " ++ identityTyConName ++ " type constructor!"
-      L.printErr msg
-      return $ Left $ stringToSupermonadError msg
-    (_, _, _, _, _, _) -> do
+    (_, _, _, _) -> do
       let msg = "Problems when finding supermonad instances:"
       let sdocErr = O.vcat smErrors
       L.printErr msg
@@ -203,14 +182,6 @@ getReturnClass = asks smEnvReturnClass
 -- | The 'Control.Supermonad' module.
 getSupermonadModule :: SupermonadPluginM Module
 getSupermonadModule = asks smEnvSupermonadModule
-
--- | Returns the module that contains the 'Data.Functor.Identity' data type.
-getIdentityModule :: SupermonadPluginM Module
-getIdentityModule = asks smEnvIdentityModule
-
--- | Returns the type constructor of the 'Data.Functor.Identity' data type.
-getIdentityTyCon :: SupermonadPluginM TyCon
-getIdentityTyCon = asks smEnvIdentityTyCon
 
 -- | Returns all of the /given/ and /derived/ constraints of this plugin call.
 getGivenConstraints :: SupermonadPluginM [GivenCt]
