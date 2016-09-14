@@ -24,10 +24,6 @@ module Control.Supermonad
     Bind(..), Return(..), Fail(..)
     -- * Conveniences
   , Monad
-    -- * Reexports
-    -- Reexporting this is convenient for users, because they don't
-    -- have to remember to import Data.Functor.Identity separatly anymore.
-  , Identity( Identity, runIdentity )
   ) where
 
 import Prelude
@@ -38,7 +34,7 @@ import Prelude
   )
 import qualified Prelude as P
 
-import Data.Functor.Identity ( Identity( Identity, runIdentity ) )
+import Data.Functor.Identity ( Identity )
 
 import GHC.Exts ( Constraint )
 

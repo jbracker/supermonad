@@ -25,10 +25,6 @@ module Control.Supermonad.Constrained
   , CFunctor(..)
     -- * Conveniences
   , Monad
-    -- * Reexports
-    -- Reexporting this is convenient for users, because they don't
-    -- have to remember to import Data.Functor.Identity separatly anymore.
-  , Identity( Identity, runIdentity )
   ) where
 
 import GHC.Exts ( Constraint )
