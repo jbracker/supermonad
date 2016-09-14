@@ -12,6 +12,32 @@ copyright:           Copyright (c) 2016, Jan Bracker
 build-type:          Simple
 cabal-version:       >=1.10
 tested-with:         GHC == 7.10.3, GHC == 8.0.1
+extra-source-files: README.md
+                  , Makefile
+                  , compile-all.sh
+                  , examples/constrained/constrained-example.cabal
+                  , examples/constrained/*.hs
+                  , examples/effect/effect-example.cabal
+                  , examples/effect/*.hs
+                  , examples/session/session-example.cabal
+                  , examples/session/*.hs
+                  , examples/session-chat/original/session-chat-orig-example.cabal
+                  , examples/session-chat/original/*.hs
+                  , examples/session-chat/supermonad/session-chat-supermonad-example.cabal
+                  , examples/session-chat/supermonad/*.hs
+                  , examples/hmtc/monad-param/hmtc-monad-param.cabal
+                  , examples/hmtc/monad-param/Makefile
+                  , examples/hmtc/monad-param/*.y
+                  , examples/hmtc/monad-param/*.hs
+                  , examples/hmtc/original/hmtc-orig.cabal
+                  , examples/hmtc/original/Makefile
+                  , examples/hmtc/original/*.y
+                  , examples/hmtc/original/*.hs
+                  , examples/hmtc/supermonad/hmtc-supermonad.cabal
+                  , examples/hmtc/supermonad/Makefile
+                  , examples/hmtc/supermonad/*.y
+                  , examples/hmtc/supermonad/*.hs
+                  , examples/hmtc/test-files/*.mt
 description:
 
     The @supermonad@ library adds support for supermonads to GHC
