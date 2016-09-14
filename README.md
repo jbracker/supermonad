@@ -35,6 +35,12 @@ To use supermonads in a module you need to do the following:
 If you file a bug report, please always include the version of GHC 
 you are working with and a minimal example that shows the problem.
 
+## Examples
+
+Examples for the use of the plugin with different kinds of monad generalizations 
+are provided in the `examples` directory. All examples have their own separate 
+cabal file and offer a version of the code with and without the use of supermonads.
+
 ## Known Problems
 
 * The `effect` example will not compile with GHC 8+, 
