@@ -1,4 +1,4 @@
-name:                supermonad-plugin
+name:                supermonad
 version:             0.1
 synopsis:            Plugin and base library to support super monads in Haskell
 category:            Type System, Plugin, Monad
@@ -6,7 +6,7 @@ license:             BSD3
 license-file:        LICENSE
 author:              Jan Bracker <jan.bracker@googlemail.com>
 maintainer:          Jan Bracker <jan.bracker@googlemail.com>
-bug-reports:         https://github.com/jbracker/supermonad-plugin/issues
+bug-reports:         https://github.com/jbracker/supermonad/issues
 stability:           experimental
 copyright:           Copyright (c) 2016, Jan Bracker
 build-type:          Simple
@@ -20,7 +20,7 @@ description:
 
 source-repository head
   type:     git
-  location: https://github.com/jbracker/supermonad-plugin.git
+  location: https://github.com/jbracker/supermonad.git
 
 library
   exposed-modules: Control.Supermonad
