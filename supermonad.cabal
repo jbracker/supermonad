@@ -13,8 +13,8 @@ build-type:          Simple
 cabal-version:       >=1.10
 description:
 
-    The @supermonad-plugin@ library adds support for super monads to GHC
-    using typechecker plugins. Plugins are available from GHC 7.10 onwards.
+    The @supermonad@ library adds support for supermonads to GHC
+    using a type checker plugin. Plugins are available from GHC 7.10 onwards.
     The base library containing the Haskell representation of super monads
     is also given by this package.
 
