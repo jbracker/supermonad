@@ -15,7 +15,7 @@ executable session-chat-supermonad
                , indexed         == 0.1
                , stm             >= 2.4
                , simple-sessions == 0.1.3
-               , supermonad-plugin == 0.1
+               , supermonad      == 0.1
   main-is: Main.hs
   hs-source-dirs:      .
   other-modules: Server

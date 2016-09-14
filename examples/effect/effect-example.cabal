@@ -25,7 +25,7 @@ executable effect-example-pm
   build-depends:  base              >= 4.8,
                   effect-monad      == 0.6.1,
                   type-level-sets   == 0.5,
-                  supermonad-plugin == 0.1
+                  supermonad        == 0.1
   main-is:             MainSupermonad.hs
   hs-source-dirs:      .
   default-language:    Haskell2010
@@ -46,7 +46,7 @@ executable effect-example2-pm
   build-depends:  base              >= 4.8,
                   effect-monad      == 0.6.1,
                   type-level-sets   == 0.5,
-                  supermonad-plugin == 0.1
+                  supermonad        == 0.1
   main-is:             MainSupermonad2.hs
   hs-source-dirs:      .
   default-language:    Haskell2010
@@ -68,7 +68,7 @@ executable effect-example3-pm
   build-depends:  base              >= 4.8,
                   effect-monad      == 0.6.1,
                   type-level-sets   == 0.5,
-                  supermonad-plugin == 0.1
+                  supermonad        == 0.1
   main-is:             MainSupermonad3.hs
   hs-source-dirs:      .
   default-language:    Haskell2010
