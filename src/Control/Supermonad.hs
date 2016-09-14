@@ -80,7 +80,31 @@ import qualified Control.Monad.Trans.Writer.Strict as WriterS ( WriterT(..) )
 -- Supermonad Type Class
 -- -----------------------------------------------------------------------------
 
--- | TODO
+-- | Representation of bind operations for supermonads.
+--   A proper supermonad consists of an instance 
+--   for 'Bind', 'Return' and optionally 'Fail'.
+--   
+--   The instances are required to follow a certain scheme.
+--   If the type constructor of your supermonad is @M@ there
+--   may only be exactly one 'Bind' and one 'Return' instance 
+--   that look as follows:
+--   
+-- > instance Bind (M ...) (M ...) (M ...) where
+-- >   ...
+-- > instance Return (M ...) where
+-- >   ...
+--   
+--   This is enforced by the plugin. A compilation error will
+--   result from either instance missing or multiple instances
+--   for @M@.
+--   
+--   For supermonads we expect the usual monad laws to hold:
+--   
+--   * @'return' a '>>=' k  =  k a@
+--   * @m '>>=' 'return'  =  m@
+--   * @m '>>=' (\\x -> k x '>>=' h)  =  (m '>>=' k) '>>=' h@
+--   * @'fmap' f xs  =  xs '>>=' 'return' . f@
+--   
 class (Functor m, Functor n, Functor p) => Bind m n p where
   type BindCts m n p :: Constraint
   type BindCts m n p = ()
@@ -270,7 +294,7 @@ instance (P.Monoid w, Bind m n p) => Bind (WriterS.WriterT w m) (WriterS.WriterT
 -- Return Type Class
 -- -----------------------------------------------------------------------------
 
--- | TODO
+-- | See 'Bind' for details on laws and requirements.
 class (Functor m) => Return m where
   type ReturnCts m :: Constraint
   type ReturnCts m = ()
@@ -416,7 +440,7 @@ instance (P.Monoid w, Return m) => Return (WriterS.WriterT w m) where
 -- Fail Type Class
 -- -----------------------------------------------------------------------------
 
--- | TODO
+-- | See 'Bind' for details on laws and requirements.
 class Fail m where
   type FailCts m :: Constraint
   type FailCts m = ()

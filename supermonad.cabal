@@ -18,6 +18,8 @@ description:
     using a type checker plugin. Plugins are available from GHC 7.10 onwards.
     The base library containing the Haskell representation of super monads
     is also given by this package.
+    
+    Additional information can be found in the <https://github.com/jbracker/supermonad README>.
 
 source-repository head
   type:     git

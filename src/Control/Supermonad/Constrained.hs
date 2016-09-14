@@ -88,7 +88,7 @@ import Control.Supermonad.Constrained.Functor
 -- Supermonad Type Class
 -- -----------------------------------------------------------------------------
 
--- | TODO
+-- | See @Control.Supermonad.@'Control.Supermonad.Bind' for details on laws and requirements.
 class (CFunctor m, CFunctor n, CFunctor p) => Bind m n p where
   type BindCts m n p (a :: *) (b :: *) :: Constraint
   type BindCts m n p a b = ()
@@ -274,7 +274,7 @@ instance (P.Monoid w, Bind m n p) => Bind (WriterS.WriterT w m) (WriterS.WriterT
 -- Return Type Class
 -- -----------------------------------------------------------------------------
 
--- | TODO
+-- | See 'Bind' for details on laws and requirements.
 class (CFunctor m) => Return m where
   type ReturnCts m (a :: *) :: Constraint
   type ReturnCts m a = ()
@@ -424,7 +424,7 @@ instance (P.Monoid w, Return m) => Return (WriterS.WriterT w m) where
 -- Fail Type Class
 -- -----------------------------------------------------------------------------
 
--- | TODO
+-- | See 'Bind' for details on laws and requirements.
 class Fail m where
   type FailCts m (a :: *) :: Constraint
   type FailCts m a = ()
