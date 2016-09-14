@@ -1,6 +1,6 @@
 name:                supermonad
 version:             0.1
-synopsis:            Plugin and base library to support super monads in Haskell
+synopsis:            Plugin and base library to support supermonads in Haskell
 category:            Type System, Plugin, Monad
 license:             BSD3
 license-file:        LICENSE
