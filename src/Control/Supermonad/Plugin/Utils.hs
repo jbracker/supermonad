@@ -10,7 +10,6 @@ module Control.Supermonad.Plugin.Utils (
   -- * General Utilities
   , skolemVarsBindFun
   , eqTyVar, eqTyVar'
-  , eqTyCon
   , getTyConName
   , isAmbiguousType
   , partiallyApplyTyCons
@@ -162,11 +161,6 @@ eqTyVar' tv ty = case getTyVar_maybe ty of
 -- | Returns the arity of a given type variable.
 tyVarArity :: TyVar -> Arity
 tyVarArity = length . fst . splitKindFunTys . tyVarKind
-
--- | Checks if the given type constructors equals the given type.
--- TODO: Test!
-eqTyCon :: TyCon -> Type -> Bool
-eqTyCon tc = eqType (mkTyConTy tc)
 
 -- | Returns the string representation of the given type constructor in the source code.
 getTyConName :: TyCon -> String
