@@ -26,10 +26,6 @@ module Control.Supermonad
   , Applicative(..), pure
     -- * Conveniences
   , Monad
-    -- * Reexports
-    -- Reexporting this is convenient for users, because they don't
-    -- have to remember to import Data.Functor.Identity separatly anymore.
-  , Identity( Identity, runIdentity )
   ) where
 
 import Prelude
@@ -40,7 +36,7 @@ import Prelude
   )
 import qualified Prelude as P
 
-import Data.Functor.Identity ( Identity( Identity, runIdentity ) )
+import Data.Functor.Identity ( Identity )
 
 import GHC.Exts ( Constraint )
 
@@ -311,7 +307,31 @@ instance (P.Monoid w, Applicative m n p) => Applicative (WriterS.WriterT w m) (W
 -- Supermonad Type Class - Bind
 -- -----------------------------------------------------------------------------
 
--- | TODO
+-- | Representation of bind operations for supermonads.
+--   A proper supermonad consists of an instance 
+--   for 'Bind', 'Return' and optionally 'Fail'.
+--   
+--   The instances are required to follow a certain scheme.
+--   If the type constructor of your supermonad is @M@ there
+--   may only be exactly one 'Bind' and one 'Return' instance 
+--   that look as follows:
+--   
+-- > instance Bind (M ...) (M ...) (M ...) where
+-- >   ...
+-- > instance Return (M ...) where
+-- >   ...
+--   
+--   This is enforced by the plugin. A compilation error will
+--   result from either instance missing or multiple instances
+--   for @M@.
+--   
+--   For supermonads we expect the usual monad laws to hold:
+--   
+--   * @'return' a '>>=' k  =  k a@
+--   * @m '>>=' 'return'  =  m@
+--   * @m '>>=' (\\x -> k x '>>=' h)  =  (m '>>=' k) '>>=' h@
+--   * @'fmap' f xs  =  xs '>>=' 'return' . f@
+--   
 class (Applicative m n p) => Bind m n p where
   type BindCts m n p :: Constraint
   type BindCts m n p = ()
@@ -501,7 +521,7 @@ instance (P.Monoid w, Bind m n p) => Bind (WriterS.WriterT w m) (WriterS.WriterT
 -- Return Type Class
 -- -----------------------------------------------------------------------------
 
--- | TODO
+-- | See 'Bind' for details on laws and requirements.
 class (Functor m) => Return m where
   type ReturnCts m :: Constraint
   type ReturnCts m = ()
@@ -647,7 +667,7 @@ instance (P.Monoid w, Return m) => Return (WriterS.WriterT w m) where
 -- Fail Type Class
 -- -----------------------------------------------------------------------------
 
--- | TODO
+-- | See 'Bind' for details on laws and requirements.
 class Fail m where
   type FailCts m :: Constraint
   type FailCts m = ()

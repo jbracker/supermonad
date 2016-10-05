@@ -65,7 +65,7 @@ import qualified Control.Monad.Trans.Writer.Strict as WriterS ( WriterT(..), map
 -- -----------------------------------------------------------------------------
 
 -- | Class for constrained functors. Obeys all of the same laws as the standard
---   'Functor' class, but allows to constrain the functors result type.
+--   'Prelude.Functor' class, but allows to constrain the functors result type.
 class CFunctor f where
   type CFunctorCts f (a :: *) (b :: *) :: Constraint
   type CFunctorCts f a b = ()
