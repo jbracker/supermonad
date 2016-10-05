@@ -45,7 +45,7 @@ module CodeGenMonad (
 import Control.Supermonad.Prelude
 
 -- Standard library imports
-import Control.Applicative      -- Backwards compatibibility
+--import Control.Applicative      -- Backwards compatibibility
 
 -- HMTC module imports
 import Name
@@ -95,9 +95,7 @@ instance Functor (CG i x) where
             (a, cgs')
 
 
-instance Applicative (CG i x) where
-    pure a = CG $ \cgs -> (a, cgs)
-
+instance Applicative (CG i x) (CG i x) (CG i x) where
     cgf <*> cga = CG $ \cgs ->
         let
             (f, cgs')  = unCG cgf cgs
@@ -122,7 +120,7 @@ instance Bind (CG i x) (CG i x) (CG i x) where
         in
             unCG (f a) cgs'
 instance Return (CG i x) where
-  return = pure
+  return a = CG $ \cgs -> (a, cgs)
 instance Fail (CG i x) where
   fail = error
 
