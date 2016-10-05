@@ -8,6 +8,7 @@
 
 -- Use the polymonad plugin.
 {-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 
 -- Remove this so compilation creates a proper executable.
 --module MainPolymonad ( main ) where
@@ -17,6 +18,8 @@ import Control.Supermonad.Prelude
 
 import Control.Monad.Indexed
   ( IxPointed(..), (>>>=) )
+import Data.Functor.Indexed
+  ( IxApplicative(..) )
 import Control.Monad.Trans.State ( StateT(..) ) 
 
 import Control.Concurrent
@@ -34,6 +37,9 @@ import Control.Concurrent.SimpleSession.SessionTypes
 instance Functor (Session i j) where
   fmap = fmap
 
+instance Applicative (Session i j) (Session j k) (Session i k) where
+  (<*>) = iap
+  
 instance Bind (Session i j) (Session j k) (Session i k) where
   (>>=) = (>>>=)
 
@@ -47,7 +53,7 @@ type Ping = Eps :+: (String :!: String :?: Var Z)
 type Pong = Eps :&: (String :?: String :!: Var Z)
 
 liftS :: ( BindCts (Session i j) (Session j j) (Session i j)
-         , ReturnCts (Session j j)
+         --, ReturnCts (Session j j)
          ) => Session i j a -> StateT s (Session i j) a
 liftS sess = StateT $ \s -> sess >>= \a -> return (a, s)
 
