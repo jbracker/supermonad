@@ -27,7 +27,11 @@ import qualified Control.Effect as E
 import Control.Effect.State
 
 instance Functor (State (s :: [*])) where
-  fmap f ma = State $ \s -> let (a, s') = runState ma s in (f a, s') 
+  fmap f ma = State $ \s -> let (a, s') = runState ma s in (f a, s')
+
+instance ( h ~ Plus State f g ) => Applicative (State (f :: [*])) (State (g :: [*])) (State (h :: [*])) where
+  type ApplicativeCts (State (f :: [*])) (State (g :: [*])) (State (h :: [*])) = Inv State f g
+  (State mf) <*> (State ma) = State $ undefined
 
 instance ( h ~ Plus State f g ) => Bind (State (f :: [*])) (State (g :: [*])) (State (h :: [*])) where
   type BindCts (State (f :: [*])) (State (g :: [*])) (State (h :: [*])) = Inv State f g
