@@ -2,7 +2,7 @@
 {-# LANGUAGE RebindableSyntax #-}
 {-# LANGUAGE TypeOperators #-}
 
-{-# OPTIONS_GHC -Wno-name-shadowing #-}
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
 module Main ( main ) where
 
