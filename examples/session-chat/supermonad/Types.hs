@@ -7,6 +7,8 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeFamilies #-}
 
+{-# OPTIONS_GHC -fno-warn-orphans #-}
+
 module Types 
   ( Message, User
   , Update(..), Request(..), Response(..)
@@ -32,6 +34,9 @@ instance Functor (Session i j) where
 
 instance Bind (Session i j) (Session j k) (Session i k) where
   (>>=) = (>>>=)
+
+instance Applicative (Session i j) (Session j k) (Session i k) where
+  mf <*> ma = mf >>= \f -> fmap f ma
 
 instance Return (Session i i) where
   return = ireturn

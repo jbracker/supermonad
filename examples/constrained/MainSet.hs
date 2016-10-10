@@ -11,7 +11,6 @@
 
 import Control.Supermonad.Constrained.Prelude
 
-import Data.Set ( Set )
 import qualified Data.Set as S
 
 main :: IO ()

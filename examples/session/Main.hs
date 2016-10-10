@@ -2,6 +2,8 @@
 {-# LANGUAGE RebindableSyntax #-}
 {-# LANGUAGE TypeOperators #-}
 
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
+
 module Main ( main ) where
 
 import Prelude
@@ -14,7 +16,7 @@ import Control.Monad
   ( Monad (..) )
 
 import Control.Monad.Indexed
-  ( IxMonad(..), (>>>=) )
+  ( (>>>=) )
 
 import Control.Concurrent
   ( forkIO )
