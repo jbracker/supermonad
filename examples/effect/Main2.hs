@@ -15,7 +15,7 @@ ifThenElse False t e = e
 
 main :: IO ()
 main = do
-  let l = runReader (flatFilter tree) (Ext (vThres :-> 3) Empty)
+  let l = runReader (flatFilter tree) (Ext vThres 3 Empty)
   print l
   print (sum l)
   where (>>) = (P.>>)
@@ -32,7 +32,7 @@ data Tree = Leaf Int
 tree :: Tree
 tree = Branch (Branch (Leaf 1) (Leaf 4)) (Leaf 5)
 
-flatFilter :: Tree -> Reader '["thres" :-> Int] [Int]
+flatFilter :: Tree -> Reader '["thres" ':-> Int] [Int]
 flatFilter ( Leaf i ) = do
   thres <- ask vThres
   return (if i < thres then [] else [i])

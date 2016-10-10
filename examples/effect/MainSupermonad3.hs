@@ -31,12 +31,16 @@ instance (h ~ Plus Counter f g) => Bind (Counter (f :: Nat)) (Counter (g :: Nat)
 instance Return (Counter (0 :: Nat)) where
   return = E.return
 
+instance (h ~ Plus Counter f g) => Applicative (Counter (f :: Nat)) (Counter (g :: Nat)) (Counter (h :: Nat)) where
+  type ApplicativeCts (Counter (f :: Nat)) (Counter (g :: Nat)) (Counter (h :: Nat)) = Inv Counter f g
+  mf <*> ma = mf E.>>= \f -> fmap f ma
+
 instance Fail (Counter (h :: Nat)) where
   fail = E.fail
 
 main :: IO ()
 main = do
-  print $ forget (limitedOp 1 2 3 4)
+  print $ forget (limitedOp 1 2 3 4) -- 10
 
 specialOp :: Int -> Int -> Counter 1 Int
 specialOp n m = tick (n + m)

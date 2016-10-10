@@ -26,22 +26,28 @@ import qualified Control.Effect as E
 import Control.Effect ( Plus, Inv )
 import Control.Effect.Reader
 
-instance Functor (Reader (s :: [*])) where
+import GHC.TypeLits ( Symbol )
+
+instance Functor (Reader (s :: [Mapping Symbol *])) where
   fmap f ma = IxR $ \s -> f $ runReader ma s
 
-instance ( h ~ Plus Reader f g) => Bind (Reader (f :: [*])) (Reader (g :: [*])) (Reader (h :: [*])) where
-  type BindCts (Reader (f :: [*])) (Reader (g :: [*])) (Reader (h :: [*])) = Inv Reader f g
+instance ( h ~ Plus Reader f g) => Bind (Reader (f :: [Mapping Symbol *])) (Reader (g :: [Mapping Symbol *])) (Reader (h :: [Mapping Symbol *])) where
+  type BindCts (Reader (f :: [Mapping Symbol *])) (Reader (g :: [Mapping Symbol *])) (Reader (h :: [Mapping Symbol *])) = Inv Reader f g
   (>>=) = (E.>>=)
 
 instance Return (Reader '[]) where
   return = E.return
 
-instance Fail (Reader (h :: [*])) where
+instance ( h ~ Plus Reader f g) => Applicative (Reader (f :: [Mapping Symbol *])) (Reader (g :: [Mapping Symbol *])) (Reader (h :: [Mapping Symbol *])) where
+  type ApplicativeCts (Reader (f :: [Mapping Symbol *])) (Reader (g :: [Mapping Symbol *])) (Reader (h :: [Mapping Symbol *])) = Inv Reader f g
+  mf <*> ma = mf E.>>= \f -> fmap f ma
+
+instance Fail (Reader (h :: [Mapping Symbol *])) where
   fail = E.fail
 
 main :: IO ()
 main = do
-  let l = runReader (flatFilter tree) (Ext (vThres :-> 3) Empty)
+  let l = runReader (flatFilter tree) (Ext vThres 3 Empty)
   print l
   print (sum l)
 
@@ -55,7 +61,7 @@ data Tree = Leaf Int
 tree :: Tree
 tree = Branch (Branch (Leaf 1) (Leaf 4)) (Leaf 5)
 
-flatFilter :: Tree -> Reader '["thres" :-> Int] [Int]
+flatFilter :: Tree -> Reader '["thres" ':-> Int] [Int]
 flatFilter ( Leaf i ) = do
   thres <- ask vThres
   return (if i < thres then [] else [i])

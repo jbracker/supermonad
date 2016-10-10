@@ -31,7 +31,7 @@ instance Functor (State (s :: [*])) where
 
 instance ( h ~ Plus State f g ) => Applicative (State (f :: [*])) (State (g :: [*])) (State (h :: [*])) where
   type ApplicativeCts (State (f :: [*])) (State (g :: [*])) (State (h :: [*])) = Inv State f g
-  (State mf) <*> (State ma) = State $ undefined
+  mf <*> ma = mf E.>>= \f -> fmap f ma
 
 instance ( h ~ Plus State f g ) => Bind (State (f :: [*])) (State (g :: [*])) (State (h :: [*])) where
   type BindCts (State (f :: [*])) (State (g :: [*])) (State (h :: [*])) = Inv State f g
