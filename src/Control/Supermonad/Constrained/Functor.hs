@@ -1,15 +1,15 @@
 
 {-# LANGUAGE CPP #-}
 
-{-# LANGUAGE ConstraintKinds #-} -- 'CFunctor' class.
-{-# LANGUAGE TypeFamilies    #-} -- 'CFunctor' class.
+{-# LANGUAGE ConstraintKinds #-} -- 'Functor' class.
+{-# LANGUAGE TypeFamilies    #-} -- 'Functor' class.
 
 {-# LANGUAGE UndecidableInstances #-} -- Required for some of the 'transformer' instances.
 
 -- | Definition of constrained functors as they are required to work with
 --   constrained monads and constrained supermonads.
 module Control.Supermonad.Constrained.Functor 
-  ( CFunctor(..)
+  ( Functor(..)
   ) where
 
 import Prelude
@@ -66,185 +66,185 @@ import qualified Control.Monad.Trans.Writer.Strict as WriterS ( WriterT(..), map
 
 -- | Class for constrained functors. Obeys all of the same laws as the standard
 --   'Prelude.Functor' class, but allows to constrain the functors result type.
-class CFunctor f where
-  type CFunctorCts f (a :: *) (b :: *) :: Constraint
-  type CFunctorCts f a b = ()
+class Functor f where
+  type FunctorCts f (a :: *) :: Constraint
+  type FunctorCts f a = ()
   
-  fmap :: (CFunctorCts f a b) => (a -> b) -> f a -> f b
-  (<$) :: (CFunctorCts f b a) => a -> f b -> f a
+  fmap :: (FunctorCts f a, FunctorCts f b) => (a -> b) -> f a -> f b
+  (<$) :: (FunctorCts f a, FunctorCts f b) => a -> f b -> f a
   (<$) = fmap . const
 
 -- Unconstrained instances -----------------------------------------------------
 
-instance CFunctor ((->) r) where
+instance Functor ((->) r) where
   fmap = P.fmap
   (<$) = (P.<$)
-instance CFunctor Identity where
+instance Functor Identity where
   fmap = P.fmap
   (<$) = (P.<$)
-instance CFunctor [] where
+instance Functor [] where
   fmap = P.fmap
   (<$) = (P.<$)
-instance CFunctor P.Maybe where
+instance Functor P.Maybe where
   fmap = P.fmap
   (<$) = (P.<$)
-instance CFunctor P.IO where
+instance Functor P.IO where
   fmap = P.fmap
   (<$) = (P.<$)
-instance CFunctor (P.Either e) where
+instance Functor (P.Either e) where
   fmap = P.fmap
   (<$) = (P.<$)
 
-instance CFunctor Mon.First where
+instance Functor Mon.First where
   fmap = P.fmap
   (<$) = (P.<$)
-instance CFunctor Mon.Last where
+instance Functor Mon.Last where
   fmap = P.fmap
   (<$) = (P.<$)
 #if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
-instance CFunctor Mon.Sum where
+instance Functor Mon.Sum where
   fmap = P.fmap
   (<$) = (P.<$)
-instance CFunctor Mon.Product where
+instance Functor Mon.Product where
   fmap = P.fmap
   (<$) = (P.<$)
-instance CFunctor Mon.Dual where
+instance Functor Mon.Dual where
   fmap = P.fmap
   (<$) = (P.<$)
 #endif
-instance (CFunctor f) => CFunctor (Mon.Alt f) where
-  type CFunctorCts (Mon.Alt f) a b = CFunctorCts f a b
+instance (Functor f) => Functor (Mon.Alt f) where
+  type FunctorCts (Mon.Alt f) a = FunctorCts f a
   fmap f (Mon.Alt ma) = Mon.Alt $ fmap f ma
   a <$ (Mon.Alt mb) = Mon.Alt $ a <$ mb
 
 #if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
-instance CFunctor Semigroup.Min where
+instance Functor Semigroup.Min where
   fmap = P.fmap
   (<$) = (P.<$)
-instance CFunctor Semigroup.Max where
+instance Functor Semigroup.Max where
   fmap = P.fmap
   (<$) = (P.<$)
-instance CFunctor Semigroup.Option where
+instance Functor Semigroup.Option where
   fmap = P.fmap
   (<$) = (P.<$)
-instance CFunctor Semigroup.First where
+instance Functor Semigroup.First where
   fmap = P.fmap
   (<$) = (P.<$)
-instance CFunctor Semigroup.Last where
+instance Functor Semigroup.Last where
   fmap = P.fmap
   (<$) = (P.<$)
 #endif
 
-instance CFunctor Proxy.Proxy where
+instance Functor Proxy.Proxy where
   fmap = P.fmap
   (<$) = (P.<$)
 #if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
-instance CFunctor Complex.Complex where
+instance Functor Complex.Complex where
   fmap = P.fmap
   (<$) = (P.<$)
-instance CFunctor NonEmpty.NonEmpty where
+instance Functor NonEmpty.NonEmpty where
   fmap = P.fmap
   (<$) = (P.<$)
 #endif
-instance (CFunctor f, CFunctor g) => CFunctor (Product.Product f g) where
-  type CFunctorCts (Product.Product f g) a b = (CFunctorCts f a b, CFunctorCts g a b)
+instance (Functor f, Functor g) => Functor (Product.Product f g) where
+  type FunctorCts (Product.Product f g) a = (FunctorCts f a, FunctorCts g a)
   fmap f (Product.Pair fa fb) = Product.Pair (fmap f fa) (fmap f fb)
 
-instance CFunctor Read.ReadP where
+instance Functor Read.ReadP where
   fmap = P.fmap
   (<$) = (P.<$)
-instance CFunctor Read.ReadPrec where
+instance Functor Read.ReadPrec where
   fmap = P.fmap
   (<$) = (P.<$)
 
-instance CFunctor (ST.ST s) where
+instance Functor (ST.ST s) where
   fmap = P.fmap
   (<$) = (P.<$)
-instance CFunctor (STL.ST s) where
+instance Functor (STL.ST s) where
   fmap = P.fmap
   (<$) = (P.<$)
-instance (Arrow.ArrowApply a) => CFunctor (Arrow.ArrowMonad a) where
+instance (Arrow.ArrowApply a) => Functor (Arrow.ArrowMonad a) where
   fmap = P.fmap
   (<$) = (P.<$)
-instance (CFunctor m) => CFunctor (App.WrappedMonad m) where
-  type CFunctorCts (App.WrappedMonad m) a b = CFunctorCts m a b
+instance (Functor m) => Functor (App.WrappedMonad m) where
+  type FunctorCts (App.WrappedMonad m) a = FunctorCts m a
   fmap f (App.WrapMonad ma) = App.WrapMonad $ fmap f ma
   a <$ (App.WrapMonad mb) = App.WrapMonad $ a <$ mb
 
-instance CFunctor STM.STM where
+instance Functor STM.STM where
   fmap = P.fmap
   (<$) = (P.<$)
 
 -- Constrained instances -------------------------------------------------------
 
-instance CFunctor S.Set where
-  type CFunctorCts S.Set a b = Ord b
+instance Functor S.Set where
+  type FunctorCts S.Set a = Ord a
   fmap = S.map
 
 -- "transformers" package instances: -------------------------------------------
 
 -- Continuations are so wierd...
 -- | TODO / FIXME: Still need to figure out how and if we can generalize the continuation implementation.
-instance CFunctor (Cont.ContT r m) where
+instance Functor (Cont.ContT r m) where
   fmap = P.fmap
   (<$) = (P.<$)
 
-instance CFunctor m => CFunctor (Except.ExceptT e m) where
-  type CFunctorCts (Except.ExceptT e m) a b = CFunctorCts m (P.Either e a) (P.Either e b)
+instance Functor m => Functor (Except.ExceptT e m) where
+  type FunctorCts (Except.ExceptT e m) a = FunctorCts m (P.Either e a)
   fmap f = Except.ExceptT . fmap (fmap f) . Except.runExceptT
   {-# INLINE fmap #-}
 
-instance (CFunctor m) => CFunctor (Identity.IdentityT m) where
-  type CFunctorCts (Identity.IdentityT m) a b = CFunctorCts m a b
+instance (Functor m) => Functor (Identity.IdentityT m) where
+  type FunctorCts (Identity.IdentityT m) a = FunctorCts m a
   fmap f = Identity.mapIdentityT (fmap f)
   {-# INLINE fmap #-}
 
-instance (CFunctor m) => CFunctor (List.ListT m) where
-  type CFunctorCts (List.ListT m) a b = CFunctorCts m [a] [b]
+instance (Functor m) => Functor (List.ListT m) where
+  type FunctorCts (List.ListT m) a = FunctorCts m [a]
   fmap f = List.mapListT $ fmap $ P.map f
   {-# INLINE fmap #-}
 
-instance (CFunctor m) => CFunctor (Maybe.MaybeT m) where
-  type CFunctorCts (Maybe.MaybeT m) a b = CFunctorCts m (P.Maybe a) (P.Maybe b)
+instance (Functor m) => Functor (Maybe.MaybeT m) where
+  type FunctorCts (Maybe.MaybeT m) a = FunctorCts m (P.Maybe a)
   fmap f = Maybe.mapMaybeT (fmap (fmap f))
   {-# INLINE fmap #-}
 
-instance (CFunctor m) => CFunctor (RWSL.RWST r w s m) where
-  type CFunctorCts (RWSL.RWST r w s m) a b = CFunctorCts m (a, s, w) (b, s, w)
+instance (Functor m) => Functor (RWSL.RWST r w s m) where
+  type FunctorCts (RWSL.RWST r w s m) a = FunctorCts m (a, s, w)
   fmap f m = RWSL.RWST $ \ r s ->
       fmap (\ ~(a, s', w) -> (f a, s', w)) $ RWSL.runRWST m r s
   {-# INLINE fmap #-}
 
-instance (CFunctor m) => CFunctor (RWSS.RWST r w s m) where
-  type CFunctorCts (RWSS.RWST r w s m) a b = CFunctorCts m (a, s, w) (b, s, w)
+instance (Functor m) => Functor (RWSS.RWST r w s m) where
+  type FunctorCts (RWSS.RWST r w s m) a = FunctorCts m (a, s, w)
   fmap f m = RWSS.RWST $ \ r s ->
       fmap (\ (a, s', w) -> (f a, s', w)) $ RWSS.runRWST m r s
   {-# INLINE fmap #-}
 
-instance (CFunctor m) => CFunctor (Reader.ReaderT r m) where
-  type CFunctorCts (Reader.ReaderT r m) a b = CFunctorCts m a b
+instance (Functor m) => Functor (Reader.ReaderT r m) where
+  type FunctorCts (Reader.ReaderT r m) a = FunctorCts m a
   fmap f  = Reader.mapReaderT (fmap f)
   {-# INLINE fmap #-}
 
-instance (CFunctor m) => CFunctor (StateL.StateT s m) where
-  type CFunctorCts (StateL.StateT s m) a b = CFunctorCts m (a, s) (b, s)
+instance (Functor m) => Functor (StateL.StateT s m) where
+  type FunctorCts (StateL.StateT s m) a = FunctorCts m (a, s)
   fmap f m = StateL.StateT $ \ s ->
       fmap (\ ~(a, s') -> (f a, s')) $ StateL.runStateT m s
   {-# INLINE fmap #-}
 
-instance (CFunctor m) => CFunctor (StateS.StateT s m) where
-  type CFunctorCts (StateS.StateT s m) a b = CFunctorCts m (a, s) (b, s)
+instance (Functor m) => Functor (StateS.StateT s m) where
+  type FunctorCts (StateS.StateT s m) a = FunctorCts m (a, s)
   fmap f m = StateS.StateT $ \ s ->
       fmap (\ (a, s') -> (f a, s')) $ StateS.runStateT m s
   {-# INLINE fmap #-}
 
-instance (CFunctor m) => CFunctor (WriterL.WriterT w m) where
-  type CFunctorCts (WriterL.WriterT w m) a b = CFunctorCts m (a, w) (b, w)
+instance (Functor m) => Functor (WriterL.WriterT w m) where
+  type FunctorCts (WriterL.WriterT w m) a = FunctorCts m (a, w)
   fmap f = WriterL.mapWriterT $ fmap $ \ ~(a, w) -> (f a, w)
   {-# INLINE fmap #-}
 
-instance (CFunctor m) => CFunctor (WriterS.WriterT w m) where
-  type CFunctorCts (WriterS.WriterT w m) a b = CFunctorCts m (a, w) (b, w)
+instance (Functor m) => Functor (WriterS.WriterT w m) where
+  type FunctorCts (WriterS.WriterT w m) a = FunctorCts m (a, w)
   fmap f = WriterS.mapWriterT $ fmap $ \ (a, w) -> (f a, w)
   {-# INLINE fmap #-}
 
