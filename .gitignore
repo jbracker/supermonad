@@ -5,6 +5,13 @@
 *~
 *.backup
 
+# LaTeX build products for HCAR
+/hcar/*.aux
+/hcar/*.log
+/hcar/*.out
+/hcar/*.pdf
+/hcar/*.synctex.gz
+
 # Temporary files
 *.o
 *.tmp
