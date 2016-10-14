@@ -1,6 +1,23 @@
 # Supermonads for GHC
 
-Implementation of supermonads for GHC.
+Implementation of supermonads for GHC. See the 
+"Supermonads: One Notion to Bind Them All" paper for detailed explanation
+of version 0.1.
+
+The library offers two definitions for supermonads. The version 
+in `Control.Supermonad` does not have support for constrained
+monads. The version in `Control.Supermonad.Constrained` has 
+support for constrained monads. The different versions are 
+provided, because working with the additional constraints 
+required for constrained monads can be cumbersome sometimes.
+We want to offer people a possibility to experiment with supermonads 
+without having to bother with these constraints, if they don't need 
+constrained monads. If you have any feedback or suggestions for 
+improvement from you usage of supermonads, please leave them on
+the GitHub bug tracker or write an email to the maintainer.
+These parallel structures will not be maintained indefinitely and
+at some point we will probably only offer supermonads with support
+for constrained monads.
 
 ## GHC Version
 
@@ -43,6 +60,4 @@ cabal file and offer a version of the code with and without the use of supermona
 
 ## Known Problems
 
-* The `effect` example will not compile with GHC 8+, 
-  because the `effect-monad` package requires `base < 4.9`
-  but GHC 8+ delivers `base >= 4.9`.
+None at the moment.
