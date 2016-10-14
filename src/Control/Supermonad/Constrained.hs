@@ -252,10 +252,10 @@ instance (Arrow.Arrow a, Arrow.ArrowApply a) => Applicative (Arrow.ArrowMonad a)
   (<*)  = (P.<*)
   (*>)  = (P.*>)
 
-instance (Applicative m m m) => Applicative (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) where
-  type ApplicativeCts (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) a b = ApplicativeCts m m m a b
-  type ApplicativeCtsR (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) a b = ApplicativeCtsR m m m a b
-  type ApplicativeCtsL (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) a b = ApplicativeCtsL m m m a b
+instance (Applicative m n p) => Applicative (App.WrappedMonad m) (App.WrappedMonad n) (App.WrappedMonad p) where
+  type ApplicativeCts (App.WrappedMonad m) (App.WrappedMonad n) (App.WrappedMonad p) a b = ApplicativeCts m n p a b
+  type ApplicativeCtsR (App.WrappedMonad m) (App.WrappedMonad n) (App.WrappedMonad p) a b = ApplicativeCtsR m n p a b
+  type ApplicativeCtsL (App.WrappedMonad m) (App.WrappedMonad n) (App.WrappedMonad p) a b = ApplicativeCtsL m n p a b
   mf <*> na = App.WrapMonad $ (App.unwrapMonad mf) <*> (App.unwrapMonad na)
   mf *> na = App.WrapMonad $ (App.unwrapMonad mf) *> (App.unwrapMonad na)
   mf <* na = App.WrapMonad $ (App.unwrapMonad mf) <* (App.unwrapMonad na)
@@ -503,8 +503,8 @@ instance Bind (STL.ST s) (STL.ST s) (STL.ST s) where
   (>>=) = (P.>>=)
 instance (Arrow.ArrowApply a) => Bind (Arrow.ArrowMonad a) (Arrow.ArrowMonad a) (Arrow.ArrowMonad a) where
   (>>=) = (P.>>=)
-instance (Bind m m m) => Bind (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) where
-  type BindCts (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) a b = BindCts m m m a b
+instance (Bind m n p) => Bind (App.WrappedMonad m) (App.WrappedMonad n) (App.WrappedMonad p) where
+  type BindCts (App.WrappedMonad m) (App.WrappedMonad n) (App.WrappedMonad p) a b = BindCts m n p a b
   m >>= f = App.WrapMonad $ (App.unwrapMonad m) >>= (App.unwrapMonad . f)
 
 instance Bind STM.STM STM.STM STM.STM where
