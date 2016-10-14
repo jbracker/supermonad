@@ -24,7 +24,7 @@ module Control.Supermonad.Constrained
     Bind(..), Return(..), Fail(..)
     -- * Super-Applicatives
   , Applicative(..), pure
-  , CFunctor(..)
+  , Functor(..)
     -- * Conveniences
   , Monad
   ) where
@@ -80,7 +80,7 @@ import qualified Control.Monad.Trans.Writer.Strict as WriterS ( WriterT(..) )
 
 -- To define 'Bind' class:
 import Control.Supermonad.Constrained.Functor 
-  ( CFunctor(..) )
+  ( Functor(..) )
 
 
 -- -----------------------------------------------------------------------------
@@ -88,7 +88,7 @@ import Control.Supermonad.Constrained.Functor
 -- -----------------------------------------------------------------------------
 
 -- | TODO
-class (CFunctor m, CFunctor n, CFunctor p) => Applicative m n p where
+class (Functor m, Functor n, Functor p) => Applicative m n p where
   type ApplicativeCts m n p (a :: *) (b :: *) :: Constraint
   type ApplicativeCts m n p a b = ()
   
@@ -116,10 +116,10 @@ pure :: (Return f, ReturnCts f a) => a -> f a
 pure = return
 
 type family DefaultAppCtsR m n p a b :: Constraint where
-  DefaultAppCtsR m n p a b = (ApplicativeCts m n p b b, CFunctorCts m a (b -> b))
+  DefaultAppCtsR m n p a b = (ApplicativeCts m n p b b, FunctorCts m a (b -> b))
 
 type family DefaultAppCtsL m n p a b :: Constraint where
-  DefaultAppCtsL m n p a b = (ApplicativeCts m n p b a, CFunctorCts m a (b -> a))
+  DefaultAppCtsL m n p a b = (ApplicativeCts m n p b a, FunctorCts m a (b -> a))
 
 defaultAppR :: (Applicative m n p, DefaultAppCtsR m n p a b) => m a -> n b -> p b
 defaultAppR ma nb = (P.id <$ ma) <*> nb
@@ -251,18 +251,8 @@ instance (Arrow.Arrow a, Arrow.ArrowApply a) => Applicative (Arrow.ArrowMonad a)
   (<*>) = (P.<*>)
   (<*)  = (P.<*)
   (*>)  = (P.*>)
--- | TODO / FIXME: The wrapped monad instances for 'Functor' and 'P.Monad' are both 
---   based on @m@ being a monad, although the functor instance should only be 
---   dependend on @m@ being a functor (as can be seen below). This can only be
---   fixed by either giving a custom version of 'App.WrappedMonad' here or by fixing
---   the version of 'App.WrappedMonad' in base.
---   Once this issue is fixed we can replace the 'P.Monad' constraint
---   with a 'Functor' constraint.
---   
---   > instance (Functor m) => Functor (App.WrappedMonad m) where
---   >   fmap f m = App.WrapMonad $ fmap (App.unwrapMonad m) f
---   
-instance (Applicative m m m, P.Monad m) => Applicative (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) where
+
+instance (Applicative m m m) => Applicative (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) where
   type ApplicativeCts (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) a b = ApplicativeCts m m m a b
   type ApplicativeCtsR (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) a b = ApplicativeCtsR m m m a b
   type ApplicativeCtsL (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) a b = ApplicativeCtsL m m m a b
@@ -299,7 +289,7 @@ instance Applicative (Cont.ContT r m) (Cont.ContT r m) (Cont.ContT r m) where
 instance (Applicative m n p) => Applicative (Except.ExceptT e m) (Except.ExceptT e n) (Except.ExceptT e p) where
   type ApplicativeCts (Except.ExceptT e m) (Except.ExceptT e n) (Except.ExceptT e p) a b = 
         ( ApplicativeCts m n p (Either e a) (Either e b)
-        , CFunctorCts m (Either e (a -> b)) (Either e a -> Either e b) )
+        , FunctorCts m (Either e (a -> b)) (Either e a -> Either e b) )
   type ApplicativeCtsL (Except.ExceptT e m) (Except.ExceptT e n) (Except.ExceptT e p) a b = 
         (ApplicativeCtsL m n p (Either e a) (Either e b))
   type ApplicativeCtsR (Except.ExceptT e m) (Except.ExceptT e n) (Except.ExceptT e p) a b = 
@@ -322,7 +312,7 @@ instance (Applicative m n p) => Applicative (Identity.IdentityT m) (Identity.Ide
 instance (Applicative m n p) => Applicative (List.ListT m) (List.ListT n) (List.ListT p) where
   type ApplicativeCts  (List.ListT m) (List.ListT n) (List.ListT p) a b = 
         ( ApplicativeCts m n p [a] [b]
-        , CFunctorCts m [a -> b] ([a] -> [b]) )
+        , FunctorCts m [a -> b] ([a] -> [b]) )
   type ApplicativeCtsR (List.ListT m) (List.ListT n) (List.ListT p) a b = 
         ( ApplicativeCtsR m n p [a] [b] )
   type ApplicativeCtsL (List.ListT m) (List.ListT n) (List.ListT p) a b =
@@ -335,7 +325,7 @@ instance (Applicative m n p) => Applicative (List.ListT m) (List.ListT n) (List.
 instance (Applicative m n p) => Applicative (Maybe.MaybeT m) (Maybe.MaybeT n) (Maybe.MaybeT p) where
   type ApplicativeCts  (Maybe.MaybeT m) (Maybe.MaybeT n) (Maybe.MaybeT p) a b = 
         ( ApplicativeCts m n p (Maybe a) (Maybe b)
-        , CFunctorCts m (Maybe (a -> b)) (Maybe a -> Maybe b) )
+        , FunctorCts m (Maybe (a -> b)) (Maybe a -> Maybe b) )
   type ApplicativeCtsR (Maybe.MaybeT m) (Maybe.MaybeT n) (Maybe.MaybeT p) a b = 
         ( ApplicativeCtsR m n p (Maybe a) (Maybe b) )
   type ApplicativeCtsL (Maybe.MaybeT m) (Maybe.MaybeT n) (Maybe.MaybeT p) a b =
@@ -348,7 +338,7 @@ instance (Applicative m n p) => Applicative (Maybe.MaybeT m) (Maybe.MaybeT n) (M
 instance (P.Monoid w, Bind m n p) => Applicative (RWSL.RWST r w s m) (RWSL.RWST r w s n) (RWSL.RWST r w s p) where
   type ApplicativeCts (RWSL.RWST r w s m) (RWSL.RWST r w s n) (RWSL.RWST r w s p) a b = 
         ( BindCts m n p (a -> b, s, w) (b, s, w)
-        , CFunctorCts n (a, s, w) (b, s, w) )
+        , FunctorCts n (a, s, w) (b, s, w) )
   type ApplicativeCtsR (RWSL.RWST r w s m) (RWSL.RWST r w s n) (RWSL.RWST r w s p) a b = 
         (DefaultAppCtsR (RWSL.RWST r w s m) (RWSL.RWST r w s n) (RWSL.RWST r w s p) a b)
   type ApplicativeCtsL (RWSL.RWST r w s m) (RWSL.RWST r w s n) (RWSL.RWST r w s p) a b = 
@@ -361,7 +351,7 @@ instance (P.Monoid w, Bind m n p) => Applicative (RWSL.RWST r w s m) (RWSL.RWST 
 instance (P.Monoid w, Bind m n p) => Applicative (RWSS.RWST r w s m) (RWSS.RWST r w s n) (RWSS.RWST r w s p) where
   type ApplicativeCts (RWSS.RWST r w s m) (RWSS.RWST r w s n) (RWSS.RWST r w s p) a b = 
         ( BindCts m n p (a -> b, s, w) (b, s, w)
-        , CFunctorCts n (a, s, w) (b, s, w) )
+        , FunctorCts n (a, s, w) (b, s, w) )
   type ApplicativeCtsR (RWSS.RWST r w s m) (RWSS.RWST r w s n) (RWSS.RWST r w s p) a b = 
         (DefaultAppCtsR (RWSS.RWST r w s m) (RWSS.RWST r w s n) (RWSS.RWST r w s p) a b)
   type ApplicativeCtsL (RWSS.RWST r w s m) (RWSS.RWST r w s n) (RWSS.RWST r w s p) a b = 
@@ -385,7 +375,7 @@ instance (Applicative m n p) => Applicative (Reader.ReaderT r m) (Reader.ReaderT
 instance (Bind m n p) => Applicative (StateL.StateT s m) (StateL.StateT s n) (StateL.StateT s p) where
   type ApplicativeCts (StateL.StateT s m) (StateL.StateT s n) (StateL.StateT s p) a b = 
         ( BindCts m n p (a -> b, s) (b, s)
-        , CFunctorCts n (a, s) (b, s) )
+        , FunctorCts n (a, s) (b, s) )
   type ApplicativeCtsR (StateL.StateT s m) (StateL.StateT s n) (StateL.StateT s p) a b = 
         (DefaultAppCtsR (StateL.StateT s m) (StateL.StateT s n) (StateL.StateT s p) a b)
   type ApplicativeCtsL (StateL.StateT s m) (StateL.StateT s n) (StateL.StateT s p) a b = 
@@ -398,7 +388,7 @@ instance (Bind m n p) => Applicative (StateL.StateT s m) (StateL.StateT s n) (St
 instance (Bind m n p) => Applicative (StateS.StateT s m) (StateS.StateT s n) (StateS.StateT s p) where
   type ApplicativeCts (StateS.StateT s m) (StateS.StateT s n) (StateS.StateT s p) a b = 
         ( BindCts m n p (a -> b, s) (b, s)
-        , CFunctorCts n (a, s) (b, s) )
+        , FunctorCts n (a, s) (b, s) )
   type ApplicativeCtsR (StateS.StateT s m) (StateS.StateT s n) (StateS.StateT s p) a b = 
         (DefaultAppCtsR (StateS.StateT s m) (StateS.StateT s n) (StateS.StateT s p) a b)
   type ApplicativeCtsL (StateS.StateT s m) (StateS.StateT s n) (StateS.StateT s p) a b = 
@@ -411,7 +401,7 @@ instance (Bind m n p) => Applicative (StateS.StateT s m) (StateS.StateT s n) (St
 instance (P.Monoid w, Applicative m n p) => Applicative (WriterL.WriterT w m) (WriterL.WriterT w n) (WriterL.WriterT w p) where
   type ApplicativeCts (WriterL.WriterT w m) (WriterL.WriterT w n) (WriterL.WriterT w p) a b = 
         ( ApplicativeCts m n p (a, w) (b, w)
-        , CFunctorCts m (a -> b, w) ((a, w) -> (b, w)) )
+        , FunctorCts m (a -> b, w) ((a, w) -> (b, w)) )
   type ApplicativeCtsR (WriterL.WriterT w m) (WriterL.WriterT w n) (WriterL.WriterT w p) a b = 
         (DefaultAppCtsR (WriterL.WriterT w m) (WriterL.WriterT w n) (WriterL.WriterT w p) a b)
   type ApplicativeCtsL (WriterL.WriterT w m) (WriterL.WriterT w n) (WriterL.WriterT w p) a b = 
@@ -424,7 +414,7 @@ instance (P.Monoid w, Applicative m n p) => Applicative (WriterL.WriterT w m) (W
 instance (P.Monoid w, Applicative m n p) => Applicative (WriterS.WriterT w m) (WriterS.WriterT w n) (WriterS.WriterT w p) where
   type ApplicativeCts (WriterS.WriterT w m) (WriterS.WriterT w n) (WriterS.WriterT w p) a b = 
         ( ApplicativeCts m n p (a, w) (b, w)
-        , CFunctorCts m (a -> b, w) ((a, w) -> (b, w)) )
+        , FunctorCts m (a -> b, w) ((a, w) -> (b, w)) )
   type ApplicativeCtsR (WriterS.WriterT w m) (WriterS.WriterT w n) (WriterS.WriterT w p) a b = 
         (DefaultAppCtsR (WriterS.WriterT w m) (WriterS.WriterT w n) (WriterS.WriterT w p) a b)
   type ApplicativeCtsL (WriterS.WriterT w m) (WriterS.WriterT w n) (WriterS.WriterT w p) a b = 
@@ -439,7 +429,7 @@ instance (P.Monoid w, Applicative m n p) => Applicative (WriterS.WriterT w m) (W
 -- -----------------------------------------------------------------------------
 
 -- | See @Control.Supermonad.@'Control.Supermonad.Bind' for details on laws and requirements.
-class (CFunctor m, CFunctor n, CFunctor p) => Bind m n p where
+class (Applicative m n p) => Bind m n p where
   type BindCts m n p (a :: *) (b :: *) :: Constraint
   type BindCts m n p a b = ()
   (>>=) :: (BindCts m n p a b) => m a -> (a -> n b) -> p b
@@ -552,13 +542,13 @@ instance (Bind m n p) => Bind (Identity.IdentityT m) (Identity.IdentityT n) (Ide
 
 -- Requires undecidable instances.
 instance (Bind m n p, Bind n n n, Return n) => Bind (List.ListT m) (List.ListT n) (List.ListT p) where
-  type BindCts (List.ListT m) (List.ListT n) (List.ListT p) a b = (BindCts m n p [a] [b], BindCts n n n [b] [[b]], ReturnCts n [[b]], CFunctorCts n [[b]] [[b]], CFunctorCts n [[b]] [b])
-  (>>=) :: forall a b. (BindCts m n p [a] [b], BindCts n n n [b] [[b]], ReturnCts n [[b]], CFunctorCts n [[b]] [[b]], CFunctorCts n [[b]] [b]) => List.ListT m a -> (a -> List.ListT n b) -> List.ListT p b
+  type BindCts (List.ListT m) (List.ListT n) (List.ListT p) a b = (BindCts m n p [a] [b], BindCts n n n [b] [[b]], ReturnCts n [[b]], FunctorCts n [[b]] [[b]], FunctorCts n [[b]] [b])
+  (>>=) :: forall a b. (BindCts m n p [a] [b], BindCts n n n [b] [[b]], ReturnCts n [[b]], FunctorCts n [[b]] [[b]], FunctorCts n [[b]] [b]) => List.ListT m a -> (a -> List.ListT n b) -> List.ListT p b
   m >>= f = List.ListT $
       List.runListT m >>=
       \ a -> fmap P.concat $ P.foldr k (return []) a
     where
-      k :: (BindCts n n n [b] [[b]], CFunctorCts n [[b]] [[b]]) => a -> n [[b]] -> n [[b]]
+      k :: (BindCts n n n [b] [[b]], FunctorCts n [[b]] [[b]]) => a -> n [[b]] -> n [[b]]
       k a r = List.runListT (f a) >>= \ x -> fmap (x :) r
   {-# INLINE (>>=) #-}
 
@@ -572,14 +562,14 @@ instance (Return n, Bind m n p) => Bind (Maybe.MaybeT m) (Maybe.MaybeT n) (Maybe
   {-# INLINE (>>=) #-}
 
 instance (P.Monoid w, Bind m n p) => Bind (RWSL.RWST r w s m) (RWSL.RWST r w s n) (RWSL.RWST r w s p) where
-  type BindCts (RWSL.RWST r w s m) (RWSL.RWST r w s n) (RWSL.RWST r w s p) a b = (BindCts m n p (a, s, w) (b, s, w), CFunctorCts n (b, s, w) (b, s, w))
+  type BindCts (RWSL.RWST r w s m) (RWSL.RWST r w s n) (RWSL.RWST r w s p) a b = (BindCts m n p (a, s, w) (b, s, w), FunctorCts n (b, s, w) (b, s, w))
   m >>= k  = RWSL.RWST $ 
     \ r s -> RWSL.runRWST m r s >>=
     \ ~(a, s', w) -> fmap (\ ~(b, s'',w') -> (b, s'', w `P.mappend` w')) $ RWSL.runRWST (k a) r s'
   {-# INLINE (>>=) #-}
 
 instance (P.Monoid w, Bind m n p) => Bind (RWSS.RWST r w s m) (RWSS.RWST r w s n) (RWSS.RWST r w s p) where
-  type BindCts (RWSS.RWST r w s m) (RWSS.RWST r w s n) (RWSS.RWST r w s p) a b = (BindCts m n p (a, s, w) (b, s, w), CFunctorCts n (b, s, w) (b, s, w))
+  type BindCts (RWSS.RWST r w s m) (RWSS.RWST r w s n) (RWSS.RWST r w s p) a b = (BindCts m n p (a, s, w) (b, s, w), FunctorCts n (b, s, w) (b, s, w))
   m >>= k  = RWSS.RWST $ 
     \ r s -> RWSS.runRWST m r s >>=
     \ (a, s', w) -> fmap (\(b, s'',w') -> (b, s'', w `P.mappend` w')) $ RWSS.runRWST (k a) r s'
@@ -607,14 +597,14 @@ instance (Bind m n p) => Bind (StateS.StateT s m) (StateS.StateT s n) (StateS.St
   {-# INLINE (>>=) #-}
 
 instance (P.Monoid w, Bind m n p) => Bind (WriterL.WriterT w m) (WriterL.WriterT w n) (WriterL.WriterT w p) where
-  type BindCts (WriterL.WriterT w m) (WriterL.WriterT w n) (WriterL.WriterT w p) a b = (BindCts m n p (a, w) (b, w), CFunctorCts n (b, w) (b, w))
+  type BindCts (WriterL.WriterT w m) (WriterL.WriterT w n) (WriterL.WriterT w p) a b = (BindCts m n p (a, w) (b, w), FunctorCts n (b, w) (b, w))
   m >>= k  = WriterL.WriterT $
       WriterL.runWriterT m >>=
       \ ~(a, w) -> fmap (\ ~(b, w') -> (b, w `P.mappend` w')) $ WriterL.runWriterT (k a)
   {-# INLINE (>>=) #-}
 
 instance (P.Monoid w, Bind m n p) => Bind (WriterS.WriterT w m) (WriterS.WriterT w n) (WriterS.WriterT w p) where
-  type BindCts (WriterS.WriterT w m) (WriterS.WriterT w n) (WriterS.WriterT w p) a b = (BindCts m n p (a, w) (b, w), CFunctorCts n (b, w) (b, w))
+  type BindCts (WriterS.WriterT w m) (WriterS.WriterT w n) (WriterS.WriterT w p) a b = (BindCts m n p (a, w) (b, w), FunctorCts n (b, w) (b, w))
   m >>= k  = WriterS.WriterT $
       WriterS.runWriterT m >>=
       \ (a, w) -> fmap (\ (b, w') -> (b, w `P.mappend` w')) $ WriterS.runWriterT (k a)
@@ -625,7 +615,7 @@ instance (P.Monoid w, Bind m n p) => Bind (WriterS.WriterT w m) (WriterS.WriterT
 -- -----------------------------------------------------------------------------
 
 -- | See 'Bind' for details on laws and requirements.
-class (CFunctor m) => Return m where
+class (Functor m) => Return m where
   type ReturnCts m (a :: *) :: Constraint
   type ReturnCts m a = ()
   return :: (ReturnCts m a) => a -> m a
