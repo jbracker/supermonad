@@ -1,5 +1,5 @@
 name:                supermonad
-version:             0.1
+version:             0.2
 synopsis:            Plugin and base library to support supermonads in Haskell
 category:            Type System, Plugin, Monad
 license:             BSD3
