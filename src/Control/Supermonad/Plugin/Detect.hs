@@ -6,6 +6,7 @@ module Control.Supermonad.Plugin.Detect
     supermonadModuleName
   , bindClassName, returnClassName, applicativeClassName
   , findSupermonadModule
+  , findAnyModule, findEitherModule
   , isBindClass, isReturnClass, isApplicativeClass
   , isSupermonadModule
   , findBindClass, findReturnClass, findApplicativeClass
@@ -51,7 +52,7 @@ import InstEnv
   , ie_global
   , classInstances )
 import PrelNames ( mAIN_NAME )
-import Outputable ( SDoc, ($$), (<>), text, vcat, ppr )
+import Outputable ( SDoc, ($$), (<>), text, vcat, ppr, hang )
 --import qualified Outputable as O
 
 --import Control.Supermonad.Plugin.Log ( printObj, printObjTrace )
@@ -62,7 +63,7 @@ import Control.Supermonad.Plugin.Instance
   , isMonoTyConInstance 
   , isPolyTyConInstance )
 import Control.Supermonad.Plugin.Utils
-  ( collectTopTyCons )
+  ( collectTopTyCons, errIndent )
 import Control.Supermonad.Plugin.Dict
   ( SupermonadDict
   , BindInst, ApplicativeInst, ReturnInst
@@ -73,6 +74,23 @@ import Control.Supermonad.Plugin.Names
 -- Polymonad Class Detection
 -- -----------------------------------------------------------------------------
 
+-- | Makes sure that only one of the given modules was found and returns that
+--   found module. If both or none of them were found an error is returned.
+--   The returned error message can be customized using the optional 
+--   function.
+findEitherModule :: (Either SDoc Module) -> (Either SDoc Module) -> Maybe (Maybe (SDoc, SDoc) -> SDoc) -> (Either SDoc Module)
+findEitherModule eMdlA eMdlB mErrFun = case (eMdlA, eMdlB) of
+    (Right _mdlA, Left  _errB) -> eMdlA
+    (Left  _errA, Right _mdlB) -> eMdlB
+    (Left   errA, Left   errB) -> 
+      let err = text "Failed to find either module!" 
+              $$ hang (text "First module error:") errIndent errA 
+              $$ hang (text "Second module error:") errIndent errB
+      in Left $ maybe err ($ Just (errA, errB)) mErrFun
+    (Right  mdlA, Right  mdlB) -> 
+      let err = hang (text "Found both modules:") errIndent $ ppr mdlA $$ ppr mdlB
+      in Left $ maybe err ($ Nothing) mErrFun
+
 -- | Checks if a module providing the supermonad classes is imported.
 findSupermonadModule :: TcPluginM (Either SDoc Module)
 findSupermonadModule = do
@@ -80,13 +98,11 @@ findSupermonadModule = do
   eSmUnCtMdl <- findAnyModule [(Nothing, supermonadModuleName  ), (Nothing, supermonadPreludeModuleName  )]
   -- Checks if the module "Control.Supermonad.Constrained" or "Control.Supermonad.Constrained.Prelude" is imported.
   eSmCtMdl   <- findAnyModule [(Nothing, supermonadCtModuleName), (Nothing, supermonadCtPreludeModuleName)]
-  case (eSmUnCtMdl, eSmCtMdl) of
-    (Right _  , Left _errCt) -> return eSmUnCtMdl
-    (Left _err, Right _    ) -> return eSmCtMdl
-    (Left err, Left errCt) -> return $ Left
-      $ text "Could not find supermonad or constrained supermonad modules!" $$ err $$ errCt
-    (Right _, Right _) -> return $ Left
-      $ text "Found unconstrained and constrained supermonad modules!"
+  
+  return $ findEitherModule eSmUnCtMdl eSmCtMdl $ Just 
+         $ \mErr -> maybe (text "Found unconstrained and constrained supermonad modules!")
+                          (\(err, errCt) -> hang (text "Could not find supermonad or constrained supermonad modules!") errIndent (err $$ errCt))
+                          mErr
 
 
 -- | Checks if any of the given modules is imported and, if so, returns 
