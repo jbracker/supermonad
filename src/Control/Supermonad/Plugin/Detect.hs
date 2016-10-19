@@ -232,15 +232,11 @@ findInstancesInScope cls = do
 -- | Check if there are any supermonad instances that clearly 
 --   do not belong to a specific supermonad.
 checkSupermonadInstances 
-  :: Class -- ^ 'Control.Supermonad.Bind' type class.
-  -> Class -- ^ 'Control.Supermonad.Applicative' type class.
-  -> Class -- ^ 'Control.Supermonad.Return' type class.
+  :: (Class, [ClsInst]) -- ^ The @Bind@ class and instances.
+  -> (Class, [ClsInst]) -- ^ The @Applicative@ class and instances.
+  -> (Class, [ClsInst]) -- ^ The @Return@ class and instances.
   -> TcPluginM [(ClsInst, SDoc)]
-checkSupermonadInstances bindCls applicativeCls returnCls = do
-  bindInsts        <- findInstancesInScope bindCls
-  applicativeInsts <- findInstancesInScope applicativeCls
-  returnInsts      <- findInstancesInScope returnCls
-  
+checkSupermonadInstances (bindCls, bindInsts) (applicativeCls, applicativeInsts) (returnCls, returnInsts) = do
   let polyBindInsts        = filter (isPolyTyConInstance bindCls       ) bindInsts
   let polyApplicativeInsts = filter (isPolyTyConInstance applicativeCls) applicativeInsts
   let polyReturnInsts      = filter (isPolyTyConInstance returnCls     ) returnInsts
@@ -253,15 +249,12 @@ checkSupermonadInstances bindCls applicativeCls returnCls = do
 
 -- | Constructs the map between type constructors and their supermonad instances.
 findSupermonads 
-  :: Class -- ^ 'Control.Supermonad.Bind' type class.
-  -> Class -- ^ 'Control.Supermonad.Applicative' type class.
-  -> Class -- ^ 'Control.Supermonad.Return' type class.
+  :: (Class, [ClsInst]) -- ^ The @Bind@ class and instances.
+  -> (Class, [ClsInst]) -- ^ The @Applicative@ class and instances.
+  -> (Class, [ClsInst]) -- ^ The @Return@ class and instances.
   -> TcPluginM (SupermonadDict, [(TyCon, SDoc)])
   -- ^ Association between type constructors and their supermonad instances.
-findSupermonads bindCls applicativeCls returnCls = do
-  bindInsts        <- findInstancesInScope bindCls
-  applicativeInsts <- findInstancesInScope applicativeCls
-  returnInsts      <- findInstancesInScope returnCls
+findSupermonads (bindCls, bindInsts) (applicativeCls, applicativeInsts) (returnCls, returnInsts) = do
   -- Collect all type constructors that are used for supermonads
   let supermonadTyCons = S.unions 
                        $ fmap (S.unions . fmap instTopTyCons) 
