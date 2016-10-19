@@ -18,7 +18,7 @@ module Control.Supermonad.Plugin.Detect
   ) where
 
 import Data.List  ( find )
-import Data.Maybe ( catMaybes )
+--import Data.Maybe ( catMaybes )
 import qualified Data.Set as S
 
 import BasicTypes ( Arity )
@@ -34,9 +34,9 @@ import Name
   , getOccName )
 import OccName
   ( occNameString )
-import RdrName
-  ( GlobalRdrElt(..)
-  , Parent( NoParent ) )
+--import RdrName
+--  ( GlobalRdrElt(..)
+--  , Parent( NoParent ) )
 import Module
   ( Module, ModuleName
   , moduleName
@@ -67,46 +67,7 @@ import Control.Supermonad.Plugin.Dict
   ( SupermonadDict
   , BindInst, ApplicativeInst, ReturnInst
   , insertDict, emptyDict )
-
--- -----------------------------------------------------------------------------
--- Constant Names (Magic Numbers...)
--- -----------------------------------------------------------------------------
-
--- | Name of the "Control.Supermonad" module.
-supermonadModuleName :: String
-supermonadModuleName = "Control.Supermonad"
-
--- | Name of the "Control.Supermonad.Constrained" module.
-supermonadCtModuleName :: String
-supermonadCtModuleName = "Control.Supermonad.Constrained"
-
--- | Name of the 'Control.Supermonad.Bind' type class.
-bindClassName :: String
-bindClassName = "Bind"
-
--- | Name of the 'Control.Supermonad.Bind' type class.
-returnClassName :: String
-returnClassName = "Return"
-
--- | Name of the 'Data.Functor.Functor' class.
-functorClassName :: String
-functorClassName = "Functor"
-
--- | Name of the 'Control.Supermonad.Applicative' type class.
-applicativeClassName :: String
-applicativeClassName = "Applicative"
-
--- | Name of the "Control.Supermonad.Prelude" module.
-supermonadPreludeModuleName :: String
-supermonadPreludeModuleName = "Control.Supermonad.Prelude"
-
--- | Name of the "Control.Supermonad.Constrained.Prelude" module.
-supermonadCtPreludeModuleName :: String
-supermonadCtPreludeModuleName = "Control.Supermonad.Constrained.Prelude"
-
--- | Name of the "Data.Functor" module.
-functorModuleName :: String
-functorModuleName = "Data.Functor"
+import Control.Supermonad.Plugin.Names
 
 -- -----------------------------------------------------------------------------
 -- Polymonad Class Detection
@@ -185,14 +146,14 @@ findApplicativeClass = findClass isApplicativeClass
 -- -----------------------------------------------------------------------------
 -- Local Utility Functions
 -- -----------------------------------------------------------------------------
-
+{-
 -- | Tries to find all of the given modules using the given search functions.
 --   Returns the list of all found modules.
 findModules :: [TcPluginM (Either SDoc Module)] -> TcPluginM [Module]
 findModules findMdls = do
   eitherMdls <- sequence findMdls
   return $ catMaybes $ fmap (either (const Nothing) Just) eitherMdls
-
+-}
 -- | Checks if the module with the given name is imported and,
 --   if so, returns that module.
 getModule :: Maybe UnitId -> String -> TcPluginM (Either SDoc Module)
@@ -263,13 +224,13 @@ isClass cls isModule targetClassName targetArity =
   in    isModule clsMdl
      && clsNameStr == targetClassName
      && clsArity == targetArity
-
+{-
 -- | Check if the given element has no parents.
 hasNoParent :: GlobalRdrElt -> Bool
 hasNoParent rdrElt = case gre_par rdrElt of
   NoParent -> True
   _ -> False
-
+-}
 -- | Returns a list of all instances for the given class that are currently in scope.
 findInstancesInScope :: Class -> TcPluginM [ClsInst]
 findInstancesInScope cls = do

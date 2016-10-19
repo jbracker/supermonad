@@ -62,6 +62,7 @@ library
                  , Control.Supermonad.Constrained.Prelude
                  , Control.Supermonad.Constrained.Functions
   other-modules: Control.Supermonad.Plugin.Utils
+               , Control.Supermonad.Plugin.Names
                , Control.Supermonad.Plugin.Wrapper
                , Control.Supermonad.Plugin.Log
                , Control.Supermonad.Plugin.Detect
