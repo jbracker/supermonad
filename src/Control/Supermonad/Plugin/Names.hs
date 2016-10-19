@@ -26,19 +26,23 @@ supermonadModuleName = "Control.Supermonad"
 supermonadCtModuleName :: String
 supermonadCtModuleName = "Control.Supermonad.Constrained"
 
--- | Name of the 'Control.Supermonad.Bind' type class.
+-- | Name of the @Bind@ type class.
+--   Also used as dictionary key for the @Bind@ class.
 bindClassName :: String
 bindClassName = "Bind"
 
--- | Name of the 'Control.Supermonad.Bind' type class.
+-- | Name of the @Return@ type class.
+--   Also used as dictionary key for the @Return@ class.
 returnClassName :: String
 returnClassName = "Return"
 
--- | Name of the 'Data.Functor.Functor' class.
+-- | Name of the @Functor@ class.
+--   Also used as dictionary key for the @Functor@ class.
 functorClassName :: String
 functorClassName = "Functor"
 
--- | Name of the 'Control.Supermonad.Applicative' type class.
+-- | Name of the @Applicative@ type class.
+--   Also used as dictionary key for the @Applicative@ class.
 applicativeClassName :: String
 applicativeClassName = "Applicative"
 
