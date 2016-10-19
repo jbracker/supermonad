@@ -64,7 +64,7 @@ import Control.Supermonad.Plugin.Log
 
   
 -- | Attempts to solve the given /wanted/ constraints.
-solveConstraints :: [WantedCt] -> SupermonadPluginM ()
+solveConstraints :: [WantedCt] -> SupermonadPluginM s ()
 solveConstraints wantedCts = do
   -- Calculate the different groups of constraints that belong 
   -- together for solving purposes.
@@ -102,7 +102,7 @@ solveConstraints wantedCts = do
 --   If necessary the associated type constructors are partially applied 
 --   to new ambiguous variables to match the kind of type variable they are 
 --   associated with.
-solveMonoConstraintGroup :: (TyCon, [WantedCt]) -> SupermonadPluginM ()
+solveMonoConstraintGroup :: (TyCon, [WantedCt]) -> SupermonadPluginM s ()
 solveMonoConstraintGroup (_, []) = return ()
 solveMonoConstraintGroup (tyCon, ctGroup) = do
   printMsg "Solve mono group..."
@@ -139,7 +139,7 @@ solveMonoConstraintGroup (tyCon, ctGroup) = do
 --   If necessary the associated type constructors are partially applied 
 --   to new ambiguous variables to match the kind of type variable they are 
 --   associated with.
-solvePolyConstraintGroup :: [WantedCt] -> SupermonadPluginM ()
+solvePolyConstraintGroup :: [WantedCt] -> SupermonadPluginM s ()
 solvePolyConstraintGroup ctGroup = do
   printMsg "Solve poly group..."
   -- Find a valid associations for each of the constraint groups.
@@ -192,7 +192,7 @@ solvePolyConstraintGroup ctGroup = do
       forM_ appliedAssocs printObj
       throwPluginError "There is more then one possible association for the current constraint group!"
   where
-    collectBindReturnTopTcVars :: Ct -> SupermonadPluginM [TyVar]
+    collectBindReturnTopTcVars :: Ct -> SupermonadPluginM s [TyVar]
     collectBindReturnTopTcVars ct = do
       isBindOrReturn <- liftM2 (||) (isBindConstraint ct) (isReturnConstraint ct)
       case (isBindOrReturn, constraintClassType ct) of
@@ -205,7 +205,7 @@ solvePolyConstraintGroup ctGroup = do
 --   involved with that constraint group and then generates all potentially
 --   satisfiable (see 'isPotentiallyInstantiatedCt') associations between 
 --   ambiguous supermonad type variables and type constructor (variables).
-determineValidConstraintGroupAssocs :: [WantedCt] -> SupermonadPluginM ([WantedCt], [[(TyVar, Either TyCon TyVar)]])
+determineValidConstraintGroupAssocs :: [WantedCt] -> SupermonadPluginM s ([WantedCt], [[(TyVar, Either TyCon TyVar)]])
 determineValidConstraintGroupAssocs [] = throwPluginError "Solving received an empty constraint group!"
 determineValidConstraintGroupAssocs ctGroup = do
   -- Get the all of the given constraints.
@@ -269,7 +269,7 @@ determineValidConstraintGroupAssocs ctGroup = do
   return (ctGroup, validAssocs)
   where
     -- | Only keep supermonad constraints ('Bind' and 'Return').
-    filterSupermonadCts :: [Ct] -> SupermonadPluginM [Ct]
+    filterSupermonadCts :: [Ct] -> SupermonadPluginM s [Ct]
     filterSupermonadCts cts = do
       returnCls <- getReturnClass
       bindCls <- getBindClass
@@ -278,18 +278,18 @@ determineValidConstraintGroupAssocs ctGroup = do
     -- | Filters all supermonad constraints ('Bind' and 'Return')
     --   that contain at least one of the given variables/type constructors
     --   in their arguments.
-    filterSupermonadCtsWith :: [Ct] -> S.Set (Either TyCon TyVar) -> SupermonadPluginM [Ct]
+    filterSupermonadCtsWith :: [Ct] -> S.Set (Either TyCon TyVar) -> SupermonadPluginM s [Ct]
     filterSupermonadCtsWith allCts baseTyCons = do
       cts <- filterSupermonadCts allCts
       filterM predicate cts
       where 
-        predicate :: Ct -> SupermonadPluginM Bool
+        predicate :: Ct -> SupermonadPluginM s Bool
         predicate ct = do
           ctBase <- getTyConBaseFrom [ct]
           return $ not $ S.null $ S.intersection ctBase baseTyCons
     
     -- | Calculate the type constructor base for the given constraint.
-    getTyConBaseFrom :: [Ct] -> SupermonadPluginM (S.Set (Either TyCon TyVar))
+    getTyConBaseFrom :: [Ct] -> SupermonadPluginM s (S.Set (Either TyCon TyVar))
     getTyConBaseFrom cts = do
       checkedCts <- filterSupermonadCts cts
       let baseTvs :: S.Set (Either TyCon TyVar)
@@ -300,7 +300,7 @@ determineValidConstraintGroupAssocs ctGroup = do
     
     -- | Collect all ambiguous top-level type constructor variables
     --   from the given constraints.
-    getAmbTyConVarsFrom :: [Ct] -> SupermonadPluginM (S.Set TyVar)
+    getAmbTyConVarsFrom :: [Ct] -> SupermonadPluginM s (S.Set TyVar)
     getAmbTyConVarsFrom cts = do
       checkedCts <- filterSupermonadCts cts
       return $ S.filter isAmbiguousTyVar $ componentTopTcVars checkedCts
@@ -309,7 +309,7 @@ determineValidConstraintGroupAssocs ctGroup = do
 
 -- | Solves the indices of constraints that have been associated a type 
 --   constructor.
-solveSolvedTyConIndices :: SupermonadPluginM ()
+solveSolvedTyConIndices :: SupermonadPluginM s ()
 solveSolvedTyConIndices = do
   -- Get the type equalities that were determined up until now 
   -- and create a substitution from them.
@@ -333,11 +333,11 @@ solveSolvedTyConIndices = do
   where
     unificationSolve :: [(Ct, TyCon, [Type])] 
                      -- ^ Prepared and substituted constraints.
-                     -> (Ct -> SupermonadPluginM Bool) 
+                     -> (Ct -> SupermonadPluginM s Bool) 
                      -- ^ Filter predicate to filter the relevant constraints.
-                     -> (TyCon -> SupermonadPluginM (Maybe ClsInst)) 
+                     -> (TyCon -> SupermonadPluginM s (Maybe ClsInst)) 
                      -- ^ Lookup of the instances that is used to solve the relevant constraints.
-                     -> SupermonadPluginM ()
+                     -> SupermonadPluginM s ()
     unificationSolve prepWantedCts isRequiredConstraint getTyConInst = do
       cts <- filterTopTyConSolvedConstraints prepWantedCts isRequiredConstraint
       forM_ cts $ \ct -> do
@@ -354,8 +354,8 @@ solveSolvedTyConIndices = do
     
     
     filterTopTyConSolvedConstraints :: [(WantedCt, TyCon, [Type])] 
-                                    -> (WantedCt -> SupermonadPluginM Bool) 
-                                    -> SupermonadPluginM [(WantedCt, TyCon, [Type])]
+                                    -> (WantedCt -> SupermonadPluginM s Bool) 
+                                    -> SupermonadPluginM s [(WantedCt, TyCon, [Type])]
     filterTopTyConSolvedConstraints cts p = do
       -- Get all wanted constraints that meet the predicate.
       predFilteredCts <- filterM (\(ct, _tc, _args) -> p ct) cts
@@ -371,9 +371,9 @@ solveSolvedTyConIndices = do
       return $ filter (S.null . collectTopTcVars . (\(_ct, _tc, args) -> args)) filterNoVarCts
     
     withTopTyCon :: (Ct, TyCon, [Type]) 
-                 -> (TyCon -> SupermonadPluginM (Maybe ClsInst)) 
-                 -> (TyCon -> [Type] -> ClsInst -> SupermonadPluginM a) 
-                 -> SupermonadPluginM (Either O.SDoc a)
+                 -> (TyCon -> SupermonadPluginM s (Maybe ClsInst)) 
+                 -> (TyCon -> [Type] -> ClsInst -> SupermonadPluginM s a) 
+                 -> SupermonadPluginM s (Either O.SDoc a)
     withTopTyCon (ct, _ctClsTyCon, ctArgs) getTyConInst process = do
       -- Get the top-level type constructor for this bind constraint.
       let mTopTyCon = S.toList $ collectTopTyCons ctArgs

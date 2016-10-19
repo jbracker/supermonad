@@ -59,10 +59,10 @@ supermonadStop _s = return ()
 -- | The plugin code wrapper. Handles execution of the monad stack.
 supermonadSolve :: SupermonadState -> [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginResult
 supermonadSolve s given derived wanted = do
-  res <- runSupermonadPlugin (given ++ derived) wanted $
+  res <- runSupermonadPlugin (given ++ derived) wanted (return s) $
     if not $ null wanted then do
       printMsg "Invoke supermonad plugin..."
-      supermonadSolve' s
+      supermonadSolve'
       
       tyVarEqs <- getTyVarEqualities
       let tyVarEqCts = fmap (\(baseCt, tv, ty) -> mkDerivedTypeEqCt baseCt tv ty) tyVarEqs
@@ -80,8 +80,8 @@ supermonadSolve s given derived wanted = do
     Right solution -> return solution
 
 -- | The actual plugin code.
-supermonadSolve' :: SupermonadState -> SupermonadPluginM ()
-supermonadSolve' _s = do
+supermonadSolve' :: SupermonadPluginM SupermonadState ()
+supermonadSolve' = do
   --(getWantedConstraints >>= filterM isBindConstraint) >>= (printConstraints . sortConstraintsByLine)
   --(getWantedConstraints >>= filterM isReturnConstraint) >>= (printConstraints . sortConstraintsByLine)
   --getGivenConstraints >>= (printConstraints . sortConstraintsByLine)

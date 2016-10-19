@@ -37,7 +37,7 @@ type SCNode = LNode WantedCt
 
 -- | Checks if the given component only involved exactly one top-level type constructor
 --   in its supermonad constraints.
-componentMonoTyCon :: [WantedCt] -> SupermonadPluginM (Maybe TyCon)
+componentMonoTyCon :: [WantedCt] -> SupermonadPluginM s (Maybe TyCon)
 componentMonoTyCon cts = do
   -- Find all of the return and bind constraints
   smCts <- filterM (\ct -> liftM2 (||) (isReturnConstraint ct) (isBindConstraint ct)) cts
@@ -75,12 +75,12 @@ collect f cts = S.unions $ fmap collectLocal cts
 --   Returns the connected components of that graph. 
 --   These components represent the groups of constraints that are in need of 
 --   solving and have to be handeled together.
-separateContraints :: [WantedCt] -> SupermonadPluginM [[WantedCt]]
+separateContraints :: [WantedCt] -> SupermonadPluginM s [[WantedCt]]
 separateContraints wantedCts = filterM containsBindOrReturn comps
   where
     -- | Checks if the given constraint group contains any 'Bind' or 'Return'
     --   constraints.
-    containsBindOrReturn :: [WantedCt] -> SupermonadPluginM Bool
+    containsBindOrReturn :: [WantedCt] -> SupermonadPluginM s Bool
     containsBindOrReturn = anyM $ \ct -> liftM2 (||) (isBindConstraint ct) (isReturnConstraint ct)
     
     comps :: [[WantedCt]]
