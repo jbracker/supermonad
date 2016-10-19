@@ -58,6 +58,7 @@ import Control.Supermonad.Plugin.Detect
   , bindClassName, returnClassName, applicativeClassName
   , findSupermonads
   , checkSupermonadInstances )
+import qualified Control.Supermonad.Plugin.ClassDict as CD
 import Control.Supermonad.Plugin.Dict
   ( SupermonadDict
   , BindInst, ApplicativeInst, ReturnInst
@@ -72,8 +73,8 @@ import Control.Supermonad.Plugin.Dict
 type SupermonadError = O.SDoc
 
 -- | The plugin monad.
-type SupermonadPluginM = ReaderT SupermonadPluginEnv 
-                       ( StateT  SupermonadPluginState 
+type SupermonadPluginM s = ReaderT SupermonadPluginEnv 
+                       ( StateT  (SupermonadPluginState s)
                        ( ExceptT SupermonadError TcPluginM
                        ) )
 
@@ -93,6 +94,8 @@ data SupermonadPluginEnv = SupermonadPluginEnv
   -- ^ The given and derived constraints (all of them).
   , smEnvWantedConstraints :: [WantedCt]
   -- ^ The wanted constraints (all of them).
+  , smEnvClassDictionary :: CD.ClassDict
+  -- ^ Class dictionary of the environment.
   , smEnvSupermonads :: SupermonadDict
   -- ^ The supermonads currently in scope. Associates the type constructor 
   --   of each supermonad with its 'Control.Supermonad.Bind' and 
@@ -100,13 +103,15 @@ data SupermonadPluginEnv = SupermonadPluginEnv
   }
 
 -- | The modifiable state of the plugin.
-data SupermonadPluginState = SupermonadPluginState 
+data SupermonadPluginState s = SupermonadPluginState 
   { smStateTyVarEqualities :: [(Ct, TyVar, Type)]
   -- ^ Equalities between type variables and types that have been derived by the plugin.
   , smStateTypeEqualities :: [(Ct, Type, Type)]
   -- ^ Eqaulities between types that have been derived by the plugin.
   , smStateWarningQueue :: [(String, O.SDoc)]
   -- ^ A queue of warnings that are only displayed if no progress could be made.
+  , smStateCustom :: s
+  -- ^ Custom state of the environment.
   }
 
 -- | Runs the given supermonad plugin solver within the type checker plugin 
@@ -114,9 +119,10 @@ data SupermonadPluginState = SupermonadPluginState
 runSupermonadPlugin 
   :: [GivenCt] -- ^ /Given/ and /derived/ constraints. 
   -> [WantedCt] -- ^ /Wanted/ constraints.
-  -> SupermonadPluginM a -- ^ Plugin code to run.
+  -> SupermonadPluginM () s -- ^ Initialize the custom state of the plugin.
+  -> SupermonadPluginM s a -- ^ Plugin code to run.
   -> TcPluginM (Either SupermonadError a) -- ^ Either an error message or an actual plugin result.
-runSupermonadPlugin givenCts wantedCts smM = do
+runSupermonadPlugin givenCts wantedCts initStateM smM = do
   mSupermonadMdl <- findSupermonadModule
   mBindCls <- findBindClass
   mApplicativeCls <- findApplicativeClass
@@ -176,7 +182,7 @@ runSupermonadPlugin givenCts wantedCts smM = do
 
 
 -- | Execute the given 'TcPluginM' computation within the plugin monad.
-runTcPlugin :: TcPluginM a -> SupermonadPluginM a
+runTcPlugin :: TcPluginM a -> SupermonadPluginM s a
 runTcPlugin = lift . lift . lift
 
 -- -----------------------------------------------------------------------------
@@ -184,91 +190,91 @@ runTcPlugin = lift . lift . lift
 -- -----------------------------------------------------------------------------
 
 -- | Returns the 'Control.Supermonad.Bind' class.
-getBindClass :: SupermonadPluginM Class
+getBindClass :: SupermonadPluginM s Class
 getBindClass = asks smEnvBindClass
 
 -- | Returns the 'Control.Supermonad.Applicative' class.
-getApplicativeClass :: SupermonadPluginM Class
+getApplicativeClass :: SupermonadPluginM s Class
 getApplicativeClass = asks smEnvApplicativeClass
 
 -- | Returns the 'Control.Supermonad.Return' class.
-getReturnClass :: SupermonadPluginM Class
+getReturnClass :: SupermonadPluginM s Class
 getReturnClass = asks smEnvReturnClass
 
 -- | The 'Control.Supermonad' module.
-getSupermonadModule :: SupermonadPluginM Module
+getSupermonadModule :: SupermonadPluginM s Module
 getSupermonadModule = asks smEnvSupermonadModule
 
 -- | Returns all of the /given/ and /derived/ constraints of this plugin call.
-getGivenConstraints :: SupermonadPluginM [GivenCt]
+getGivenConstraints :: SupermonadPluginM s [GivenCt]
 getGivenConstraints = asks smEnvGivenConstraints
 
 -- | Returns all of the wanted constraints of this plugin call.
-getWantedConstraints :: SupermonadPluginM [WantedCt]
+getWantedConstraints :: SupermonadPluginM s [WantedCt]
 getWantedConstraints = asks smEnvWantedConstraints
 
 -- | Returns all bind instances including those given by
 --   'getBindApplyInstance' and 'getBindFunctorInstance'.
-getBindInstances :: SupermonadPluginM [ClsInst]
+getBindInstances :: SupermonadPluginM s [ClsInst]
 getBindInstances = asks smEnvBindInstances
 
 -- | Shortcut to access the instance environments.
-getInstEnvs :: SupermonadPluginM InstEnvs
+getInstEnvs :: SupermonadPluginM s InstEnvs
 getInstEnvs = runTcPlugin TcPluginM.getInstEnvs
 
 -- | Retrieves the supermonad instances of the given type constructor,
 --   if the type constructor represents a supermonad in scope.
-getSupermonadFor :: TyCon -> SupermonadPluginM (Maybe (Maybe BindInst, ApplicativeInst, ReturnInst))
+getSupermonadFor :: TyCon -> SupermonadPluginM s (Maybe (Maybe BindInst, ApplicativeInst, ReturnInst))
 getSupermonadFor tc = (return . lookupDict tc) =<< asks smEnvSupermonads
 
 -- | Retrieves the supermonad 'Control.Supermonad.Bind' instances 
 --   of the given type constructor, if the type constructor represents 
 --   a supermonad in scope and there is a bind instance for that type constructor.
-getSupermonadBindFor :: TyCon -> SupermonadPluginM (Maybe BindInst)
+getSupermonadBindFor :: TyCon -> SupermonadPluginM s (Maybe BindInst)
 getSupermonadBindFor tc = (return . lookupDictBind tc) =<< asks smEnvSupermonads
 
 -- | Retrieves the supermonad 'Control.Supermonad.Applicative' instances 
 --   of the given type constructor, if the type constructor represents 
 --   a supermonad in scope.
-getSupermonadApplicativeFor :: TyCon -> SupermonadPluginM (Maybe ApplicativeInst)
+getSupermonadApplicativeFor :: TyCon -> SupermonadPluginM s (Maybe ApplicativeInst)
 getSupermonadApplicativeFor tc = (return . lookupDictApplicative tc) =<< asks smEnvSupermonads
 
 -- | Retrieves the supermonad 'Control.Supermonad.Return' instances 
 --   of the given type constructor, if the type constructor represents 
 --   a supermonad in scope.
-getSupermonadReturnFor :: TyCon -> SupermonadPluginM (Maybe ReturnInst)
+getSupermonadReturnFor :: TyCon -> SupermonadPluginM s (Maybe ReturnInst)
 getSupermonadReturnFor tc = (return . lookupDictReturn tc) =<< asks smEnvSupermonads
 
 -- | Add another type variable equality to the derived equalities.
-addTyVarEquality :: Ct -> TyVar -> Type -> SupermonadPluginM ()
+addTyVarEquality :: Ct -> TyVar -> Type -> SupermonadPluginM s ()
 addTyVarEquality ct tv ty = modify $ \s -> s { smStateTyVarEqualities = (ct, tv, ty) : smStateTyVarEqualities s }
 
 -- | Add a list of type variable equalities to the derived equalities.
-addTyVarEqualities :: [(Ct, TyVar, Type)] -> SupermonadPluginM ()
+addTyVarEqualities :: [(Ct, TyVar, Type)] -> SupermonadPluginM s ()
 addTyVarEqualities = mapM_ (\(ct, tv, ty) -> addTyVarEquality ct tv ty)
 
 -- | Add another type equality to the derived equalities.
-addTypeEquality :: Ct -> Type -> Type -> SupermonadPluginM ()
+addTypeEquality :: Ct -> Type -> Type -> SupermonadPluginM s ()
 addTypeEquality ct ta tb = modify $ \s -> s { smStateTypeEqualities = (ct, ta, tb) : smStateTypeEqualities s }
 
 -- | Add a list of type equality to the derived equalities.
-addTypeEqualities :: [(Ct, Type, Type)] -> SupermonadPluginM ()
+addTypeEqualities :: [(Ct, Type, Type)] -> SupermonadPluginM s ()
 addTypeEqualities = mapM_ (\(ct, ta, tb) -> addTypeEquality ct ta tb)
 
 -- | Returns all derived type variable equalities that were added to the results thus far.
-getTyVarEqualities :: SupermonadPluginM [(Ct, TyVar, Type)]
+getTyVarEqualities :: SupermonadPluginM s [(Ct, TyVar, Type)]
 getTyVarEqualities = gets $ smStateTyVarEqualities
 
 -- | Returns all derived type variable equalities that were added to the results thus far.
-getTypeEqualities :: SupermonadPluginM [(Ct, Type, Type)]
+getTypeEqualities :: SupermonadPluginM s [(Ct, Type, Type)]
 getTypeEqualities = gets $ smStateTypeEqualities
 
 -- | Add a warning to the queue of warnings that will be displayed when no progress could be made.
-addWarning :: String -> O.SDoc -> SupermonadPluginM ()
+addWarning :: String -> O.SDoc -> SupermonadPluginM s ()
 addWarning msg details = modify $ \s -> s { smStateWarningQueue = (msg, details) : smStateWarningQueue s }
 
 -- | Execute the given plugin code only if no plugin results were produced so far.
-whenNoResults :: SupermonadPluginM () -> SupermonadPluginM ()
+whenNoResults :: SupermonadPluginM s () -> SupermonadPluginM s ()
 whenNoResults m = do
   tyVarEqs <- getTyVarEqualities
   tyEqs <- getTypeEqualities
@@ -277,7 +283,7 @@ whenNoResults m = do
     else return ()
 
 -- | Displays the queued warning messages if no progress has been made.
-displayWarnings :: SupermonadPluginM ()
+displayWarnings :: SupermonadPluginM s ()
 displayWarnings = whenNoResults $ do
   warns <- gets smStateWarningQueue
   forM_ warns $ \(msg, details) -> do
@@ -294,57 +300,57 @@ stringToSupermonadError = O.text
 -- | Assert the given condition. If the condition does not
 --   evaluate to 'True', an error with the given message will
 --   be thrown the plugin aborts.
-assert :: Bool -> String -> SupermonadPluginM ()
+assert :: Bool -> String -> SupermonadPluginM s ()
 assert cond msg = unless cond $ throwPluginError msg
 
 -- | Assert the given condition. Same as 'assert' but with
 --   a monadic condition.
-assertM :: SupermonadPluginM Bool -> String -> SupermonadPluginM ()
+assertM :: SupermonadPluginM s Bool -> String -> SupermonadPluginM s ()
 assertM condM msg = do
   cond <- condM
   assert cond msg
 
 -- | Throw an error with the given message in the plugin.
 --   This will abort all further actions.
-throwPluginError :: String -> SupermonadPluginM a
+throwPluginError :: String -> SupermonadPluginM s a
 throwPluginError = throwError . stringToSupermonadError
 
 -- | Throw an error with the given message in the plugin.
 --   This will abort all further actions.
-throwPluginErrorSDoc :: O.SDoc -> SupermonadPluginM a
+throwPluginErrorSDoc :: O.SDoc -> SupermonadPluginM s a
 throwPluginErrorSDoc = throwError
 
 -- | Catch an error that was thrown by the plugin.
-catchPluginError :: SupermonadPluginM a -> (SupermonadError -> SupermonadPluginM a) -> SupermonadPluginM a
+catchPluginError :: SupermonadPluginM s a -> (SupermonadError -> SupermonadPluginM s a) -> SupermonadPluginM s a
 catchPluginError = catchError
 
 -- | Print some generic outputable object from the plugin (Unsafe).
-printObj :: Outputable o => o -> SupermonadPluginM ()
+printObj :: Outputable o => o -> SupermonadPluginM s ()
 printObj = internalPrint . L.smObjMsg . L.pprToStr
 
 -- | Print a message from the plugin.
-printMsg :: String -> SupermonadPluginM ()
+printMsg :: String -> SupermonadPluginM s ()
 printMsg = internalPrint . L.smDebugMsg
 
 -- | Print an error message from the plugin.
-printErr :: String -> SupermonadPluginM ()
+printErr :: String -> SupermonadPluginM s ()
 printErr = internalPrint . L.smErrMsg
 
 -- | Print a warning message from the plugin.
-printWarn :: String -> SupermonadPluginM ()
+printWarn :: String -> SupermonadPluginM s ()
 printWarn = internalPrint . L.smWarnMsg
 
 -- | Internal function for printing from within the monad.
-internalPrint :: String -> SupermonadPluginM ()
+internalPrint :: String -> SupermonadPluginM s ()
 internalPrint = runTcPlugin . tcPluginIO . putStr
 
 -- | Print the given string as if it was an object. This allows custom
 --   formatting of object.
-printFormattedObj :: String -> SupermonadPluginM ()
+printFormattedObj :: String -> SupermonadPluginM s ()
 printFormattedObj = internalPrint . L.smObjMsg
 
 -- | Print the given constraints in the plugins custom format.
-printConstraints :: [Ct] -> SupermonadPluginM ()
+printConstraints :: [Ct] -> SupermonadPluginM s ()
 printConstraints cts =
   forM_ groupedCts $ \(file, ctGroup) -> do
     printFormattedObj $ maybe "From unknown file:" (("From " ++) . (++":") . unpackFS) file
