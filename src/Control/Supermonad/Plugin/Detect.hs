@@ -163,14 +163,7 @@ findApplicativeClass = findClass isApplicativeClass
 -- -----------------------------------------------------------------------------
 -- Local Utility Functions
 -- -----------------------------------------------------------------------------
-{-
--- | Tries to find all of the given modules using the given search functions.
---   Returns the list of all found modules.
-findModules :: [TcPluginM (Either SDoc Module)] -> TcPluginM [Module]
-findModules findMdls = do
-  eitherMdls <- sequence findMdls
-  return $ catMaybes $ fmap (either (const Nothing) Just) eitherMdls
--}
+
 -- | Checks if the module with the given name is imported and,
 --   if so, returns that module.
 getModule :: Maybe UnitId -> String -> TcPluginM (Either SDoc Module)
@@ -188,32 +181,6 @@ getModule pkgKeyToFind mdlNameToFind = do
     
     splitModule :: Module -> (UnitId, ModuleName)
     splitModule mdl = (moduleUnitId mdl, moduleName mdl)
-  
--- For some reason this version also found modules that are not in the
--- imports.
-{-
--- | Checks if the module with the given name is imported and,
---   if so, returns that module.
-getModule :: Maybe UnitId -> String -> TcPluginM (Either SDoc Module)
-getModule pkgKeyToFind mdlNameToFind = do
-  mdlResult <- findImportedModule (mkModuleName mdlNameToFind) Nothing -- From "TcPluginM"
-  case mdlResult of
-    Found _mdlLoc mdl ->
-      if maybe True (moduleUnitId mdl ==) pkgKeyToFind then
-        return $ Right mdl
-      else
-        return $ Left
-          $  text "Package key of found module does not match the requested key:"
-          $$ text "Found:     " <> ppr (moduleUnitId mdl)
-          $$ text "Requested: " <> ppr pkgKeyToFind
-    NoPackage pkgKey -> return $ Left
-      $ text "Found module, but missing its package: " <> ppr pkgKey
-    FoundMultiple mdls -> return $ Left
-      $  text ("Module '" ++ mdlNameToFind ++ "' appears in several packages:")
-      $$ ppr (fmap snd mdls)
-    NotFound {} -> return $ Left 
-      $ text $ "Module was not found: " ++ mdlNameToFind
--}
 
 -- | Checks if a type class matching the shape of the given 
 --   predicate is in scope.
@@ -241,13 +208,7 @@ isClass cls isModule targetClassName targetArity =
   in    isModule clsMdl
      && clsNameStr == targetClassName
      && clsArity == targetArity
-{-
--- | Check if the given element has no parents.
-hasNoParent :: GlobalRdrElt -> Bool
-hasNoParent rdrElt = case gre_par rdrElt of
-  NoParent -> True
-  _ -> False
--}
+
 -- | Returns a list of all instances for the given class that are currently in scope.
 findInstancesInScope :: Class -> TcPluginM [ClsInst]
 findInstancesInScope cls = do
