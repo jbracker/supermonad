@@ -23,7 +23,6 @@ import Control.Supermonad.Plugin.Environment
   ( SupermonadPluginM
   , runTcPlugin
   , getBindClass, getReturnClass
-  --, getSupermonadModule
   --, getIdentityTyCon --, getIdentityModule
   , getGivenConstraints --, getWantedConstraints
   --, setWantedConstraints

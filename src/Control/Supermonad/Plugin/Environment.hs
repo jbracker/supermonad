@@ -8,7 +8,6 @@ module Control.Supermonad.Plugin.Environment
   , runTcPlugin
     -- * Polymonad Plugin Environment Access
   , getBindClass, getApplicativeClass, getReturnClass
-  , getSupermonadModule
   , getGivenConstraints, getWantedConstraints
   , getInstEnvs
   , getBindInstances
@@ -84,9 +83,7 @@ type SupermonadPluginM s = ReaderT SupermonadPluginEnv
 
 -- | The read-only environent of the plugin.
 data SupermonadPluginEnv = SupermonadPluginEnv
-  { smEnvSupermonadModule :: Module
-  -- ^ The 'Control.Supermonad' module.
-  , smEnvGivenConstraints  :: [GivenCt]
+  { smEnvGivenConstraints  :: [GivenCt]
   -- ^ The given and derived constraints (all of them).
   , smEnvWantedConstraints :: [WantedCt]
   -- ^ The wanted constraints (all of them).
@@ -125,14 +122,14 @@ runSupermonadPlugin givenCts wantedCts initStateM smM = do
   mReturnClsInsts <- findClassAndInstancesInScope (isClass isSupermonadModule returnClassName 1)
   -- Calculate the supermonads in scope and check for rogue bind and return instances.
   (smInsts, smErrors) <- case (mBindClsInsts, mApplicativeClsInsts, mReturnClsInsts) of
-      (Just (bindCls, bindInsts), Just (applicativeCls, applicativeInsts), Just (returnCls, returnInsts)) -> do
+      (Just (bindCls, _bindInsts), Just (applicativeCls, _applicativeInsts), Just (returnCls, _returnInsts)) -> do
         (smInsts, smErrors) <- findSupermonads bindCls applicativeCls returnCls
         smCheckErrors <- checkSupermonadInstances bindCls applicativeCls returnCls
         return $ (smInsts, fmap snd smErrors ++ fmap snd smCheckErrors) 
       (_, _, _) -> return mempty
   -- Try to construct the environment or throw errors
   case (mSupermonadMdl, mBindClsInsts, mApplicativeClsInsts, mReturnClsInsts, smErrors) of
-    (Right supermonadMdl, Just (bindCls, bindInsts), Just (applicativeCls, applicativeInsts), Just (returnCls, returnInsts), []) -> do
+    (Right _supermonadMdl, Just (bindCls, bindInsts), Just (applicativeCls, applicativeInsts), Just (returnCls, returnInsts), []) -> do
       let initState = SupermonadPluginState 
             { smStateTyVarEqualities = []
             , smStateTypeEqualities  = []
@@ -143,8 +140,7 @@ runSupermonadPlugin givenCts wantedCts initStateM smM = do
                     $ CD.insertDict bindClassName bindCls bindInsts 
                     $ CD.emptyDict
       eResult <- runExceptT $ flip runStateT initState $ runReaderT smM $ SupermonadPluginEnv
-        { smEnvSupermonadModule  = supermonadMdl
-        , smEnvGivenConstraints  = givenCts
+        { smEnvGivenConstraints  = givenCts
         , smEnvWantedConstraints = wantedCts
         , smEnvClassDictionary   = classDict
         , smEnvSupermonads       = smInsts
@@ -196,10 +192,6 @@ getApplicativeClass = (fromJust . CD.lookupDictClass applicativeClassName) <$> a
 -- | Returns the 'Control.Supermonad.Return' class.
 getReturnClass :: SupermonadPluginM s Class
 getReturnClass = (fromJust . CD.lookupDictClass returnClassName) <$> asks smEnvClassDictionary
-
--- | The 'Control.Supermonad' module.
-getSupermonadModule :: SupermonadPluginM s Module
-getSupermonadModule = asks smEnvSupermonadModule
 
 -- | Returns all of the /given/ and /derived/ constraints of this plugin call.
 getGivenConstraints :: SupermonadPluginM s [GivenCt]
