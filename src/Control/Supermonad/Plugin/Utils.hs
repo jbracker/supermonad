@@ -1,8 +1,9 @@
 
 -- | Provides all kinds of functions that are needed by the plugin.
 module Control.Supermonad.Plugin.Utils (
+    errIndent
   -- * Type inspection
-    collectTopTyCons
+  , collectTopTyCons
   , collectTopTcVars
   , collectTopTcVarsWithArity
   , collectTyVars
@@ -64,6 +65,14 @@ import Control.Supermonad.Plugin.Wrapper
   , splitKindFunTys
   , fromLeft, fromRight
   )
+
+-- -----------------------------------------------------------------------------
+-- Constants
+-- -----------------------------------------------------------------------------
+
+-- | Indentation to be used in error messages.
+errIndent :: Int
+errIndent = 4
 
 -- -----------------------------------------------------------------------------
 -- Constraint and type inspection
