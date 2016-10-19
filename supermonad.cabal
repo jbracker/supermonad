@@ -75,6 +75,7 @@ library
                , Control.Supermonad.Plugin.Separation
                , Control.Supermonad.Plugin.Solving
                , Control.Supermonad.Plugin.Dict
+               , Control.Supermonad.Plugin.ClassDict
   other-extensions:
   build-depends: base         >=4.8  && <5
                , ghc          >=7.10.1 && <8.1
