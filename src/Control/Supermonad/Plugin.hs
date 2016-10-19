@@ -14,10 +14,12 @@ import TcPluginM ( TcPluginM )
 
 import Control.Supermonad.Plugin.Log ( sDocToStr )
 import qualified Control.Supermonad.Plugin.Log as L
+import Control.Supermonad.Plugin.Dict ( SupermonadDict )
 import Control.Supermonad.Plugin.Solving
   ( solveConstraints )
 import Control.Supermonad.Plugin.Environment
-  ( SupermonadPluginM, runSupermonadPlugin
+  ( SupermonadPluginM
+  , initSupermonadPlugin, runSupermonadPlugin
   , getWantedConstraints
   , getTypeEqualities, getTyVarEqualities
   , printMsg
@@ -58,8 +60,8 @@ supermonadStop _s = return ()
 
 -- | The plugin code wrapper. Handles execution of the monad stack.
 supermonadSolve :: SupermonadState -> [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginResult
-supermonadSolve s given derived wanted = do
-  res <- runSupermonadPlugin (given ++ derived) wanted (return s) $
+supermonadSolve _s given derived wanted = do
+  res <- runSupermonadPlugin (given ++ derived) wanted initSupermonadPlugin $
     if not $ null wanted then do
       printMsg "Invoke supermonad plugin..."
       supermonadSolve'
@@ -80,7 +82,7 @@ supermonadSolve s given derived wanted = do
     Right solution -> return solution
 
 -- | The actual plugin code.
-supermonadSolve' :: SupermonadPluginM SupermonadState ()
+supermonadSolve' :: SupermonadPluginM SupermonadDict ()
 supermonadSolve' = do
   --(getWantedConstraints >>= filterM isBindConstraint) >>= (printConstraints . sortConstraintsByLine)
   --(getWantedConstraints >>= filterM isReturnConstraint) >>= (printConstraints . sortConstraintsByLine)
