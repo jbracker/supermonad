@@ -6,7 +6,6 @@ module Control.Supermonad.Plugin.Detect
     supermonadModuleName
   , bindClassName, returnClassName, applicativeClassName
   , findSupermonadModule
-  , findAnyModule, findEitherModule
   , isBindClass, isReturnClass, isApplicativeClass
   , isSupermonadModule
   , findBindClass, findReturnClass, findApplicativeClass
@@ -15,7 +14,11 @@ module Control.Supermonad.Plugin.Detect
     -- * Functor class detection
   , functorClassName, functorModuleName
     -- * General detection utilities
+  , findAnyModule, findEitherModule
+  , isClass
+  , findClass
   , findInstancesInScope
+  , findClassAndInstancesInScope
   ) where
 
 import Data.List  ( find )
@@ -181,6 +184,17 @@ getModule pkgKeyToFind mdlNameToFind = do
     
     splitModule :: Module -> (UnitId, ModuleName)
     splitModule mdl = (moduleUnitId mdl, moduleName mdl)
+
+-- | Tries to find a given class and all of its instances in scope 
+--   using the class predicate.
+findClassAndInstancesInScope :: (Class -> Bool) -> TcPluginM (Maybe (Class, [ClsInst]))
+findClassAndInstancesInScope clsPred = do
+  mCls <- findClass clsPred
+  case mCls of
+    Nothing -> return $ Nothing
+    Just cls -> do
+      insts <- findInstancesInScope cls
+      return $ Just (cls, insts)
 
 -- | Checks if a type class matching the shape of the given 
 --   predicate is in scope.
