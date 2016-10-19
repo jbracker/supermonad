@@ -12,6 +12,7 @@ clean: init
 	rm -fR ./examples/hmtc/supermonad/dist
 	rm -fR ./examples/hmtc/monad-param/dist
 	rm -fR ./examples/constrained/dist
+	rm -fR ./dist
 
 clean-sandbox:
 	rm -fR ./.cabal-sandbox
@@ -26,15 +27,15 @@ opendoc:
 init:
 	[ -f ./cabal.sandbox.config ] || [ -d ./.cabal-sandbox ] || cabal sandbox init
 
-supermonad-examples: session-example session-chat-supermonad-example effect-example constrained-example hmtc-supermonad-example
+supermonad-examples: install session-example session-chat-supermonad-example effect-example constrained-example hmtc-supermonad-example
 
 session-example: install
 	cabal install ./examples/session
 
-session-chat-orig-example:
+session-chat-orig-example: init
 	cabal install ./examples/session-chat/original
 
-session-chat-supermonad-example:
+session-chat-supermonad-example: init
 	cabal install ./examples/session-chat/supermonad
 
 effect-example: install
@@ -43,11 +44,11 @@ effect-example: install
 constrained-example: install
 	cabal install ./examples/constrained
 
-hmtc-orig-example:
+hmtc-orig-example: init
 	cabal install ./examples/hmtc/original
 
 hmtc-supermonad-example: install
 	cabal install ./examples/hmtc/supermonad
 	
-hmtc-monad-param-example:
+hmtc-monad-param-example: init
 	cabal install ./examples/hmtc/monad-param
