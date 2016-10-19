@@ -232,9 +232,9 @@ findInstancesInScope cls = do
 -- | Check if there are any supermonad instances that clearly 
 --   do not belong to a specific supermonad.
 checkSupermonadInstances 
-  :: (Class, [ClsInst]) -- ^ The @Bind@ class and instances.
-  -> (Class, [ClsInst]) -- ^ The @Applicative@ class and instances.
-  -> (Class, [ClsInst]) -- ^ The @Return@ class and instances.
+  :: (Class, [BindInst]) -- ^ The @Bind@ class and instances.
+  -> (Class, [ApplicativeInst]) -- ^ The @Applicative@ class and instances.
+  -> (Class, [ReturnInst]) -- ^ The @Return@ class and instances.
   -> TcPluginM [(ClsInst, SDoc)]
 checkSupermonadInstances (bindCls, bindInsts) (applicativeCls, applicativeInsts) (returnCls, returnInsts) = do
   let polyBindInsts        = filter (isPolyTyConInstance bindCls       ) bindInsts
@@ -249,9 +249,9 @@ checkSupermonadInstances (bindCls, bindInsts) (applicativeCls, applicativeInsts)
 
 -- | Constructs the map between type constructors and their supermonad instances.
 findSupermonads 
-  :: (Class, [ClsInst]) -- ^ The @Bind@ class and instances.
-  -> (Class, [ClsInst]) -- ^ The @Applicative@ class and instances.
-  -> (Class, [ClsInst]) -- ^ The @Return@ class and instances.
+  :: (Class, [BindInst]) -- ^ The @Bind@ class and instances.
+  -> (Class, [ApplicativeInst]) -- ^ The @Applicative@ class and instances.
+  -> (Class, [ReturnInst]) -- ^ The @Return@ class and instances.
   -> TcPluginM (SupermonadDict, [(TyCon, SDoc)])
   -- ^ Association between type constructors and their supermonad instances.
 findSupermonads (bindCls, bindInsts) (applicativeCls, applicativeInsts) (returnCls, returnInsts) = do
@@ -261,12 +261,11 @@ findSupermonads (bindCls, bindInsts) (applicativeCls, applicativeInsts) (returnC
                        $ [bindInsts, applicativeInsts, returnInsts]
   -- Find the supermonad instances of each type constructor
   return $ mconcat 
-         $ fmap (findSupermonad bindInsts applicativeInsts returnInsts) 
+         $ fmap findSupermonad
          $ S.toList supermonadTyCons
   where
-    findSupermonad :: [BindInst] -> [ApplicativeInst] -> [ReturnInst] -> TyCon 
-                   -> (SupermonadDict, [(TyCon, SDoc)])
-    findSupermonad bindInsts applicativeInsts returnInsts tc = 
+    findSupermonad :: TyCon -> (SupermonadDict, [(TyCon, SDoc)])
+    findSupermonad tc = 
       case ( filter (isMonoTyConInstance tc bindCls) bindInsts
            , filter (isMonoTyConInstance tc applicativeCls) applicativeInsts
            , filter (isMonoTyConInstance tc returnCls) returnInsts ) of
