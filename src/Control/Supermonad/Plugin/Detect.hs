@@ -76,8 +76,10 @@ import Control.Supermonad.Plugin.Names
 -- | Checks if a module providing the supermonad classes is imported.
 findSupermonadModule :: TcPluginM (Either SDoc Module)
 findSupermonadModule = do
-  eSmUnCtMdl <- findSupermonadUnCtModule
-  eSmCtMdl   <- findSupermonadCtModule
+  -- Check if the module "Control.Supermonad" or "Control.Supermonad.Prelude" is imported.
+  eSmUnCtMdl <- findAnyModule [(Nothing, supermonadModuleName  ), (Nothing, supermonadPreludeModuleName  )]
+  -- Checks if the module "Control.Supermonad.Constrained" or "Control.Supermonad.Constrained.Prelude" is imported.
+  eSmCtMdl   <- findAnyModule [(Nothing, supermonadCtModuleName), (Nothing, supermonadCtPreludeModuleName)]
   case (eSmUnCtMdl, eSmCtMdl) of
     (Right _  , Left _errCt) -> return eSmUnCtMdl
     (Left _err, Right _    ) -> return eSmCtMdl
@@ -86,23 +88,22 @@ findSupermonadModule = do
     (Right _, Right _) -> return $ Left
       $ text "Found unconstrained and constrained supermonad modules!"
 
--- | Checks if the module "Control.Supermonad" or "Control.Supermonad.Prelude"
---   is imported and, if so, returns either.
-findSupermonadUnCtModule :: TcPluginM (Either SDoc Module)
-findSupermonadUnCtModule = do
-  eMdl <- getModule Nothing supermonadModuleName
-  case eMdl of
-    Left _err -> getModule Nothing supermonadPreludeModuleName
-    Right _ -> return eMdl
 
--- | Checks if the module "Control.Supermonad.Constrained" or "Control.Supermonad.Constrained.Prelude"
---   is imported and, if so, returns either.
-findSupermonadCtModule :: TcPluginM (Either SDoc Module)
-findSupermonadCtModule = do
-  eCtMdl <- getModule Nothing supermonadCtModuleName
-  case eCtMdl of
-    Left _err -> getModule Nothing supermonadCtPreludeModuleName
-    Right _ -> return eCtMdl
+-- | Checks if any of the given modules is imported and, if so, returns 
+--   the first one it finds in order of the list. If none of the modules 
+--   exists an error message will be returned.
+findAnyModule :: [(Maybe UnitId, String)] -> TcPluginM (Either SDoc Module)
+findAnyModule = findAnyModule' []
+  where 
+    findAnyModule' :: [SDoc] -> [(Maybe UnitId, String)] -> TcPluginM (Either SDoc Module)
+    findAnyModule' errs [] = do
+      -- Need to reverse, because accumulation stacks them that way.
+      return $ Left $ vcat $ reverse errs
+    findAnyModule' errs ((mdlUnit, mdlName) : mdls) = do
+      eMdl <- getModule mdlUnit mdlName
+      case eMdl of
+        Left err -> findAnyModule' (err : errs) mdls
+        Right _ -> return eMdl
 
 -- | Check if the given module is the supermonad module.
 isSupermonadModule :: Module -> Bool
