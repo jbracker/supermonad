@@ -74,7 +74,7 @@ import Control.Supermonad.Plugin.Dict
 import Control.Supermonad.Plugin.Names
 
 -- -----------------------------------------------------------------------------
--- Polymonad Class Detection
+-- Supermonad Class Detection
 -- -----------------------------------------------------------------------------
 
 -- | Makes sure that only one of the given modules was found and returns that

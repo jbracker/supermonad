@@ -98,8 +98,8 @@ formatSpan (RealSrcSpan s) =
 --
 --   /Example:/
 --
--- >>> [G] Polymonad m Identity m (129:12-131:41, CDictCan)
--- [D] m_a1kdW ~ m (134:3-14, CNonCanonical)
+-- >>> [G] Supermonad m Identity m (129:12-131:41, CDictCan)
+-- >>> [D] m_a1kdW ~ m (134:3-14, CNonCanonical)
 formatConstraint :: Ct -> String
 formatConstraint ct
   =  "["  ++ formatCtFlavour ct
