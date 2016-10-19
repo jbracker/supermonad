@@ -136,17 +136,17 @@ isSupermonadModule mdl = mdlName `elem` [smMdlName, smPrelName, smCtMdlName, smC
 -- | Checks if the given class matches the shape of the 'Control.Supermonad.Bind'
 --   type class and is defined in the right module.
 isBindClass :: Class -> Bool
-isBindClass cls = isClass cls isSupermonadModule bindClassName 3
+isBindClass = isClass isSupermonadModule bindClassName 3
 
 -- | Checks if the given class matches the shape of the 'Control.Supermonad.Return'
 --   type class and is defined in the right module.
 isReturnClass :: Class -> Bool
-isReturnClass cls = isClass cls isSupermonadModule returnClassName 1
+isReturnClass = isClass isSupermonadModule returnClassName 1
 
 -- | Checks if the given class matches the shape of the 'Control.Supermonad.Applicative'
 --   type class and is defined in the right module.
 isApplicativeClass :: Class -> Bool
-isApplicativeClass cls = isClass cls isSupermonadModule applicativeClassName 3
+isApplicativeClass = isClass isSupermonadModule applicativeClassName 3
 
 -- | Checks if a type class matching the shape and name of the
 --   'Control.Supermonad.Bind' type class is in scope.
@@ -213,8 +213,8 @@ findClass isClass' = do
 
 -- | Check if the given class has the given name, arity and if the classes
 --   module fulfills the given predicate.
-isClass :: Class -> (Module -> Bool) -> String -> Arity -> Bool
-isClass cls isModule targetClassName targetArity =
+isClass :: (Module -> Bool) -> String -> Arity -> Class -> Bool
+isClass isModule targetClassName targetArity cls =
   let clsName = className cls
       clsMdl = nameModule clsName
       clsNameStr = occNameString $ getOccName clsName
