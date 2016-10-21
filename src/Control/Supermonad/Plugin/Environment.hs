@@ -59,7 +59,8 @@ import Control.Supermonad.Plugin.Constraint
   ( GivenCt, WantedCt
   , constraintSourceLocation )
 import Control.Supermonad.Plugin.Detect
-  ( findSupermonadModule
+  ( findModuleByQuery, supermonadModuleQuery
+  , findClassesAndInstancesInScope, supermonadClassQuery
   , findSupermonads
   , isSupermonadModule
   , checkSupermonadInstances
@@ -110,34 +111,23 @@ data SupermonadPluginState s = SupermonadPluginState
 initSupermonadPlugin :: SupermonadPluginM () (CD.ClassDict, SupermonadDict)
 initSupermonadPlugin = do
   -- Determine if the supermonad module is available.
-  mSupermonadMdl <- runTcPlugin findSupermonadModule
-  case mSupermonadMdl of
-    Right _smMdl -> return ()
-    Left mdlErrMsg ->
-      throwPluginErrorSDoc $ O.hang (O.text "Could not find supermonad module:") errIndent $ mdlErrMsg
+  eSupermonadMdl <- runTcPlugin $ findModuleByQuery supermonadModuleQuery
+  _supermonadMdl <- case eSupermonadMdl of
+    Right smMdl -> return smMdl
+    Left mdlErrMsg -> throwPluginErrorSDoc mdlErrMsg
   
-  -- Determine the 'Bind', 'Applicative' and 'Return' class as well as their 
-  -- respective instances.
-  mBindClsInsts <- runTcPlugin $ findClassAndInstancesInScope (isClass isSupermonadModule bindClassName 3)
-  mApplicativeClsInsts <- runTcPlugin $ findClassAndInstancesInScope (isClass isSupermonadModule applicativeClassName 3)
-  mReturnClsInsts <- runTcPlugin $ findClassAndInstancesInScope (isClass isSupermonadModule returnClassName 1)
+  -- Find the supermonad classes and instances.
+  eFoundClsInsts <- runTcPlugin $ findClassesAndInstancesInScope supermonadClassQuery
+  foundClsInsts <- case eFoundClsInsts of
+    Right clsInsts -> return clsInsts
+    Left errMsg -> throwPluginErrorSDoc errMsg
   
-  -- Throw an error if one of the class could not be found.
-  let clsInstsErrs = maybe [O.text $ "Could not find '" ++ bindClassName        ++ "' class!"] (const []) mBindClsInsts
-                  ++ maybe [O.text $ "Could not find '" ++ applicativeClassName ++ "' class!"] (const []) mApplicativeClsInsts
-                  ++ maybe [O.text $ "Could not find '" ++ returnClassName      ++ "' class!"] (const []) mReturnClsInsts
-  case clsInstsErrs of
-    [] -> return ()
-    _  -> throwPluginErrorSDoc $ O.vcat clsInstsErrs
-  
-  
-  -- Match the actual contents...
-  let Just (bindCls       , bindInsts       ) = mBindClsInsts
-  let Just (applicativeCls, applicativeInsts) = mApplicativeClsInsts
-  let Just (returnCls     , returnInsts     ) = mReturnClsInsts
+  -- Construct the initialized class dictionary.
+  oldClsDict <- getClassDictionary
+  let newClsDict = foldr (\(clsName, cls, clsInsts) -> CD.insertDict clsName cls clsInsts) oldClsDict foundClsInsts 
   
   -- Calculate the supermonads in scope and check for rogue bind and return instances.
-  (smInsts, smErrors) <- case (mBindClsInsts, mApplicativeClsInsts, mReturnClsInsts) of
+  (smInsts, smErrors) <- case (CD.lookupDict bindClassName newClsDict, CD.lookupDict applicativeClassName newClsDict, CD.lookupDict returnClassName newClsDict) of
       (Just bindClsInsts, Just applicativeClsInsts, Just returnClsInsts) -> do
         (smInsts, smErrors) <- runTcPlugin $ findSupermonads bindClsInsts applicativeClsInsts returnClsInsts
         smCheckErrors <- runTcPlugin $ checkSupermonadInstances bindClsInsts applicativeClsInsts returnClsInsts
@@ -146,15 +136,7 @@ initSupermonadPlugin = do
   
   -- Try to construct the environment or throw errors
   case smErrors of
-    [] -> do
-      -- Returns the class dictionary and the supermonad dictionary as a result
-      -- of initialization.
-      oldClassDict <- getClassDictionary
-      let classDict = CD.insertDict returnClassName returnCls returnInsts 
-                    $ CD.insertDict applicativeClassName applicativeCls applicativeInsts 
-                    $ CD.insertDict bindClassName bindCls bindInsts 
-                    $ oldClassDict
-      return (classDict, smInsts)
+    [] -> return (newClsDict, smInsts)
     _ -> do
       throwPluginErrorSDoc $ O.hang (O.text "Problems when finding supermonad instances:") errIndent $ O.vcat smErrors
 
