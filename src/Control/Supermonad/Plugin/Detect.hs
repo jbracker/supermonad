@@ -2,8 +2,12 @@
 -- | Functions and utilities to detect the importent modules, classes
 --   and types of the plugin.
 module Control.Supermonad.Plugin.Detect
-  ( -- * Supermonad class detection
-    supermonadModuleName
+  ( -- * Searching for Modules
+    ModuleQuery(..)
+  , findModuleByQuery
+  , findModule
+    -- * Supermonad class detection
+  , supermonadModuleName
   , bindClassName, returnClassName, applicativeClassName
   , findSupermonadModule
   , isBindClass, isReturnClass, isApplicativeClass
@@ -14,7 +18,6 @@ module Control.Supermonad.Plugin.Detect
     -- * Functor class detection
   , functorClassName, functorModuleName
     -- * General detection utilities
-  , findAnyModule, findEitherModule
   , isClass
   , findClass
   , findInstancesInScope
@@ -22,8 +25,11 @@ module Control.Supermonad.Plugin.Detect
   ) where
 
 import Data.List  ( find )
+import Data.Either ( isLeft, isRight )
 --import Data.Maybe ( catMaybes )
 import qualified Data.Set as S
+
+import Control.Monad ( forM )
 
 import BasicTypes ( Arity )
 import TcRnTypes
@@ -66,7 +72,8 @@ import Control.Supermonad.Plugin.Instance
   , isMonoTyConInstance 
   , isPolyTyConInstance )
 import Control.Supermonad.Plugin.Utils
-  ( collectTopTyCons, errIndent )
+  ( collectTopTyCons, errIndent
+  , fromRight, fromLeft )
 import Control.Supermonad.Plugin.Dict
   ( SupermonadDict
   , BindInst, ApplicativeInst, ReturnInst
@@ -77,52 +84,25 @@ import Control.Supermonad.Plugin.Names
 -- Supermonad Class Detection
 -- -----------------------------------------------------------------------------
 
--- | Makes sure that only one of the given modules was found and returns that
---   found module. If both or none of them were found an error is returned.
---   The returned error message can be customized using the optional 
---   function.
-findEitherModule :: (Either SDoc Module) -> (Either SDoc Module) -> Maybe (Maybe (SDoc, SDoc) -> SDoc) -> (Either SDoc Module)
-findEitherModule eMdlA eMdlB mErrFun = case (eMdlA, eMdlB) of
-    (Right _mdlA, Left  _errB) -> eMdlA
-    (Left  _errA, Right _mdlB) -> eMdlB
-    (Left   errA, Left   errB) -> 
-      let err = text "Failed to find either module!" 
-              $$ hang (text "First module error:") errIndent errA 
-              $$ hang (text "Second module error:") errIndent errB
-      in Left $ maybe err ($ Just (errA, errB)) mErrFun
-    (Right  mdlA, Right  mdlB) -> 
-      let err = hang (text "Found both modules:") errIndent $ ppr mdlA $$ ppr mdlB
-      in Left $ maybe err ($ Nothing) mErrFun
+
+findSupermonadModulesErrMsg :: [Either SDoc Module] -> SDoc
+findSupermonadModulesErrMsg [Left errA, Left errB] = 
+  hang (text "Could not find supermonad or constrained supermonad modules!") errIndent (errA $$ errB)
+findSupermonadModulesErrMsg [Right _mdlA, Right _mdlB] =
+  text "Found unconstrained and constrained supermonad modules!"
+findSupermonadModulesErrMsg mdls = defaultFindEitherModuleErrMsg mdls
 
 -- | Checks if a module providing the supermonad classes is imported.
 findSupermonadModule :: TcPluginM (Either SDoc Module)
-findSupermonadModule = do
-  -- Check if the module "Control.Supermonad" or "Control.Supermonad.Prelude" is imported.
-  eSmUnCtMdl <- findAnyModule [(Nothing, supermonadModuleName  ), (Nothing, supermonadPreludeModuleName  )]
-  -- Checks if the module "Control.Supermonad.Constrained" or "Control.Supermonad.Constrained.Prelude" is imported.
-  eSmCtMdl   <- findAnyModule [(Nothing, supermonadCtModuleName), (Nothing, supermonadCtPreludeModuleName)]
-  
-  return $ findEitherModule eSmUnCtMdl eSmCtMdl $ Just 
-         $ \mErr -> maybe (text "Found unconstrained and constrained supermonad modules!")
-                          (\(err, errCt) -> hang (text "Could not find supermonad or constrained supermonad modules!") errIndent (err $$ errCt))
-                          mErr
-
-
--- | Checks if any of the given modules is imported and, if so, returns 
---   the first one it finds in order of the list. If none of the modules 
---   exists an error message will be returned.
-findAnyModule :: [(Maybe UnitId, String)] -> TcPluginM (Either SDoc Module)
-findAnyModule = findAnyModule' []
-  where 
-    findAnyModule' :: [SDoc] -> [(Maybe UnitId, String)] -> TcPluginM (Either SDoc Module)
-    findAnyModule' errs [] = do
-      -- Need to reverse, because accumulation stacks them that way.
-      return $ Left $ vcat $ reverse errs
-    findAnyModule' errs ((mdlUnit, mdlName) : mdls) = do
-      eMdl <- getModule mdlUnit mdlName
-      case eMdl of
-        Left err -> findAnyModule' (err : errs) mdls
-        Right _ -> return eMdl
+findSupermonadModule = findModuleByQuery 
+  $ EitherModule
+    [ AnyModule [ ThisModule supermonadModuleName Nothing
+                , ThisModule supermonadPreludeModuleName Nothing
+                ]
+    , AnyModule [ ThisModule supermonadCtModuleName Nothing
+                , ThisModule supermonadCtPreludeModuleName Nothing
+                ]
+    ] $ Just findSupermonadModulesErrMsg
 
 -- | Check if the given module is the supermonad module.
 isSupermonadModule :: Module -> Bool
@@ -164,13 +144,39 @@ findApplicativeClass :: TcPluginM (Maybe Class)
 findApplicativeClass = findClass isApplicativeClass
 
 -- -----------------------------------------------------------------------------
--- Local Utility Functions
+-- Searching for Modules
 -- -----------------------------------------------------------------------------
+
+-- | Formulates queries to find modules.
+data ModuleQuery
+  = ThisModule PluginModuleName (Maybe UnitId)
+  -- ^ Search for a specific module using its name and optionally its 
+  --   unit ID (module ID).
+  | EitherModule [ModuleQuery] (Maybe ([Either SDoc Module] -> SDoc))
+  -- ^ Find either of the modules described by the given subqueries.
+  --   If only one of the queries delivers a result, it will be used
+  --   otherwise an error will be returned. The error message is customizable
+  --   using the optional function.
+  | AnyModule    [ModuleQuery]
+  -- ^ Find any of the modules described by the given subqueries.
+  --   The first one found (in order of the queries) will be delivered as result,
+  --   the rest will be ignored. If no module could be found an error message
+  --   will be returned.
+
+-- | Tries to find a module using the given module query.
+findModuleByQuery :: ModuleQuery -> TcPluginM (Either SDoc Module)
+findModuleByQuery (ThisModule mdlName mdlUnit) = findModule mdlUnit mdlName
+findModuleByQuery (EitherModule queries mErrFun) = do
+  queryResults <- forM queries findModuleByQuery
+  return $ findEitherModule mErrFun queryResults
+findModuleByQuery (AnyModule queries) = do
+  queryResults <- forM queries findModuleByQuery
+  return $ findAnyModule Nothing queryResults
 
 -- | Checks if the module with the given name is imported and,
 --   if so, returns that module.
-getModule :: Maybe UnitId -> String -> TcPluginM (Either SDoc Module)
-getModule pkgKeyToFind mdlNameToFind = do
+findModule :: Maybe UnitId -> String -> TcPluginM (Either SDoc Module)
+findModule pkgKeyToFind mdlNameToFind = do
   (gblEnv, _lclEnv) <- getEnvs
   let mdls = moduleEnvKeys $ imp_mods $ tcg_imports $ gblEnv
   case find (isModule . splitModule) mdls of
@@ -184,6 +190,45 @@ getModule pkgKeyToFind mdlNameToFind = do
     
     splitModule :: Module -> (UnitId, ModuleName)
     splitModule mdl = (moduleUnitId mdl, moduleName mdl)
+
+-- | Makes sure that only one of the given modules was found and returns that
+--   found module. If many or none of them were found an error is returned.
+--   The returned error message can be customized using the optional 
+--   function.
+findEitherModule :: Maybe ([Either SDoc Module] -> SDoc) -> [Either SDoc Module] -> (Either SDoc Module)
+findEitherModule mErrFun eMdls = 
+  case fmap fromRight $ filter isRight eMdls of
+    [] -> Left $ maybe defaultFindEitherModuleErrMsg id mErrFun $ eMdls
+    [mdl] -> Right mdl
+    _ -> Left $ maybe defaultFindEitherModuleErrMsg id mErrFun $ eMdls
+
+-- | Makes sure that at least one of the given modules was found and, if so, returns 
+--   the first one found (in order of the list). If none of the modules 
+--   was found an error message will be returned.
+--   The returned error message can be customized using the optional 
+--   function.
+findAnyModule :: Maybe ([SDoc] -> SDoc) -> [Either SDoc Module] -> (Either SDoc Module)
+findAnyModule mErrFun eMdls = 
+  case fmap fromRight $ filter isRight eMdls of
+    [] -> Left $ maybe defaultFindAnyModuleErrMsg id mErrFun $ fmap fromLeft eMdls
+    (mdl : _) -> Right mdl
+
+-- | Default error message function in case 'EitherModule' fails.
+defaultFindEitherModuleErrMsg :: [Either SDoc Module] -> SDoc
+defaultFindEitherModuleErrMsg mdls = case found of
+    [] -> hang (text "Failed to find either module!") errIndent $ vcat notFound
+    _ -> hang (text "Found several modules, unclear which one to use:") errIndent $ vcat $ fmap ppr found
+  where
+    found = fmap fromRight $ filter isRight mdls
+    notFound = fmap fromLeft $ filter isLeft mdls
+
+-- | Default error message function in case 'AnyModule' fails.
+defaultFindAnyModuleErrMsg :: [SDoc] -> SDoc
+defaultFindAnyModuleErrMsg mdlErrs = hang (text "Could not find any of the modules!") errIndent $ vcat mdlErrs
+
+-- -----------------------------------------------------------------------------
+-- Local Utility Functions
+-- -----------------------------------------------------------------------------
 
 -- | Tries to find a given class and all of its instances in scope 
 --   using the class predicate.
