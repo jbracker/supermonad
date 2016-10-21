@@ -1,8 +1,11 @@
 
 -- | Constant names that are used throughout the plugin.
 module Control.Supermonad.Plugin.Names
-  ( -- * Module Names
-    supermonadModuleName
+  ( -- * Types
+    PluginModuleName
+  , PluginClassName
+    -- * Module Names
+  , supermonadModuleName
   , supermonadCtModuleName
   , supermonadPreludeModuleName
   , supermonadCtPreludeModuleName
@@ -14,46 +17,52 @@ module Control.Supermonad.Plugin.Names
   , applicativeClassName
   ) where
 
+-- | Type of module names the plugin uses.
+type PluginModuleName = String
+
+-- | Type of class names the plugin uses.
+type PluginClassName = String  
+
 -- -----------------------------------------------------------------------------
 -- Constant Names (Magic Numbers...)
 -- -----------------------------------------------------------------------------
 
 -- | Name of the "Control.Supermonad" module.
-supermonadModuleName :: String
+supermonadModuleName :: PluginModuleName
 supermonadModuleName = "Control.Supermonad"
 
 -- | Name of the "Control.Supermonad.Constrained" module.
-supermonadCtModuleName :: String
+supermonadCtModuleName :: PluginModuleName
 supermonadCtModuleName = "Control.Supermonad.Constrained"
 
 -- | Name of the @Bind@ type class.
 --   Also used as dictionary key for the @Bind@ class.
-bindClassName :: String
+bindClassName :: PluginClassName
 bindClassName = "Bind"
 
 -- | Name of the @Return@ type class.
 --   Also used as dictionary key for the @Return@ class.
-returnClassName :: String
+returnClassName :: PluginClassName
 returnClassName = "Return"
 
 -- | Name of the @Functor@ class.
 --   Also used as dictionary key for the @Functor@ class.
-functorClassName :: String
+functorClassName :: PluginClassName
 functorClassName = "Functor"
 
 -- | Name of the @Applicative@ type class.
 --   Also used as dictionary key for the @Applicative@ class.
-applicativeClassName :: String
+applicativeClassName :: PluginClassName
 applicativeClassName = "Applicative"
 
 -- | Name of the "Control.Supermonad.Prelude" module.
-supermonadPreludeModuleName :: String
+supermonadPreludeModuleName :: PluginModuleName
 supermonadPreludeModuleName = "Control.Supermonad.Prelude"
 
 -- | Name of the "Control.Supermonad.Constrained.Prelude" module.
-supermonadCtPreludeModuleName :: String
+supermonadCtPreludeModuleName :: PluginModuleName
 supermonadCtPreludeModuleName = "Control.Supermonad.Constrained.Prelude"
 
 -- | Name of the "Data.Functor" module.
-functorModuleName :: String
+functorModuleName :: PluginModuleName
 functorModuleName = "Data.Functor"
