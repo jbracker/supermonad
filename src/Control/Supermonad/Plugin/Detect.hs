@@ -6,6 +6,11 @@ module Control.Supermonad.Plugin.Detect
     ModuleQuery(..)
   , findModuleByQuery
   , findModule
+    -- * Searching for Classes
+  , ClassQuery(..)
+  , findClassesByQuery
+  , findClass
+  , isClass
     -- * Supermonad class detection
   , supermonadModuleName
   , bindClassName, returnClassName, applicativeClassName
@@ -18,15 +23,13 @@ module Control.Supermonad.Plugin.Detect
     -- * Functor class detection
   , functorClassName, functorModuleName
     -- * General detection utilities
-  , isClass
-  , findClass
   , findInstancesInScope
   , findClassAndInstancesInScope
   ) where
 
 import Data.List  ( find )
 import Data.Either ( isLeft, isRight )
---import Data.Maybe ( catMaybes )
+import Data.Maybe ( isNothing )
 import qualified Data.Set as S
 
 import Control.Monad ( forM )
@@ -113,6 +116,13 @@ isSupermonadModule mdl = mdlName `elem` [smMdlName, smPrelName, smCtMdlName, smC
         smCtMdlName = mkModuleName supermonadCtModuleName
         smCtPrelName = mkModuleName supermonadCtPreludeModuleName
 
+supermonadClassQuery :: Module -> ClassQuery
+supermonadClassQuery smMdl = ClassQuery smMdl 
+  [ (bindClassName       , 3)
+  , (returnClassName     , 1)
+  , (applicativeClassName, 3)
+  ]
+
 -- | Checks if the given class matches the shape of the 'Control.Supermonad.Bind'
 --   type class and is defined in the right module.
 isBindClass :: Class -> Bool
@@ -162,6 +172,16 @@ data ModuleQuery
   --   The first one found (in order of the queries) will be delivered as result,
   --   the rest will be ignored. If no module could be found an error message
   --   will be returned.
+
+{- We don't actually need this.
+-- | Defines the equality of module queries up to the error message construction
+--   functions.
+instance Eq ModuleQuery where
+  (ThisModule mdlNameA unitIdA) == (ThisModule mdlNameB unitIdB) = mdlNameA == mdlNameB && unitIdA == unitIdB
+  (EitherModule qas _) == (EitherModule qbs _) = qas == qbs
+  (AnyModule qas) == (AnyModule qbs) = qas == qbs
+  _ == _ = False
+-}
 
 -- | Tries to find a module using the given module query.
 findModuleByQuery :: ModuleQuery -> TcPluginM (Either SDoc Module)
@@ -226,26 +246,33 @@ defaultFindEitherModuleErrMsg mdls = case found of
 defaultFindAnyModuleErrMsg :: [SDoc] -> SDoc
 defaultFindAnyModuleErrMsg mdlErrs = hang (text "Could not find any of the modules!") errIndent $ vcat mdlErrs
 
+
 -- -----------------------------------------------------------------------------
--- Local Utility Functions
+-- Searching for Classes
 -- -----------------------------------------------------------------------------
 
--- | Tries to find a given class and all of its instances in scope 
---   using the class predicate.
-findClassAndInstancesInScope :: (Class -> Bool) -> TcPluginM (Maybe (Class, [ClsInst]))
-findClassAndInstancesInScope clsPred = do
-  mCls <- findClass clsPred
-  case mCls of
-    Nothing -> return $ Nothing
-    Just cls -> do
-      insts <- findInstancesInScope cls
-      return $ Just (cls, insts)
+-- | Find a collection of classes in the given module.
+data ClassQuery = ClassQuery Module [(PluginClassName, Arity)]
 
+-- | Search for a collection of classes using the given query.
+--   If any one of the classes could not be found an error is returned.
+findClassesByQuery :: ClassQuery -> TcPluginM (Either SDoc [(PluginClassName, Class)])
+findClassesByQuery (ClassQuery mdl toFindCls) = do
+  eClss <- forM toFindCls $ \(clsName, clsArity) -> do
+    eCls <- findClass (isClass (mdl ==) clsName clsArity)
+    return (clsName, eCls, clsArity)
+  let notFound = filter (\(_, c, _) -> isNothing c) eClss
+  let errMsg :: (PluginClassName, Maybe Class, Arity) -> SDoc
+      errMsg (n, _, a) = text $ "Could not find class '" ++ n ++ "' with arity " ++ show a ++ "!"
+  return $ case notFound of
+    [] -> Right $ fmap (\(n, Just c, _) -> (n, c)) $ eClss
+    _ -> Left $ vcat $ fmap errMsg notFound
+  
 -- | Checks if a type class matching the shape of the given 
 --   predicate is in scope.
 findClass :: (Class -> Bool) -> TcPluginM (Maybe Class)
-findClass isClass' = do
-  let isCls = isClass' . is_cls
+findClass isCls' = do
+  let isCls = isCls' . is_cls
   envs <- fst <$> getEnvs
   -- This is needed while compiling the package itself...
   let foundInstsLcl =  (filter isCls . instEnvElts . tcg_inst_env $ envs)
@@ -267,6 +294,21 @@ isClass isModule targetClassName targetArity cls =
   in    isModule clsMdl
      && clsNameStr == targetClassName
      && clsArity == targetArity
+
+-- -----------------------------------------------------------------------------
+-- Local Utility Functions
+-- -----------------------------------------------------------------------------
+
+-- | Tries to find a given class and all of its instances in scope 
+--   using the class predicate.
+findClassAndInstancesInScope :: (Class -> Bool) -> TcPluginM (Maybe (Class, [ClsInst]))
+findClassAndInstancesInScope clsPred = do
+  mCls <- findClass clsPred
+  case mCls of
+    Nothing -> return $ Nothing
+    Just cls -> do
+      insts <- findInstancesInScope cls
+      return $ Just (cls, insts)
 
 -- | Returns a list of all instances for the given class that are currently in scope.
 findInstancesInScope :: Class -> TcPluginM [ClsInst]
