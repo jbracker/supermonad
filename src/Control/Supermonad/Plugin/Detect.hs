@@ -11,25 +11,22 @@ module Control.Supermonad.Plugin.Detect
   , findClassesByQuery
   , findClass
   , isClass
-    -- * Supermonad class detection
-  , supermonadModuleName
-  , bindClassName, returnClassName, applicativeClassName
-  , findSupermonadModule
-  , isBindClass, isReturnClass, isApplicativeClass
-  , isSupermonadModule
-  , findBindClass, findReturnClass, findApplicativeClass
-  , findSupermonads
-  , checkSupermonadInstances
-    -- * Functor class detection
-  , functorClassName, functorModuleName
-    -- * General detection utilities
+    -- * Searching for Instances
   , findInstancesInScope
   , findClassAndInstancesInScope
+  , findClassesAndInstancesInScope
+    -- * Supermonad class detection
+  , supermonadModuleQuery
+  , supermonadClassQuery
+  , isSupermonadModule
+  , findSupermonads
+  , checkSupermonadInstances
   ) where
 
 import Data.List  ( find )
 import Data.Either ( isLeft, isRight )
 import Data.Maybe ( isNothing )
+import Data.Set ( Set )
 import qualified Data.Set as S
 
 import Control.Monad ( forM )
@@ -67,7 +64,7 @@ import PrelNames ( mAIN_NAME )
 import Outputable ( SDoc, ($$), (<>), text, vcat, ppr, hang )
 --import qualified Outputable as O
 
---import Control.Supermonad.Plugin.Log ( printObj, printObjTrace )
+--import Control.Supermonad.Plugin.Log ( printObj, printObjTrace, printMsg )
 import Control.Supermonad.Plugin.Wrapper
   ( UnitId, moduleUnitId )
 import Control.Supermonad.Plugin.Instance
@@ -95,17 +92,16 @@ findSupermonadModulesErrMsg [Right _mdlA, Right _mdlB] =
   text "Found unconstrained and constrained supermonad modules!"
 findSupermonadModulesErrMsg mdls = defaultFindEitherModuleErrMsg mdls
 
--- | Checks if a module providing the supermonad classes is imported.
-findSupermonadModule :: TcPluginM (Either SDoc Module)
-findSupermonadModule = findModuleByQuery 
-  $ EitherModule
-    [ AnyModule [ ThisModule supermonadModuleName Nothing
-                , ThisModule supermonadPreludeModuleName Nothing
-                ]
-    , AnyModule [ ThisModule supermonadCtModuleName Nothing
-                , ThisModule supermonadCtPreludeModuleName Nothing
-                ]
-    ] $ Just findSupermonadModulesErrMsg
+-- | Queries the module providing the supermonad classes.
+supermonadModuleQuery :: ModuleQuery
+supermonadModuleQuery = EitherModule
+  [ AnyModule [ ThisModule supermonadModuleName Nothing
+              , ThisModule supermonadPreludeModuleName Nothing
+              ]
+  , AnyModule [ ThisModule supermonadCtModuleName Nothing
+              , ThisModule supermonadCtPreludeModuleName Nothing
+              ]
+  ] $ Just findSupermonadModulesErrMsg
 
 -- | Check if the given module is the supermonad module.
 isSupermonadModule :: Module -> Bool
@@ -116,42 +112,75 @@ isSupermonadModule mdl = mdlName `elem` [smMdlName, smPrelName, smCtMdlName, smC
         smCtMdlName = mkModuleName supermonadCtModuleName
         smCtPrelName = mkModuleName supermonadCtPreludeModuleName
 
-supermonadClassQuery :: Module -> ClassQuery
-supermonadClassQuery smMdl = ClassQuery smMdl 
+-- | Queries the supermonad classes.
+supermonadClassQuery :: ClassQuery
+supermonadClassQuery = ClassQuery supermonadModuleQuery 
   [ (bindClassName       , 3)
   , (returnClassName     , 1)
   , (applicativeClassName, 3)
   ]
 
--- | Checks if the given class matches the shape of the 'Control.Supermonad.Bind'
---   type class and is defined in the right module.
-isBindClass :: Class -> Bool
-isBindClass = isClass isSupermonadModule bindClassName 3
+-- | Check if there are any supermonad instances that clearly 
+--   do not belong to a specific supermonad.
+checkSupermonadInstances 
+  :: (Class, [BindInst]) -- ^ The @Bind@ class and instances.
+  -> (Class, [ApplicativeInst]) -- ^ The @Applicative@ class and instances.
+  -> (Class, [ReturnInst]) -- ^ The @Return@ class and instances.
+  -> TcPluginM [(ClsInst, SDoc)]
+checkSupermonadInstances (bindCls, bindInsts) (applicativeCls, applicativeInsts) (returnCls, returnInsts) = do
+  let polyBindInsts        = filter (isPolyTyConInstance bindCls       ) bindInsts
+  let polyApplicativeInsts = filter (isPolyTyConInstance applicativeCls) applicativeInsts
+  let polyReturnInsts      = filter (isPolyTyConInstance returnCls     ) returnInsts
+  
+  return $ mconcat $
+    [ fmap (\inst -> (inst, text "Not a valid supermonad instance: " $$ ppr inst)) polyBindInsts
+    , fmap (\inst -> (inst, text "Not a valid supermonad instance: " $$ ppr inst)) polyApplicativeInsts
+    , fmap (\inst -> (inst, text "Not a valid supermonad instance: " $$ ppr inst)) polyReturnInsts
+    ]
 
--- | Checks if the given class matches the shape of the 'Control.Supermonad.Return'
---   type class and is defined in the right module.
-isReturnClass :: Class -> Bool
-isReturnClass = isClass isSupermonadModule returnClassName 1
+-- | Constructs the map between type constructors and their supermonad instances.
+findSupermonads 
+  :: (Class, [BindInst]) -- ^ The @Bind@ class and instances.
+  -> (Class, [ApplicativeInst]) -- ^ The @Applicative@ class and instances.
+  -> (Class, [ReturnInst]) -- ^ The @Return@ class and instances.
+  -> TcPluginM (SupermonadDict, [(TyCon, SDoc)])
+  -- ^ Association between type constructors and their supermonad instances.
+findSupermonads (bindCls, bindInsts) (applicativeCls, applicativeInsts) (returnCls, returnInsts) = do
+  -- Collect all type constructors that are used for supermonads
+  let supermonadTyCons = S.unions 
+                       $ fmap (S.unions . fmap instTopTyCons) 
+                       $ [bindInsts, applicativeInsts, returnInsts]
+  -- Find the supermonad instances of each type constructor
+  return $ mconcat 
+         $ fmap findSupermonad
+         $ S.toList supermonadTyCons
+  where
+    findSupermonad :: TyCon -> (SupermonadDict, [(TyCon, SDoc)])
+    findSupermonad tc = 
+      case ( filter (isMonoTyConInstance tc bindCls) bindInsts
+           , filter (isMonoTyConInstance tc applicativeCls) applicativeInsts
+           , filter (isMonoTyConInstance tc returnCls) returnInsts ) of
+        ([bindInst], [applicativeInst], [returnInst]) -> 
+          (insertDict tc (Just bindInst) applicativeInst returnInst emptyDict, [])
+        ([], [applicativeInst], [returnInst]) -> 
+          (insertDict tc Nothing applicativeInst returnInst emptyDict, [])
+        (_, [], _) -> findError tc 
+          $ text "Missing 'Applicative' instance for supermonad '" <> ppr tc <> text "'."
+        (_, _, []) -> findError tc 
+          $ text "Missing 'Return' instance for supermonad '" <> ppr tc <> text "'."
+        (bindInsts', applicativeInsts', returnInsts') -> findError tc 
+          $ text "Multiple 'Bind' instances for supermonad '" <> ppr tc <> text "':" $$ vcat (fmap ppr bindInsts')
+          $$ text "Multiple 'Applicative' instances for supermonad '" <> ppr tc <> text "':" $$ vcat (fmap ppr applicativeInsts')
+          $$ text "Multiple 'Return' instances for supermonad '" <> ppr tc <> text "':" $$ vcat (fmap ppr returnInsts')
+    
+    findError :: TyCon -> SDoc -> (SupermonadDict, [(TyCon, SDoc)])
+    findError tc msg = (emptyDict, [(tc, msg)])
+    
+    -- | Collect the top-level type constructors in the arguments 
+    --   of the given instance.
+    instTopTyCons :: ClsInst -> S.Set TyCon
+    instTopTyCons = collectTopTyCons . instanceTyArgs
 
--- | Checks if the given class matches the shape of the 'Control.Supermonad.Applicative'
---   type class and is defined in the right module.
-isApplicativeClass :: Class -> Bool
-isApplicativeClass = isClass isSupermonadModule applicativeClassName 3
-
--- | Checks if a type class matching the shape and name of the
---   'Control.Supermonad.Bind' type class is in scope.
-findBindClass :: TcPluginM (Maybe Class)
-findBindClass = findClass isBindClass
-
--- | Checks if a type class matching the shape and name of the
---   'Control.Supermonad.Return' type class is in scope.
-findReturnClass :: TcPluginM (Maybe Class)
-findReturnClass = findClass isReturnClass
-
--- | Checks if a type class matching the shape and name of the 
---   'Control.Supermonad.Applicative' type class is in scope.
-findApplicativeClass :: TcPluginM (Maybe Class)
-findApplicativeClass = findClass isApplicativeClass
 
 -- -----------------------------------------------------------------------------
 -- Searching for Modules
@@ -182,6 +211,16 @@ instance Eq ModuleQuery where
   (AnyModule qas) == (AnyModule qbs) = qas == qbs
   _ == _ = False
 -}
+
+collectModuleNames :: ModuleQuery -> Set ModuleName
+collectModuleNames (ThisModule name _) = S.singleton $ mkModuleName name
+collectModuleNames (EitherModule qs _) = S.unions $ fmap collectModuleNames qs
+collectModuleNames (AnyModule qs)      = S.unions $ fmap collectModuleNames qs
+
+isModuleInQuery :: ModuleQuery -> Module -> Bool
+isModuleInQuery query mdl = S.member (moduleName mdl) 
+                          $ S.insert mAIN_NAME 
+                          $ collectModuleNames query
 
 -- | Tries to find a module using the given module query.
 findModuleByQuery :: ModuleQuery -> TcPluginM (Either SDoc Module)
@@ -252,14 +291,14 @@ defaultFindAnyModuleErrMsg mdlErrs = hang (text "Could not find any of the modul
 -- -----------------------------------------------------------------------------
 
 -- | Find a collection of classes in the given module.
-data ClassQuery = ClassQuery Module [(PluginClassName, Arity)]
+data ClassQuery = ClassQuery ModuleQuery [(PluginClassName, Arity)]
 
 -- | Search for a collection of classes using the given query.
 --   If any one of the classes could not be found an error is returned.
 findClassesByQuery :: ClassQuery -> TcPluginM (Either SDoc [(PluginClassName, Class)])
-findClassesByQuery (ClassQuery mdl toFindCls) = do
+findClassesByQuery (ClassQuery mdlQuery toFindCls) = do
   eClss <- forM toFindCls $ \(clsName, clsArity) -> do
-    eCls <- findClass (isClass (mdl ==) clsName clsArity)
+    eCls <- findClass (isClass (isModuleInQuery mdlQuery) clsName clsArity)
     return (clsName, eCls, clsArity)
   let notFound = filter (\(_, c, _) -> isNothing c) eClss
   let errMsg :: (PluginClassName, Maybe Class, Arity) -> SDoc
@@ -295,9 +334,20 @@ isClass isModule targetClassName targetArity cls =
      && clsNameStr == targetClassName
      && clsArity == targetArity
 
+
 -- -----------------------------------------------------------------------------
--- Local Utility Functions
+-- Searching for Instances
 -- -----------------------------------------------------------------------------
+
+-- | Use a class query to find classes and their instances.
+findClassesAndInstancesInScope :: ClassQuery -> TcPluginM (Either SDoc [(PluginClassName, Class, [ClsInst])])
+findClassesAndInstancesInScope clsQuery = do
+  eClss <- findClassesByQuery clsQuery
+  case eClss of
+    Left err -> return $ Left err
+    Right clss -> fmap Right $ forM clss $ \(n, c) -> do
+      insts <- findInstancesInScope c
+      return (n, c, insts)
 
 -- | Tries to find a given class and all of its instances in scope 
 --   using the class predicate.
@@ -315,69 +365,6 @@ findInstancesInScope :: Class -> TcPluginM [ClsInst]
 findInstancesInScope cls = do
   instEnvs <- TcPluginM.getInstEnvs
   return $ classInstances instEnvs cls
-
--- | Check if there are any supermonad instances that clearly 
---   do not belong to a specific supermonad.
-checkSupermonadInstances 
-  :: (Class, [BindInst]) -- ^ The @Bind@ class and instances.
-  -> (Class, [ApplicativeInst]) -- ^ The @Applicative@ class and instances.
-  -> (Class, [ReturnInst]) -- ^ The @Return@ class and instances.
-  -> TcPluginM [(ClsInst, SDoc)]
-checkSupermonadInstances (bindCls, bindInsts) (applicativeCls, applicativeInsts) (returnCls, returnInsts) = do
-  let polyBindInsts        = filter (isPolyTyConInstance bindCls       ) bindInsts
-  let polyApplicativeInsts = filter (isPolyTyConInstance applicativeCls) applicativeInsts
-  let polyReturnInsts      = filter (isPolyTyConInstance returnCls     ) returnInsts
-  
-  return $ mconcat $
-    [ fmap (\inst -> (inst, text "Not a valid supermonad instance: " $$ ppr inst)) polyBindInsts
-    , fmap (\inst -> (inst, text "Not a valid supermonad instance: " $$ ppr inst)) polyApplicativeInsts
-    , fmap (\inst -> (inst, text "Not a valid supermonad instance: " $$ ppr inst)) polyReturnInsts
-    ]
-
--- | Constructs the map between type constructors and their supermonad instances.
-findSupermonads 
-  :: (Class, [BindInst]) -- ^ The @Bind@ class and instances.
-  -> (Class, [ApplicativeInst]) -- ^ The @Applicative@ class and instances.
-  -> (Class, [ReturnInst]) -- ^ The @Return@ class and instances.
-  -> TcPluginM (SupermonadDict, [(TyCon, SDoc)])
-  -- ^ Association between type constructors and their supermonad instances.
-findSupermonads (bindCls, bindInsts) (applicativeCls, applicativeInsts) (returnCls, returnInsts) = do
-  -- Collect all type constructors that are used for supermonads
-  let supermonadTyCons = S.unions 
-                       $ fmap (S.unions . fmap instTopTyCons) 
-                       $ [bindInsts, applicativeInsts, returnInsts]
-  -- Find the supermonad instances of each type constructor
-  return $ mconcat 
-         $ fmap findSupermonad
-         $ S.toList supermonadTyCons
-  where
-    findSupermonad :: TyCon -> (SupermonadDict, [(TyCon, SDoc)])
-    findSupermonad tc = 
-      case ( filter (isMonoTyConInstance tc bindCls) bindInsts
-           , filter (isMonoTyConInstance tc applicativeCls) applicativeInsts
-           , filter (isMonoTyConInstance tc returnCls) returnInsts ) of
-        ([bindInst], [applicativeInst], [returnInst]) -> 
-          (insertDict tc (Just bindInst) applicativeInst returnInst emptyDict, [])
-        ([], [applicativeInst], [returnInst]) -> 
-          (insertDict tc Nothing applicativeInst returnInst emptyDict, [])
-        (_, [], _) -> findError tc 
-          $ text "Missing 'Applicative' instance for supermonad '" <> ppr tc <> text "'."
-        (_, _, []) -> findError tc 
-          $ text "Missing 'Return' instance for supermonad '" <> ppr tc <> text "'."
-        (bindInsts', applicativeInsts', returnInsts') -> findError tc 
-          $ text "Multiple 'Bind' instances for supermonad '" <> ppr tc <> text "':" $$ vcat (fmap ppr bindInsts')
-          $$ text "Multiple 'Applicative' instances for supermonad '" <> ppr tc <> text "':" $$ vcat (fmap ppr applicativeInsts')
-          $$ text "Multiple 'Return' instances for supermonad '" <> ppr tc <> text "':" $$ vcat (fmap ppr returnInsts')
-    
-    findError :: TyCon -> SDoc -> (SupermonadDict, [(TyCon, SDoc)])
-    findError tc msg = (emptyDict, [(tc, msg)])
-    
-    -- | Collect the top-level type constructors in the arguments 
-    --   of the given instance.
-    instTopTyCons :: ClsInst -> S.Set TyCon
-    instTopTyCons = collectTopTyCons . instanceTyArgs
-
-
 
 
 
