@@ -62,7 +62,6 @@ import Control.Supermonad.Plugin.Detect
   ( findModuleByQuery, supermonadModuleQuery
   , findClassesAndInstancesInScope, supermonadClassQuery
   , findSupermonads
-  , isSupermonadModule
   , checkSupermonadInstances
   , findClassAndInstancesInScope, isClass )
 import Control.Supermonad.Plugin.Utils ( errIndent )

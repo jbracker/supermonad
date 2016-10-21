@@ -18,7 +18,6 @@ module Control.Supermonad.Plugin.Detect
     -- * Supermonad class detection
   , supermonadModuleQuery
   , supermonadClassQuery
-  , isSupermonadModule
   , findSupermonads
   , checkSupermonadInstances
   ) where
@@ -84,7 +83,6 @@ import Control.Supermonad.Plugin.Names
 -- Supermonad Class Detection
 -- -----------------------------------------------------------------------------
 
-
 findSupermonadModulesErrMsg :: [Either SDoc Module] -> SDoc
 findSupermonadModulesErrMsg [Left errA, Left errB] = 
   hang (text "Could not find supermonad or constrained supermonad modules!") errIndent (errA $$ errB)
@@ -102,15 +100,6 @@ supermonadModuleQuery = EitherModule
               , ThisModule supermonadCtPreludeModuleName Nothing
               ]
   ] $ Just findSupermonadModulesErrMsg
-
--- | Check if the given module is the supermonad module.
-isSupermonadModule :: Module -> Bool
-isSupermonadModule mdl = mdlName `elem` [smMdlName, smPrelName, smCtMdlName, smCtPrelName, mAIN_NAME]
-  where mdlName = moduleName mdl
-        smMdlName = mkModuleName supermonadModuleName
-        smPrelName = mkModuleName supermonadPreludeModuleName
-        smCtMdlName = mkModuleName supermonadCtModuleName
-        smCtPrelName = mkModuleName supermonadCtPreludeModuleName
 
 -- | Queries the supermonad classes.
 supermonadClassQuery :: ClassQuery
