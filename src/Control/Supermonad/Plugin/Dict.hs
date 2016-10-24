@@ -1,5 +1,5 @@
 
--- | Provides the type for supermonad dictionaries.
+-- | Provides the type for instance dictionaries.
 module Control.Supermonad.Plugin.Dict 
   ( InstanceDict
   , emptyInstDict, insertInstDict, lookupInstDict
