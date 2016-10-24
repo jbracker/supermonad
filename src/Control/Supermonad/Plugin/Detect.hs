@@ -116,6 +116,17 @@ type ApplicativeInst = ClsInst
 -- | Type of @Return@ instance.
 type ReturnInst = ClsInst  
 
+data InstanceImplication = InstanceImplies Class Class
+
+infix 7 ===>
+infix 7 <==>
+
+(===>) :: Class -> Class -> [InstanceImplication]
+(===>) ca cb = [InstanceImplies ca cb]
+
+(<==>) :: Class -> Class -> [InstanceImplication]
+(<==>) ca cb = ca ===> cb ++ cb ===> ca
+
 -- | Check if there are any supermonad instances that clearly 
 --   do not belong to a specific supermonad.
 checkSupermonadInstances 
@@ -188,7 +199,7 @@ findSupermonads bindClsInsts applicativeClsInsts returnClsInsts =
                        $ S.unions
                        $ fmap instanceTopTyCons
                        $ concat $ fmap snd 
-                       $[bindClsInsts, applicativeClsInsts, returnClsInsts]
+                       $ [bindClsInsts, applicativeClsInsts, returnClsInsts]
     
     findMonoClassInstance :: TyCon -> Class -> [ClsInst] -> InstanceDict
     findMonoClassInstance tc cls insts = 
