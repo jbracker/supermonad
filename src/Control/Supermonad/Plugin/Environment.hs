@@ -71,8 +71,8 @@ import Control.Supermonad.Plugin.Utils
   , t1st, t2nd, t3rd )
 import Control.Supermonad.Plugin.ClassDict
   ( ClassDict
-  , insertDict, lookupDict, emptyDict
-  , lookupDictClass, lookupDictInstances )
+  , insertClsDict, lookupClsDict, emptyClsDict
+  , lookupClsDictClass, lookupClsDictInstances )
 import Control.Supermonad.Plugin.InstanceDict
   ( InstanceDict, lookupInstDict )
 
@@ -127,12 +127,12 @@ initSupermonadPlugin = do
   
   -- Construct the initialized class dictionary.
   oldClsDict <- getClassDictionary
-  let newClsDict = foldr (\(clsName, cls, clsInsts) -> insertDict clsName cls clsInsts) oldClsDict foundClsInsts 
+  let newClsDict = foldr (\(clsName, cls, clsInsts) -> insertClsDict clsName cls clsInsts) oldClsDict foundClsInsts 
   
   -- Calculate the supermonads in scope and check for rogue bind and return instances.
-  let (smInsts, smErrors) = case ( lookupDict bindClassName newClsDict
-                                 , lookupDict applicativeClassName newClsDict
-                                 , lookupDict returnClassName newClsDict) of
+  let (smInsts, smErrors) = case ( lookupClsDict bindClassName newClsDict
+                                 , lookupClsDict applicativeClassName newClsDict
+                                 , lookupClsDict returnClassName newClsDict) of
         (Just bindClsInsts, Just applicativeClsInsts, Just returnClsInsts) -> 
           ( findSupermonads bindClsInsts applicativeClsInsts returnClsInsts
           , fmap snd $ checkSupermonadInstances bindClsInsts applicativeClsInsts returnClsInsts
@@ -158,7 +158,7 @@ runSupermonadPlugin givenCts wantedCts initStateM pluginM = do
   let initEnv = SupermonadPluginEnv
         { smEnvGivenConstraints  = givenCts
         , smEnvWantedConstraints = wantedCts
-        , smEnvClassDictionary   = emptyDict
+        , smEnvClassDictionary   = emptyClsDict
         }
   let initState :: SupermonadPluginState ()
       initState = SupermonadPluginState 
@@ -212,19 +212,19 @@ modifyCustomState sf = modify (\s -> s { smStateCustom = sf (smStateCustom s) })
 -- | Looks up a class by its name in the class dictionary of the 
 --   plugin environment.
 getClass :: PluginClassName -> SupermonadPluginM s (Maybe Class)
-getClass clsName = lookupDictClass clsName <$> asks smEnvClassDictionary
+getClass clsName = lookupClsDictClass clsName <$> asks smEnvClassDictionary
 
 -- | Returns the 'Control.Supermonad.Bind' class.
 getBindClass :: SupermonadPluginM s Class
-getBindClass = (fromJust . lookupDictClass bindClassName) <$> asks smEnvClassDictionary
+getBindClass = (fromJust . lookupClsDictClass bindClassName) <$> asks smEnvClassDictionary
 
 -- | Returns the 'Control.Supermonad.Applicative' class.
 getApplicativeClass :: SupermonadPluginM s Class
-getApplicativeClass = (fromJust . lookupDictClass applicativeClassName) <$> asks smEnvClassDictionary
+getApplicativeClass = (fromJust . lookupClsDictClass applicativeClassName) <$> asks smEnvClassDictionary
 
 -- | Returns the 'Control.Supermonad.Return' class.
 getReturnClass :: SupermonadPluginM s Class
-getReturnClass = (fromJust . lookupDictClass returnClassName) <$> asks smEnvClassDictionary
+getReturnClass = (fromJust . lookupClsDictClass returnClassName) <$> asks smEnvClassDictionary
 
 -- | Returns all of the /given/ and /derived/ constraints of this plugin call.
 getGivenConstraints :: SupermonadPluginM s [GivenCt]
@@ -237,7 +237,7 @@ getWantedConstraints = asks smEnvWantedConstraints
 -- | Returns all bind instances including those given by
 --   'getBindApplyInstance' and 'getBindFunctorInstance'.
 getBindInstances :: SupermonadPluginM s [ClsInst]
-getBindInstances = (fromJust . lookupDictInstances bindClassName) <$> asks smEnvClassDictionary
+getBindInstances = (fromJust . lookupClsDictInstances bindClassName) <$> asks smEnvClassDictionary
 
 -- | Shortcut to access the instance environments.
 getInstEnvs :: SupermonadPluginM s InstEnvs
