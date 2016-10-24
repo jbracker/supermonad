@@ -14,7 +14,7 @@ import TcPluginM ( TcPluginM )
 
 import Control.Supermonad.Plugin.Log ( sDocToStr )
 import qualified Control.Supermonad.Plugin.Log as L
-import Control.Supermonad.Plugin.Dict ( SupermonadDict )
+import Control.Supermonad.Plugin.Dict ( InstanceDict )
 import Control.Supermonad.Plugin.Solving
   ( solveConstraints )
 import Control.Supermonad.Plugin.Environment
@@ -82,7 +82,7 @@ supermonadSolve _s given derived wanted = do
     Right solution -> return solution
 
 -- | The actual plugin code.
-supermonadSolve' :: SupermonadPluginM SupermonadDict ()
+supermonadSolve' :: SupermonadPluginM InstanceDict ()
 supermonadSolve' = do
   --(getWantedConstraints >>= filterM isBindConstraint) >>= (printConstraints . sortConstraintsByLine)
   --(getWantedConstraints >>= filterM isReturnConstraint) >>= (printConstraints . sortConstraintsByLine)

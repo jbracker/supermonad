@@ -31,7 +31,7 @@ module Control.Supermonad.Plugin.Environment
 import Data.Maybe ( fromJust )
 import Data.List ( groupBy )
 
-import Control.Monad ( unless, forM_ )
+import Control.Monad ( join, unless, forM_ )
 import Control.Monad.Reader ( ReaderT, runReaderT, asks )
 import Control.Monad.State  ( StateT , runStateT , gets, modify )
 import Control.Monad.Except ( ExceptT, runExceptT, throwError, catchError )
@@ -52,25 +52,29 @@ import qualified Outputable as O
 
 import qualified Control.Supermonad.Plugin.Log as L
 import Control.Supermonad.Plugin.Names 
-  ( bindClassName
+  ( PluginClassName
+  , bindClassName
   , returnClassName
   , applicativeClassName )
 import Control.Supermonad.Plugin.Constraint
   ( GivenCt, WantedCt
   , constraintSourceLocation )
 import Control.Supermonad.Plugin.Detect
-  ( findModuleByQuery, supermonadModuleQuery
+  ( BindInst, ApplicativeInst, ReturnInst
+  , findModuleByQuery, supermonadModuleQuery
   , findClassesAndInstancesInScope, supermonadClassQuery
   , findSupermonads
   , checkSupermonadInstances
   , findClassAndInstancesInScope, isClass )
-import Control.Supermonad.Plugin.Utils ( errIndent )
-import qualified Control.Supermonad.Plugin.ClassDict as CD
+import Control.Supermonad.Plugin.Utils 
+  ( errIndent
+  , t1st, t2nd, t3rd )
+import Control.Supermonad.Plugin.ClassDict
+  ( ClassDict
+  , insertDict, lookupDict, emptyDict
+  , lookupDictClass, lookupDictInstances )
 import Control.Supermonad.Plugin.Dict
-  ( SupermonadDict
-  , BindInst, ApplicativeInst, ReturnInst
-  , lookupDict
-  , lookupDictBind, lookupDictApplicative, lookupDictReturn )
+  ( InstanceDict, lookupInstDict )
 
 -- -----------------------------------------------------------------------------
 -- Plugin Monad
@@ -91,7 +95,7 @@ data SupermonadPluginEnv = SupermonadPluginEnv
   -- ^ The given and derived constraints (all of them).
   , smEnvWantedConstraints :: [WantedCt]
   -- ^ The wanted constraints (all of them).
-  , smEnvClassDictionary :: CD.ClassDict
+  , smEnvClassDictionary :: ClassDict
   -- ^ Class dictionary of the environment.
   }
 
@@ -107,7 +111,7 @@ data SupermonadPluginState s = SupermonadPluginState
   -- ^ Custom state of the environment.
   }
 
-initSupermonadPlugin :: SupermonadPluginM () (CD.ClassDict, SupermonadDict)
+initSupermonadPlugin :: SupermonadPluginM () (ClassDict, InstanceDict)
 initSupermonadPlugin = do
   -- Determine if the supermonad module is available.
   eSupermonadMdl <- runTcPlugin $ findModuleByQuery supermonadModuleQuery
@@ -123,10 +127,10 @@ initSupermonadPlugin = do
   
   -- Construct the initialized class dictionary.
   oldClsDict <- getClassDictionary
-  let newClsDict = foldr (\(clsName, cls, clsInsts) -> CD.insertDict clsName cls clsInsts) oldClsDict foundClsInsts 
+  let newClsDict = foldr (\(clsName, cls, clsInsts) -> insertDict clsName cls clsInsts) oldClsDict foundClsInsts 
   
   -- Calculate the supermonads in scope and check for rogue bind and return instances.
-  (smInsts, smErrors) <- case (CD.lookupDict bindClassName newClsDict, CD.lookupDict applicativeClassName newClsDict, CD.lookupDict returnClassName newClsDict) of
+  (smInsts, smErrors) <- case (lookupDict bindClassName newClsDict, lookupDict applicativeClassName newClsDict, lookupDict returnClassName newClsDict) of
       (Just bindClsInsts, Just applicativeClsInsts, Just returnClsInsts) -> do
         (smInsts, smErrors) <- runTcPlugin $ findSupermonads bindClsInsts applicativeClsInsts returnClsInsts
         smCheckErrors <- runTcPlugin $ checkSupermonadInstances bindClsInsts applicativeClsInsts returnClsInsts
@@ -144,7 +148,7 @@ initSupermonadPlugin = do
 runSupermonadPlugin 
   :: [GivenCt] -- ^ /Given/ and /derived/ constraints. 
   -> [WantedCt] -- ^ /Wanted/ constraints.
-  -> SupermonadPluginM () (CD.ClassDict, s) -- ^ Initialize the custom state of the plugin.
+  -> SupermonadPluginM () (ClassDict, s) -- ^ Initialize the custom state of the plugin.
   -> SupermonadPluginM s a -- ^ Plugin code to run.
   -> TcPluginM (Either SupermonadError a) -- ^ Either an error message or an actual plugin result.
 runSupermonadPlugin givenCts wantedCts initStateM pluginM = do
@@ -152,7 +156,7 @@ runSupermonadPlugin givenCts wantedCts initStateM pluginM = do
   let initEnv = SupermonadPluginEnv
         { smEnvGivenConstraints  = givenCts
         , smEnvWantedConstraints = wantedCts
-        , smEnvClassDictionary   = CD.emptyDict
+        , smEnvClassDictionary   = emptyDict
         }
   let initState :: SupermonadPluginState ()
       initState = SupermonadPluginState 
@@ -188,7 +192,7 @@ runTcPlugin = lift . lift . lift
 -- -----------------------------------------------------------------------------
 
 -- | Returns the type class dictionary.
-getClassDictionary :: SupermonadPluginM s CD.ClassDict
+getClassDictionary :: SupermonadPluginM s ClassDict
 getClassDictionary = asks smEnvClassDictionary
 
 -- | Returns the plugins custom state.
@@ -203,17 +207,22 @@ putCustomState newS = modify (\s -> s { smStateCustom = newS })
 modifyCustomState :: (s -> s) -> SupermonadPluginM s ()
 modifyCustomState sf = modify (\s -> s { smStateCustom = sf (smStateCustom s) })
 
+-- | Looks up a class by its name in the class dictionary of the 
+--   plugin environment.
+getClass :: PluginClassName -> SupermonadPluginM s (Maybe Class)
+getClass clsName = lookupDictClass clsName <$> asks smEnvClassDictionary
+
 -- | Returns the 'Control.Supermonad.Bind' class.
 getBindClass :: SupermonadPluginM s Class
-getBindClass = (fromJust . CD.lookupDictClass bindClassName) <$> asks smEnvClassDictionary
+getBindClass = (fromJust . lookupDictClass bindClassName) <$> asks smEnvClassDictionary
 
 -- | Returns the 'Control.Supermonad.Applicative' class.
 getApplicativeClass :: SupermonadPluginM s Class
-getApplicativeClass = (fromJust . CD.lookupDictClass applicativeClassName) <$> asks smEnvClassDictionary
+getApplicativeClass = (fromJust . lookupDictClass applicativeClassName) <$> asks smEnvClassDictionary
 
 -- | Returns the 'Control.Supermonad.Return' class.
 getReturnClass :: SupermonadPluginM s Class
-getReturnClass = (fromJust . CD.lookupDictClass returnClassName) <$> asks smEnvClassDictionary
+getReturnClass = (fromJust . lookupDictClass returnClassName) <$> asks smEnvClassDictionary
 
 -- | Returns all of the /given/ and /derived/ constraints of this plugin call.
 getGivenConstraints :: SupermonadPluginM s [GivenCt]
@@ -226,7 +235,7 @@ getWantedConstraints = asks smEnvWantedConstraints
 -- | Returns all bind instances including those given by
 --   'getBindApplyInstance' and 'getBindFunctorInstance'.
 getBindInstances :: SupermonadPluginM s [ClsInst]
-getBindInstances = (fromJust . CD.lookupDictInstances bindClassName) <$> asks smEnvClassDictionary
+getBindInstances = (fromJust . lookupDictInstances bindClassName) <$> asks smEnvClassDictionary
 
 -- | Shortcut to access the instance environments.
 getInstEnvs :: SupermonadPluginM s InstEnvs
@@ -234,26 +243,38 @@ getInstEnvs = runTcPlugin TcPluginM.getInstEnvs
 
 -- | Retrieves the supermonad instances of the given type constructor,
 --   if the type constructor represents a supermonad in scope.
-getSupermonadFor :: TyCon -> SupermonadPluginM SupermonadDict (Maybe (Maybe BindInst, ApplicativeInst, ReturnInst))
-getSupermonadFor tc = (return . lookupDict tc) =<< getCustomState
-
+getSupermonadFor :: TyCon -> SupermonadPluginM InstanceDict (Maybe (Maybe BindInst, ApplicativeInst, ReturnInst))
+getSupermonadFor tc = do
+  mBindCls        <- getClass bindClassName
+  mReturnCls      <- getClass returnClassName
+  mApplicativeCls <- getClass applicativeClassName
+  instDict <- getCustomState
+  return $ do
+    bindCls         <- mBindCls
+    returnCls      <- mReturnCls
+    applicativeCls <- mApplicativeCls
+    let bindInst     = lookupInstDict tc bindCls instDict
+    applicativeInst <- lookupInstDict tc applicativeCls instDict
+    returnInst      <- lookupInstDict tc returnCls instDict
+    return (bindInst, applicativeInst, returnInst)
+  
 -- | Retrieves the supermonad 'Control.Supermonad.Bind' instances 
 --   of the given type constructor, if the type constructor represents 
 --   a supermonad in scope and there is a bind instance for that type constructor.
-getSupermonadBindFor :: TyCon -> SupermonadPluginM SupermonadDict (Maybe BindInst)
-getSupermonadBindFor tc = (return . lookupDictBind tc) =<< getCustomState
+getSupermonadBindFor :: TyCon -> SupermonadPluginM InstanceDict (Maybe BindInst)
+getSupermonadBindFor tc = fmap (join . fmap t1st) $ getSupermonadFor tc
 
 -- | Retrieves the supermonad 'Control.Supermonad.Applicative' instances 
 --   of the given type constructor, if the type constructor represents 
 --   a supermonad in scope.
-getSupermonadApplicativeFor :: TyCon -> SupermonadPluginM SupermonadDict (Maybe ApplicativeInst)
-getSupermonadApplicativeFor tc = (return . lookupDictApplicative tc) =<< getCustomState
+getSupermonadApplicativeFor :: TyCon -> SupermonadPluginM InstanceDict (Maybe ApplicativeInst)
+getSupermonadApplicativeFor tc = fmap (fmap t2nd) $ getSupermonadFor tc
 
 -- | Retrieves the supermonad 'Control.Supermonad.Return' instances 
 --   of the given type constructor, if the type constructor represents 
 --   a supermonad in scope.
-getSupermonadReturnFor :: TyCon -> SupermonadPluginM SupermonadDict (Maybe ReturnInst)
-getSupermonadReturnFor tc = (return . lookupDictReturn tc) =<< getCustomState
+getSupermonadReturnFor :: TyCon -> SupermonadPluginM InstanceDict (Maybe ReturnInst)
+getSupermonadReturnFor tc = fmap (fmap t3rd) $ getSupermonadFor tc
 
 -- | Add another type variable equality to the derived equalities.
 addTyVarEquality :: Ct -> TyVar -> Type -> SupermonadPluginM s ()

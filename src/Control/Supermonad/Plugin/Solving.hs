@@ -27,7 +27,7 @@ import qualified Outputable as O
 
 
 import Control.Supermonad.Plugin.Debug ( sDocToStr )
-import Control.Supermonad.Plugin.Dict ( SupermonadDict )
+import Control.Supermonad.Plugin.Dict ( InstanceDict )
 import Control.Supermonad.Plugin.Wrapper 
   ( TypeVarSubst, mkTypeVarSubst )
 import Control.Supermonad.Plugin.Environment 
@@ -65,7 +65,7 @@ import Control.Supermonad.Plugin.Log
 
   
 -- | Attempts to solve the given /wanted/ constraints.
-solveConstraints :: [WantedCt] -> SupermonadPluginM SupermonadDict ()
+solveConstraints :: [WantedCt] -> SupermonadPluginM InstanceDict ()
 solveConstraints wantedCts = do
   -- Calculate the different groups of constraints that belong 
   -- together for solving purposes.
@@ -310,7 +310,7 @@ determineValidConstraintGroupAssocs ctGroup = do
 
 -- | Solves the indices of constraints that have been associated a type 
 --   constructor.
-solveSolvedTyConIndices :: SupermonadPluginM SupermonadDict ()
+solveSolvedTyConIndices :: SupermonadPluginM InstanceDict ()
 solveSolvedTyConIndices = do
   -- Get the type equalities that were determined up until now 
   -- and create a substitution from them.

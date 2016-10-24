@@ -16,6 +16,7 @@ module Control.Supermonad.Plugin.Detect
   , findClassAndInstancesInScope
   , findClassesAndInstancesInScope
     -- * Supermonad class detection
+  , BindInst, ApplicativeInst, ReturnInst
   , supermonadModuleQuery
   , supermonadClassQuery
   , findSupermonads
@@ -74,9 +75,8 @@ import Control.Supermonad.Plugin.Utils
   ( collectTopTyCons, errIndent
   , fromRight, fromLeft )
 import Control.Supermonad.Plugin.Dict
-  ( SupermonadDict
-  , BindInst, ApplicativeInst, ReturnInst
-  , insertDict, emptyDict )
+  ( InstanceDict
+  , insertInstDict, emptyInstDict )
 import Control.Supermonad.Plugin.Names
 
 -- -----------------------------------------------------------------------------
@@ -109,6 +109,13 @@ supermonadClassQuery = ClassQuery supermonadModuleQuery
   , (applicativeClassName, 3)
   ]
 
+-- | Type of @Bind@ instances.
+type BindInst = ClsInst
+-- | Type of @Applicative@ instances.
+type ApplicativeInst = ClsInst
+-- | Type of @Return@ instance.
+type ReturnInst = ClsInst  
+
 -- | Check if there are any supermonad instances that clearly 
 --   do not belong to a specific supermonad.
 checkSupermonadInstances 
@@ -128,11 +135,14 @@ checkSupermonadInstances (bindCls, bindInsts) (applicativeCls, applicativeInsts)
     ]
 
 -- | Constructs the map between type constructors and their supermonad instances.
+--   This function not only searches for the instances and constructs
+--   the lookup table, it also checks that all necessary instances exist.
+--   TODO: Move existance check into 'checkSupermonadInstances', so this function only adds instances.
 findSupermonads 
   :: (Class, [BindInst]) -- ^ The @Bind@ class and instances.
   -> (Class, [ApplicativeInst]) -- ^ The @Applicative@ class and instances.
   -> (Class, [ReturnInst]) -- ^ The @Return@ class and instances.
-  -> TcPluginM (SupermonadDict, [(TyCon, SDoc)])
+  -> TcPluginM (InstanceDict, [(TyCon, SDoc)])
   -- ^ Association between type constructors and their supermonad instances.
 findSupermonads (bindCls, bindInsts) (applicativeCls, applicativeInsts) (returnCls, returnInsts) = do
   -- Collect all type constructors that are used for supermonads
@@ -144,15 +154,20 @@ findSupermonads (bindCls, bindInsts) (applicativeCls, applicativeInsts) (returnC
          $ fmap findSupermonad
          $ S.toList supermonadTyCons
   where
-    findSupermonad :: TyCon -> (SupermonadDict, [(TyCon, SDoc)])
+    findSupermonad :: TyCon -> (InstanceDict, [(TyCon, SDoc)])
     findSupermonad tc = 
       case ( filter (isMonoTyConInstance tc bindCls) bindInsts
            , filter (isMonoTyConInstance tc applicativeCls) applicativeInsts
            , filter (isMonoTyConInstance tc returnCls) returnInsts ) of
         ([bindInst], [applicativeInst], [returnInst]) -> 
-          (insertDict tc (Just bindInst) applicativeInst returnInst emptyDict, [])
+          ( insertInstDict tc bindCls bindInst 
+          $ insertInstDict tc applicativeCls applicativeInst
+          $ insertInstDict tc returnCls returnInst 
+          $ emptyInstDict, [])
         ([], [applicativeInst], [returnInst]) -> 
-          (insertDict tc Nothing applicativeInst returnInst emptyDict, [])
+          ( insertInstDict tc applicativeCls applicativeInst
+          $ insertInstDict tc returnCls returnInst 
+          $ emptyInstDict, [])
         (_, [], _) -> findError tc 
           $ text "Missing 'Applicative' instance for supermonad '" <> ppr tc <> text "'."
         (_, _, []) -> findError tc 
@@ -162,8 +177,8 @@ findSupermonads (bindCls, bindInsts) (applicativeCls, applicativeInsts) (returnC
           $$ text "Multiple 'Applicative' instances for supermonad '" <> ppr tc <> text "':" $$ vcat (fmap ppr applicativeInsts')
           $$ text "Multiple 'Return' instances for supermonad '" <> ppr tc <> text "':" $$ vcat (fmap ppr returnInsts')
     
-    findError :: TyCon -> SDoc -> (SupermonadDict, [(TyCon, SDoc)])
-    findError tc msg = (emptyDict, [(tc, msg)])
+    findError :: TyCon -> SDoc -> (InstanceDict, [(TyCon, SDoc)])
+    findError tc msg = (emptyInstDict, [(tc, msg)])
     
     -- | Collect the top-level type constructors in the arguments 
     --   of the given instance.
