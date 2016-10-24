@@ -130,12 +130,14 @@ initSupermonadPlugin = do
   let newClsDict = foldr (\(clsName, cls, clsInsts) -> insertDict clsName cls clsInsts) oldClsDict foundClsInsts 
   
   -- Calculate the supermonads in scope and check for rogue bind and return instances.
-  (smInsts, smErrors) <- case (lookupDict bindClassName newClsDict, lookupDict applicativeClassName newClsDict, lookupDict returnClassName newClsDict) of
-      (Just bindClsInsts, Just applicativeClsInsts, Just returnClsInsts) -> do
-        (smInsts, smErrors) <- runTcPlugin $ findSupermonads bindClsInsts applicativeClsInsts returnClsInsts
-        smCheckErrors <- runTcPlugin $ checkSupermonadInstances bindClsInsts applicativeClsInsts returnClsInsts
-        return $ (smInsts, fmap snd smErrors ++ fmap snd smCheckErrors) 
-      (_, _, _) -> return mempty
+  let (smInsts, smErrors) = case ( lookupDict bindClassName newClsDict
+                                 , lookupDict applicativeClassName newClsDict
+                                 , lookupDict returnClassName newClsDict) of
+        (Just bindClsInsts, Just applicativeClsInsts, Just returnClsInsts) -> 
+          ( findSupermonads bindClsInsts applicativeClsInsts returnClsInsts
+          , fmap snd $ checkSupermonadInstances bindClsInsts applicativeClsInsts returnClsInsts
+          ) 
+        (_, _, _) -> mempty
   
   -- Try to construct the environment or throw errors
   case smErrors of

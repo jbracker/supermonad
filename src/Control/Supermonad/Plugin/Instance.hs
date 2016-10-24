@@ -4,6 +4,7 @@
 module Control.Supermonad.Plugin.Instance
   ( instanceClass
   , instanceClassTyCon
+  , instanceTopTyCons
   , instanceTyArgs
   , isClassInstance
   , isMonoTyConInstance
@@ -32,6 +33,10 @@ instanceClass = is_cls
 -- | Returns the type constructors of the class is instance instantiates.
 instanceClassTyCon :: ClsInst -> TyCon
 instanceClassTyCon inst = classTyCon $ instanceClass inst
+
+-- | Collects the top type constructors of the instance arguments.
+instanceTopTyCons :: ClsInst -> S.Set TyCon
+instanceTopTyCons = collectTopTyCons . instanceTyArgs
 
 -- | Returns the arguments of the given instance head.
 instanceTyArgs :: ClsInst -> [Type]
