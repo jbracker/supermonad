@@ -74,7 +74,7 @@ import Control.Supermonad.Plugin.Instance
 import Control.Supermonad.Plugin.Utils
   ( collectTopTyCons, errIndent
   , fromRight, fromLeft )
-import Control.Supermonad.Plugin.Dict
+import Control.Supermonad.Plugin.InstanceDict
   ( InstanceDict
   , insertInstDict, emptyInstDict )
 import Control.Supermonad.Plugin.Names

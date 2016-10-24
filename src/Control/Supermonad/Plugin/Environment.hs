@@ -62,10 +62,10 @@ import Control.Supermonad.Plugin.Constraint
 import Control.Supermonad.Plugin.Detect
   ( BindInst, ApplicativeInst, ReturnInst
   , findModuleByQuery, supermonadModuleQuery
-  , findClassesAndInstancesInScope, supermonadClassQuery
+  , supermonadClassQuery
   , findSupermonads
   , checkSupermonadInstances
-  , findClassAndInstancesInScope, isClass )
+  , findClassesAndInstancesInScope )
 import Control.Supermonad.Plugin.Utils 
   ( errIndent
   , t1st, t2nd, t3rd )
@@ -73,7 +73,7 @@ import Control.Supermonad.Plugin.ClassDict
   ( ClassDict
   , insertDict, lookupDict, emptyDict
   , lookupDictClass, lookupDictInstances )
-import Control.Supermonad.Plugin.Dict
+import Control.Supermonad.Plugin.InstanceDict
   ( InstanceDict, lookupInstDict )
 
 -- -----------------------------------------------------------------------------

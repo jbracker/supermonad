@@ -1,6 +1,6 @@
 
 -- | Provides the type for instance dictionaries.
-module Control.Supermonad.Plugin.Dict 
+module Control.Supermonad.Plugin.InstanceDict 
   ( InstanceDict
   , emptyInstDict, insertInstDict, lookupInstDict
   , allTyConsInstDict ) where

@@ -74,7 +74,7 @@ library
                , Control.Supermonad.Plugin.Environment.Lift
                , Control.Supermonad.Plugin.Separation
                , Control.Supermonad.Plugin.Solving
-               , Control.Supermonad.Plugin.Dict
+               , Control.Supermonad.Plugin.InstanceDict
                , Control.Supermonad.Plugin.ClassDict
   other-extensions:
   build-depends: base         >=4.8  && <5

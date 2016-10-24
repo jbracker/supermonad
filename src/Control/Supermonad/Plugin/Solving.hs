@@ -27,7 +27,7 @@ import qualified Outputable as O
 
 
 import Control.Supermonad.Plugin.Debug ( sDocToStr )
-import Control.Supermonad.Plugin.Dict ( InstanceDict )
+import Control.Supermonad.Plugin.InstanceDict ( InstanceDict )
 import Control.Supermonad.Plugin.Wrapper 
   ( TypeVarSubst, mkTypeVarSubst )
 import Control.Supermonad.Plugin.Environment 

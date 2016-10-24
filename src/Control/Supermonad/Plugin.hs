@@ -14,7 +14,7 @@ import TcPluginM ( TcPluginM )
 
 import Control.Supermonad.Plugin.Log ( sDocToStr )
 import qualified Control.Supermonad.Plugin.Log as L
-import Control.Supermonad.Plugin.Dict ( InstanceDict )
+import Control.Supermonad.Plugin.InstanceDict ( InstanceDict )
 import Control.Supermonad.Plugin.Solving
   ( solveConstraints )
 import Control.Supermonad.Plugin.Environment
