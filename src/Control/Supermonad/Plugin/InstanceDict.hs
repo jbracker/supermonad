@@ -4,7 +4,7 @@ module Control.Supermonad.Plugin.InstanceDict
   ( InstanceDict
   , emptyInstDict, insertInstDict
   , lookupInstDict, lookupInstDictByTyCon
-  , allTyConsInstDict ) where
+  , allInstDictTyCons ) where
 
 import Data.Maybe ( fromJust )
 import qualified Data.Set as S
@@ -39,8 +39,8 @@ lookupInstDict tc cls (InstanceDict instDict) = M.lookup (tc, cls) instDict
 
 -- | Retrieve the 'S.Set' of all type constructors in that have an entry in
 --   the supermonad dictionary.
-allTyConsInstDict :: InstanceDict -> S.Set TyCon
-allTyConsInstDict (InstanceDict instDict) = S.map fst $ M.keysSet instDict
+allInstDictTyCons :: InstanceDict -> S.Set TyCon
+allInstDictTyCons (InstanceDict instDict) = S.map fst $ M.keysSet instDict
 
 -- | Looks up all entries with the given type constructor as key.
 --   Returns a mapping between the classes and their instances for that
