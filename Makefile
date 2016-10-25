@@ -27,7 +27,10 @@ opendoc:
 init:
 	[ -f ./cabal.sandbox.config ] || [ -d ./.cabal-sandbox ] || cabal sandbox init
 
-supermonad-examples: install session-example session-chat-supermonad-example effect-example constrained-example hmtc-supermonad-example
+supermonad-examples: install minimal-example session-example session-chat-supermonad-example effect-example constrained-example hmtc-supermonad-example
+
+minimal-example: install
+	cabal install ./examples/minimal
 
 session-example: install
 	cabal install ./examples/session
