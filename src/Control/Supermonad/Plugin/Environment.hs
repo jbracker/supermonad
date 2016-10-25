@@ -61,7 +61,8 @@ import Control.Supermonad.Plugin.Constraint
   , constraintSourceLocation )
 import Control.Supermonad.Plugin.Detect
   ( BindInst, ApplicativeInst, ReturnInst
-  , findModuleByQuery, supermonadModuleQuery
+  , findModuleByQuery
+  , supermonadModuleQuery
   , supermonadClassQuery
   , findMonoTopTyConInstances
   , checkSupermonadInstances
@@ -127,18 +128,11 @@ initSupermonadPlugin = do
   
   -- Construct the initialized class dictionary.
   oldClsDict <- getClassDictionary
-  let newClsDict = foldr (\(clsName, cls, clsInsts) -> insertClsDict clsName cls clsInsts) oldClsDict foundClsInsts 
+  let newClsDict = foldr (\(clsName, cls, clsInsts) -> insertClsDict clsName cls clsInsts) oldClsDict foundClsInsts
   
   -- Calculate the supermonads in scope and check for rogue bind and return instances.
-  let (smInsts, smErrors) = case ( lookupClsDict bindClassName newClsDict
-                                 , lookupClsDict applicativeClassName newClsDict
-                                 , lookupClsDict returnClassName newClsDict) of
-        (Just bindClsInsts, Just applicativeClsInsts, Just returnClsInsts) -> 
-          let instDict = findMonoTopTyConInstances newClsDict
-          in ( instDict
-             , fmap snd $ checkSupermonadInstances bindClsInsts applicativeClsInsts returnClsInsts newClsDict [] instDict
-             ) 
-        (_, _, _) -> mempty
+  let smInsts = findMonoTopTyConInstances newClsDict
+  let smErrors = fmap snd $ checkSupermonadInstances newClsDict smInsts
   
   -- Try to construct the environment or throw errors
   case smErrors of

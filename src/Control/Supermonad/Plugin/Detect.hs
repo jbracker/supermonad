@@ -19,13 +19,14 @@ module Control.Supermonad.Plugin.Detect
   , BindInst, ApplicativeInst, ReturnInst
   , supermonadModuleQuery
   , supermonadClassQuery
+  , supermonadInstanceImplications
   , findMonoTopTyConInstances
   , checkSupermonadInstances
   ) where
 
 import Data.List  ( find )
 import Data.Either ( isLeft, isRight )
-import Data.Maybe ( isNothing )
+import Data.Maybe ( isNothing, maybeToList )
 import Data.Set ( Set )
 import qualified Data.Set as S
 import qualified Data.Map as M
@@ -62,7 +63,7 @@ import InstEnv
   , ie_global
   , classInstances )
 import PrelNames ( mAIN_NAME )
-import Outputable ( SDoc, ($$), (<>), text, vcat, ppr, hang )
+import Outputable ( SDoc, ($$), text, vcat, ppr, hang )
 --import qualified Outputable as O
 
 --import Control.Supermonad.Plugin.Log ( printObj, printObjTrace, printMsg )
@@ -74,13 +75,16 @@ import Control.Supermonad.Plugin.Instance
   , isPolyTyConInstance )
 import Control.Supermonad.Plugin.Utils
   ( errIndent
-  , fromRight, fromLeft )
+  , fromRight, fromLeft
+  , getClassName, getTyConName )
 import Control.Supermonad.Plugin.ClassDict
   ( ClassDict
-  , allClsDictEntries )
+  , allClsDictEntries
+  , lookupClsDictClass )
 import Control.Supermonad.Plugin.InstanceDict
   ( InstanceDict
   , insertInstDict, emptyInstDict
+  , allInstDictTyCons
   , lookupInstDictByTyCon )
 import Control.Supermonad.Plugin.Names
 
@@ -132,64 +136,65 @@ infix 7 <==>
 (<==>) :: Class -> Class -> [InstanceImplication]
 (<==>) ca cb = ca ===> cb ++ cb ===> ca
 
+clsDictInstImp :: ClassDict -> PluginClassName -> PluginClassName -> [InstanceImplication]
+clsDictInstImp clsDict caName cbName = do
+  clsA <- maybeToList $ lookupClsDictClass caName clsDict
+  clsB <- maybeToList $ lookupClsDictClass cbName clsDict
+  clsA ===> clsB
+
+clsDictInstEquiv :: ClassDict -> PluginClassName -> PluginClassName -> [InstanceImplication]
+clsDictInstEquiv clsDict caName cbName = do
+  clsA <- maybeToList $ lookupClsDictClass caName clsDict
+  clsB <- maybeToList $ lookupClsDictClass cbName clsDict
+  clsA <==> clsB
+  
+supermonadInstanceImplications :: ClassDict -> [InstanceImplication]
+supermonadInstanceImplications clsDict =
+    (applicativeClassName <=> returnClassName) ++
+    (bindClassName        ==> returnClassName)
+  where
+    (==>) = clsDictInstImp clsDict
+    (<=>) = clsDictInstEquiv clsDict
+  
+
 checkInstanceImplications :: InstanceDict -> [InstanceImplication] -> [(TyCon, SDoc)]
 checkInstanceImplications _instDict [] = []
 checkInstanceImplications instDict (imp : imps) = do
-  tc <- allInstDictTyCons instDict
+  tc <- S.toList $ allInstDictTyCons instDict
   let tcDict = lookupInstDictByTyCon tc instDict
   case imp of
-    InstanceImplies ca cb -> if M.member ca tcDict 
-                                then 
-                                else rest
+    InstanceImplies ca cb -> case (M.member ca tcDict, M.member cb tcDict) of
+      (False, _    ) -> rest
+      (True , True ) -> rest
+      (True , False) -> 
+        let errMsg = text $ "There is no or there are several instances of '" ++ getClassName cb ++ "' for '" ++ getTyConName tc ++ "'!"
+        in (tc, errMsg) : rest
   where
     rest = checkInstanceImplications instDict imps
 
 -- | Check if there are any supermonad instances that clearly 
 --   do not belong to a specific supermonad.
-checkSupermonadInstances 
+checkSupermonadInstances {-
   :: (Class, [BindInst]) -- ^ The @Bind@ class and instances.
   -> (Class, [ApplicativeInst]) -- ^ The @Applicative@ class and instances.
   -> (Class, [ReturnInst]) -- ^ The @Return@ class and instances.
-  -> ClassDict
-  -> [InstanceImplication] 
-  -- ^ Dependencies between instances. These describe 
-  --   which instances must exist and are implied by 
-  --   each other for a set of instances with a single 
-  --   top-level type constructor.
+    -}
+  :: ClassDict
   -> InstanceDict
   -- ^ The instance dictionary to check for validity.
   --   This should be the instance calculated by 'findMonoTopTyConInstances'
   --   from the given class dict. If not the validity of the checks cannot be
   --   guarenteed.
   -> [(Either TyCon ClsInst, SDoc)]
-checkSupermonadInstances (bindCls, bindInsts) (applicativeCls, applicativeInsts) (returnCls, returnInsts) clsDict instImplic instDict = 
+checkSupermonadInstances clsDict instDict = 
   monoCheckErrMsgs ++ polyCheckErrMsgs
   where 
     -- Check if all instances for each supermonad type constructor exist.
-    instTopTyCons :: [TyCon]
-    instTopTyCons = S.toList $ S.unions $ fmap instanceTopTyCons $ concat $ fmap snd $ allClsDictEntries clsDict
-  
     monoCheckErrMsgs :: [(Either TyCon ClsInst, SDoc)]
-    monoCheckErrMsgs = concat $ (flip fmap) instTopTyCons $ \tc -> 
-      let
-        monoBindInsts = filter (isMonoTyConInstance tc bindCls) bindInsts
-        monoApplicativeInsts = filter (isMonoTyConInstance tc applicativeCls) applicativeInsts
-        monoReturnInsts = filter (isMonoTyConInstance tc returnCls) returnInsts
-      in case ( monoBindInsts, monoApplicativeInsts, monoReturnInsts ) of
-        ([_bindInst], [_applicativeInst], [_returnInst]) -> []
-        ([], [_applicativeInst], [_returnInst]) -> []
-        (_, [], _) -> findError tc 
-          $ text "Missing 'Applicative' instance for supermonad '" <> ppr tc <> text "'."
-        (_, _, []) -> findError tc 
-          $ text "Missing 'Return' instance for supermonad '" <> ppr tc <> text "'."
-        (bindInsts', applicativeInsts', returnInsts') -> findError tc 
-          $ text "Multiple 'Bind' instances for supermonad '" <> ppr tc <> text "':" $$ vcat (fmap ppr bindInsts')
-          $$ text "Multiple 'Applicative' instances for supermonad '" <> ppr tc <> text "':" $$ vcat (fmap ppr applicativeInsts')
-          $$ text "Multiple 'Return' instances for supermonad '" <> ppr tc <> text "':" $$ vcat (fmap ppr returnInsts')
-          
-    findError :: TyCon -> SDoc -> [(Either TyCon ClsInst, SDoc)]
-    findError tc msg = [(Left tc, msg)]
-        
+    monoCheckErrMsgs = fmap (\(tc, msg) -> (Left tc, msg)) 
+                     $ checkInstanceImplications instDict 
+                     $ supermonadInstanceImplications clsDict
+   
     -- Check if there are any instance that involve different type constructors...
     polyCheckErrMsgs :: [(Either TyCon ClsInst, SDoc)]
     polyCheckErrMsgs = do
