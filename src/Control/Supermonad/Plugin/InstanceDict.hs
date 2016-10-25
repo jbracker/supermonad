@@ -2,9 +2,11 @@
 -- | Provides the type for instance dictionaries.
 module Control.Supermonad.Plugin.InstanceDict 
   ( InstanceDict
-  , emptyInstDict, insertInstDict, lookupInstDict
+  , emptyInstDict, insertInstDict
+  , lookupInstDict, lookupInstDictByTyCon
   , allTyConsInstDict ) where
 
+import Data.Maybe ( fromJust )
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
 
@@ -40,6 +42,15 @@ lookupInstDict tc cls (InstanceDict instDict) = M.lookup (tc, cls) instDict
 allTyConsInstDict :: InstanceDict -> S.Set TyCon
 allTyConsInstDict (InstanceDict instDict) = S.map fst $ M.keysSet instDict
 
-
+-- | Looks up all entries with the given type constructor as key.
+--   Returns a mapping between the classes and their instances for that
+--   type constructor.
+lookupInstDictByTyCon :: TyCon -> InstanceDict -> M.Map Class ClsInst
+lookupInstDictByTyCon tc (InstanceDict instDict) 
+  -- The use of fromJust is safe here, because the keys we look up were
+  -- taken from the existing entries of the map we are looking into.
+  = foldr (\cls m -> M.insert cls (fromJust $ M.lookup (tc, cls) instDict) m) M.empty clsKeys
+  where
+    clsKeys = fmap snd $ filter ((tc ==) . fst) $ M.keys instDict
 
 
