@@ -19,7 +19,7 @@ module Control.Supermonad.Plugin.Detect
   , BindInst, ApplicativeInst, ReturnInst
   , supermonadModuleQuery
   , supermonadClassQuery
-  , findSupermonads
+  , findMonoTopTyConInstances
   , checkSupermonadInstances
   ) where
 
@@ -74,6 +74,9 @@ import Control.Supermonad.Plugin.Instance
 import Control.Supermonad.Plugin.Utils
   ( errIndent
   , fromRight, fromLeft )
+import Control.Supermonad.Plugin.ClassDict
+  ( ClassDict
+  , allClsDictEntries )
 import Control.Supermonad.Plugin.InstanceDict
   ( InstanceDict
   , insertInstDict, emptyInstDict )
@@ -133,8 +136,15 @@ checkSupermonadInstances
   :: (Class, [BindInst]) -- ^ The @Bind@ class and instances.
   -> (Class, [ApplicativeInst]) -- ^ The @Applicative@ class and instances.
   -> (Class, [ReturnInst]) -- ^ The @Return@ class and instances.
+  -- -> [InstanceImplication] 
+  -- ^ Dependencies between instances. These describe 
+  --   which instances must exist and are implied by 
+  --   each other for a set of instances with a single 
+  --   top-level type constructor.
+  -- -> ClassDictionary
+  -- ^ The set of classes and instances to check for validity.
   -> [(Either TyCon ClsInst, SDoc)]
-checkSupermonadInstances (bindCls, bindInsts) (applicativeCls, applicativeInsts) (returnCls, returnInsts) = 
+checkSupermonadInstances (bindCls, bindInsts) (applicativeCls, applicativeInsts) (returnCls, returnInsts) = -- instImpl clsDict = 
   monoCheckErrMsgs ++ polyCheckErrMsgs
   where 
     -- Check if all instances for each supermonad type constructor exist.
@@ -178,28 +188,30 @@ checkSupermonadInstances (bindCls, bindInsts) (applicativeCls, applicativeInsts)
     findError tc msg = [(Left tc, msg)]
 
 -- | Constructs the map between type constructors and their supermonad instances.
---   This function not only searches for the instances and constructs
---   the lookup table, it also checks that all necessary instances exist.
---   TODO: Move existance check into 'checkSupermonadInstances', so this function only adds instances.
-findSupermonads 
-  :: (Class, [BindInst]) -- ^ The @Bind@ class and instances.
-  -> (Class, [ApplicativeInst]) -- ^ The @Applicative@ class and instances.
-  -> (Class, [ReturnInst]) -- ^ The @Return@ class and instances.
+--   It essentially collects all of the instances that only use a single top-level
+--   constructor and stores them in the instance dictionary. If there are several
+--   instances for a single type constructor none is added to the dictionary.
+--   This function only searches for the instances and constructs the lookup table.
+findMonoTopTyConInstances
+  :: ClassDict
+  -- ^ The set of classes and instances to calculate the instance dictionary from.
   -> InstanceDict
   -- ^ Association between type constructors and their supermonad instances.
-findSupermonads bindClsInsts applicativeClsInsts returnClsInsts =
+findMonoTopTyConInstances clsDict =
   mconcat $ do
     tc <- supermonadTyCons
-    (cls, insts) <- [bindClsInsts, applicativeClsInsts, returnClsInsts]
+    (cls, insts) <- dictEntries
     return $ findMonoClassInstance tc cls insts
   where
+    dictEntries :: [(Class, [ClsInst])]
+    dictEntries = allClsDictEntries clsDict
+    
     -- Collect all type constructors that are used for supermonads
     supermonadTyCons :: [TyCon]
     supermonadTyCons = S.toList 
                        $ S.unions
                        $ fmap instanceTopTyCons
-                       $ concat $ fmap snd 
-                       $ [bindClsInsts, applicativeClsInsts, returnClsInsts]
+                       $ concat $ fmap snd dictEntries
     
     findMonoClassInstance :: TyCon -> Class -> [ClsInst] -> InstanceDict
     findMonoClassInstance tc cls insts = 

@@ -63,7 +63,7 @@ import Control.Supermonad.Plugin.Detect
   ( BindInst, ApplicativeInst, ReturnInst
   , findModuleByQuery, supermonadModuleQuery
   , supermonadClassQuery
-  , findSupermonads
+  , findMonoTopTyConInstances
   , checkSupermonadInstances
   , findClassesAndInstancesInScope )
 import Control.Supermonad.Plugin.Utils 
@@ -134,7 +134,7 @@ initSupermonadPlugin = do
                                  , lookupClsDict applicativeClassName newClsDict
                                  , lookupClsDict returnClassName newClsDict) of
         (Just bindClsInsts, Just applicativeClsInsts, Just returnClsInsts) -> 
-          ( findSupermonads bindClsInsts applicativeClsInsts returnClsInsts
+          ( findMonoTopTyConInstances newClsDict
           , fmap snd $ checkSupermonadInstances bindClsInsts applicativeClsInsts returnClsInsts
           ) 
         (_, _, _) -> mempty
