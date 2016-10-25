@@ -4,7 +4,7 @@ module Control.Supermonad.Plugin.ClassDict
   ( ClassDict
   , emptyClsDict, insertClsDict, lookupClsDict
   , lookupClsDictClass, lookupClsDictInstances
-  , allClsDictKeys ) where
+  , allClsDictKeys, allClsDictEntries ) where
 
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
@@ -38,3 +38,7 @@ lookupClsDictInstances key dict = fmap (\(_, insts) -> insts) $ lookupClsDict ke
 --   the supermonad dictionary.
 allClsDictKeys :: ClassDict -> S.Set String
 allClsDictKeys (ClassDict dict) = M.keysSet dict
+
+-- | Retrives all of the entries stored in the class dictionary.
+allClsDictEntries :: ClassDict -> [(Class, [ClsInst])]
+allClsDictEntries (ClassDict dict) = M.elems dict
