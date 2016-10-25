@@ -28,6 +28,7 @@ import Data.Either ( isLeft, isRight )
 import Data.Maybe ( isNothing )
 import Data.Set ( Set )
 import qualified Data.Set as S
+import qualified Data.Map as M
 
 import Control.Monad ( forM )
 
@@ -130,6 +131,18 @@ infix 7 <==>
 
 (<==>) :: Class -> Class -> [InstanceImplication]
 (<==>) ca cb = ca ===> cb ++ cb ===> ca
+
+checkInstanceImplications :: InstanceDict -> [InstanceImplication] -> [(TyCon, SDoc)]
+checkInstanceImplications _instDict [] = []
+checkInstanceImplications instDict (imp : imps) = do
+  tc <- allInstDictTyCons instDict
+  let tcDict = lookupInstDictByTyCon tc instDict
+  case imp of
+    InstanceImplies ca cb -> if M.member ca tcDict 
+                                then 
+                                else rest
+  where
+    rest = checkInstanceImplications instDict imps
 
 -- | Check if there are any supermonad instances that clearly 
 --   do not belong to a specific supermonad.

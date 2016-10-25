@@ -11,7 +11,7 @@ module Control.Supermonad.Plugin.Utils (
   -- * General Utilities
   , skolemVarsBindFun
   , eqTyVar, eqTyVar'
-  , getTyConName
+  , getTyConName, getClassName
   , isAmbiguousType
   , partiallyApplyTyCons
   , applyTyCon
@@ -53,6 +53,7 @@ import TyCon
 import Var ( tyVarKind )
 import TcType ( isAmbiguousTyVar )
 import Kind ( Kind )
+import Class ( Class, classTyCon )
 import Unify ( BindFlag(..) )
 import InstEnv ( instanceBindFun )
 import TcPluginM ( TcPluginM, newFlexiTyVar )
@@ -175,6 +176,10 @@ tyVarArity = length . fst . splitKindFunTys . tyVarKind
 -- | Returns the string representation of the given type constructor in the source code.
 getTyConName :: TyCon -> String
 getTyConName = occNameString . nameOccName . tyConName
+
+-- | Returns the name of the class (The literal name of its type constructor).
+getClassName :: Class -> String
+getClassName cls = getTyConName $ classTyCon cls
 
 -- | Get the element of a list at a given index (If that element exists).
 atIndex :: [a] -> Int -> Maybe a
