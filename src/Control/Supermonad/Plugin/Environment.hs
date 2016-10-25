@@ -134,9 +134,10 @@ initSupermonadPlugin = do
                                  , lookupClsDict applicativeClassName newClsDict
                                  , lookupClsDict returnClassName newClsDict) of
         (Just bindClsInsts, Just applicativeClsInsts, Just returnClsInsts) -> 
-          ( findMonoTopTyConInstances newClsDict
-          , fmap snd $ checkSupermonadInstances bindClsInsts applicativeClsInsts returnClsInsts
-          ) 
+          let instDict = findMonoTopTyConInstances newClsDict
+          in ( instDict
+             , fmap snd $ checkSupermonadInstances bindClsInsts applicativeClsInsts returnClsInsts newClsDict [] instDict
+             ) 
         (_, _, _) -> mempty
   
   -- Try to construct the environment or throw errors

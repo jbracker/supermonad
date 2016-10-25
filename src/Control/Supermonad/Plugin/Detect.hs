@@ -79,7 +79,8 @@ import Control.Supermonad.Plugin.ClassDict
   , allClsDictEntries )
 import Control.Supermonad.Plugin.InstanceDict
   ( InstanceDict
-  , insertInstDict, emptyInstDict )
+  , insertInstDict, emptyInstDict
+  , lookupInstDictByTyCon )
 import Control.Supermonad.Plugin.Names
 
 -- -----------------------------------------------------------------------------
@@ -136,20 +137,24 @@ checkSupermonadInstances
   :: (Class, [BindInst]) -- ^ The @Bind@ class and instances.
   -> (Class, [ApplicativeInst]) -- ^ The @Applicative@ class and instances.
   -> (Class, [ReturnInst]) -- ^ The @Return@ class and instances.
-  -- -> [InstanceImplication] 
+  -> ClassDict
+  -> [InstanceImplication] 
   -- ^ Dependencies between instances. These describe 
   --   which instances must exist and are implied by 
   --   each other for a set of instances with a single 
   --   top-level type constructor.
-  -- -> ClassDictionary
-  -- ^ The set of classes and instances to check for validity.
+  -> InstanceDict
+  -- ^ The instance dictionary to check for validity.
+  --   This should be the instance calculated by 'findMonoTopTyConInstances'
+  --   from the given class dict. If not the validity of the checks cannot be
+  --   guarenteed.
   -> [(Either TyCon ClsInst, SDoc)]
-checkSupermonadInstances (bindCls, bindInsts) (applicativeCls, applicativeInsts) (returnCls, returnInsts) = -- instImpl clsDict = 
+checkSupermonadInstances (bindCls, bindInsts) (applicativeCls, applicativeInsts) (returnCls, returnInsts) clsDict instImplic instDict = 
   monoCheckErrMsgs ++ polyCheckErrMsgs
   where 
     -- Check if all instances for each supermonad type constructor exist.
     instTopTyCons :: [TyCon]
-    instTopTyCons = S.toList $ S.unions $ fmap instanceTopTyCons $ bindInsts ++ applicativeInsts ++ returnInsts
+    instTopTyCons = S.toList $ S.unions $ fmap instanceTopTyCons $ concat $ fmap snd $ allClsDictEntries clsDict
   
     monoCheckErrMsgs :: [(Either TyCon ClsInst, SDoc)]
     monoCheckErrMsgs = concat $ (flip fmap) instTopTyCons $ \tc -> 
@@ -169,23 +174,16 @@ checkSupermonadInstances (bindCls, bindInsts) (applicativeCls, applicativeInsts)
           $$ text "Multiple 'Applicative' instances for supermonad '" <> ppr tc <> text "':" $$ vcat (fmap ppr applicativeInsts')
           $$ text "Multiple 'Return' instances for supermonad '" <> ppr tc <> text "':" $$ vcat (fmap ppr returnInsts')
           
-          
-    -- Check if there are any instance that involve different type constructors...
-    polyBindInsts, polyApplicativeInsts, polyReturnInsts :: [ClsInst]
-    polyBindInsts        = filter (isPolyTyConInstance bindCls       ) bindInsts
-    polyApplicativeInsts = filter (isPolyTyConInstance applicativeCls) applicativeInsts
-    polyReturnInsts      = filter (isPolyTyConInstance returnCls     ) returnInsts
-    
-    polyCheckErrMsgs :: [(Either TyCon ClsInst, SDoc)]
-    polyCheckErrMsgs = mconcat $
-          [ fmap (\inst -> (Right inst, text "Not a valid supermonad instance: " $$ ppr inst)) polyBindInsts
-          , fmap (\inst -> (Right inst, text "Not a valid supermonad instance: " $$ ppr inst)) polyApplicativeInsts
-          , fmap (\inst -> (Right inst, text "Not a valid supermonad instance: " $$ ppr inst)) polyReturnInsts
-          ]
-    
-    
     findError :: TyCon -> SDoc -> [(Either TyCon ClsInst, SDoc)]
     findError tc msg = [(Left tc, msg)]
+        
+    -- Check if there are any instance that involve different type constructors...
+    polyCheckErrMsgs :: [(Either TyCon ClsInst, SDoc)]
+    polyCheckErrMsgs = do
+      (cls, insts) <- allClsDictEntries clsDict
+      polyInst <- filter (isPolyTyConInstance cls) insts
+      return (Right polyInst, text "Instance involves more then one top-level type constructor: " $$ ppr polyInst)
+    
 
 -- | Constructs the map between type constructors and their supermonad instances.
 --   It essentially collects all of the instances that only use a single top-level
