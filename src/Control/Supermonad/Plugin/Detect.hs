@@ -75,6 +75,7 @@ import Control.Supermonad.Plugin.Instance
   , isPolyTyConInstance )
 import Control.Supermonad.Plugin.Utils
   ( errIndent
+  , removeDupByIndex
   , fromRight, fromLeft
   , getClassName, getTyConName )
 import Control.Supermonad.Plugin.ClassDict
@@ -157,7 +158,7 @@ supermonadInstanceImplications clsDict =
     (<=>) = clsDictInstEquiv clsDict
   
 
-checkInstanceImplications :: InstanceDict -> [InstanceImplication] -> [(TyCon, SDoc)]
+checkInstanceImplications :: InstanceDict -> [InstanceImplication] -> [((TyCon,Class), SDoc)]
 checkInstanceImplications _instDict [] = []
 checkInstanceImplications instDict (imp : imps) = do
   tc <- S.toList $ allInstDictTyCons instDict
@@ -167,8 +168,8 @@ checkInstanceImplications instDict (imp : imps) = do
       (False, _    ) -> rest
       (True , True ) -> rest
       (True , False) -> 
-        let errMsg = text $ "There is no or there are several instances of '" ++ getClassName cb ++ "' for '" ++ getTyConName tc ++ "'!"
-        in (tc, errMsg) : rest
+        let errMsg = text $ "There is no unique instance of '" ++ getClassName cb ++ "' for the type '" ++ getTyConName tc ++ "'!"
+        in ((tc,cb), errMsg) : rest
   where
     rest = checkInstanceImplications instDict imps
 
@@ -185,18 +186,19 @@ checkSupermonadInstances {-
   --   This should be the instance calculated by 'findMonoTopTyConInstances'
   --   from the given class dict. If not the validity of the checks cannot be
   --   guarenteed.
-  -> [(Either TyCon ClsInst, SDoc)]
+  -> [(Either (TyCon, Class) ClsInst, SDoc)]
 checkSupermonadInstances clsDict instDict = 
   monoCheckErrMsgs ++ polyCheckErrMsgs
   where 
     -- Check if all instances for each supermonad type constructor exist.
-    monoCheckErrMsgs :: [(Either TyCon ClsInst, SDoc)]
+    monoCheckErrMsgs :: [(Either (TyCon, Class) ClsInst, SDoc)]
     monoCheckErrMsgs = fmap (\(tc, msg) -> (Left tc, msg)) 
+                     $ removeDupByIndex
                      $ checkInstanceImplications instDict 
                      $ supermonadInstanceImplications clsDict
    
     -- Check if there are any instance that involve different type constructors...
-    polyCheckErrMsgs :: [(Either TyCon ClsInst, SDoc)]
+    polyCheckErrMsgs :: [(Either (TyCon, Class) ClsInst, SDoc)]
     polyCheckErrMsgs = do
       (cls, insts) <- allClsDictEntries clsDict
       polyInst <- filter (isPolyTyConInstance cls) insts

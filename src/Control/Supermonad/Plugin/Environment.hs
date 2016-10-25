@@ -72,7 +72,7 @@ import Control.Supermonad.Plugin.Utils
   , t1st, t2nd, t3rd )
 import Control.Supermonad.Plugin.ClassDict
   ( ClassDict
-  , insertClsDict, lookupClsDict, emptyClsDict
+  , insertClsDict, emptyClsDict
   , lookupClsDictClass, lookupClsDictInstances )
 import Control.Supermonad.Plugin.InstanceDict
   ( InstanceDict, lookupInstDict )
