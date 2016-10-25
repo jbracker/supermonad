@@ -20,7 +20,7 @@ module Control.Supermonad.Plugin.Utils (
   , t1st, t2nd, t3rd
   , associations
   , subsets
-  , removeDup
+  , removeDup, removeDupByIndex
   , lookupBy
   , allM, anyM
   , fromLeft, fromRight
@@ -31,6 +31,7 @@ import Data.Maybe ( listToMaybe, catMaybes )
 import Data.List ( find )
 import Data.Set ( Set )
 import qualified Data.Set as S
+import qualified Data.Map as M
 
 import Control.Monad ( forM )
 import Control.Arrow ( second )
@@ -282,6 +283,11 @@ subsets s = case S.size s of
 --   The result list is ordered in ascending order.
 removeDup :: (Ord a) => [a] -> [a]
 removeDup = S.toAscList . S.fromList
+
+-- | Efficient removal of duplicate elements in O(n * log(n)).
+--   The result list is ordered.
+removeDupByIndex :: (Ord a) => [(a,b)] -> [(a,b)]
+removeDupByIndex = M.toList . M.fromList
 
 -- | Exactly like 'lookup'. Searches the list for the entry with the right key
 --   and returns the associated value if an entry is found. Uses a custom
