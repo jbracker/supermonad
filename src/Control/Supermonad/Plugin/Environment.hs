@@ -8,16 +8,12 @@ module Control.Supermonad.Plugin.Environment
   , runTcPlugin
     -- * Supermonad Plugin Environment Access
   , initSupermonadPlugin
-  , getBindClass, getApplicativeClass, getReturnClass
   , getGivenConstraints, getWantedConstraints
   , getInstEnvs
   , getClassDictionary
   , getClass
   , getCustomState, putCustomState, modifyCustomState
-  , getBindInstances
   , getInstanceFor
-  , getSupermonadFor
-  , getSupermonadBindFor, getSupermonadApplicativeFor, getSupermonadReturnFor
   , addTypeEqualities, addTypeEquality
   , addTyVarEqualities, addTyVarEquality
   , getTypeEqualities, getTyVarEqualities
@@ -30,10 +26,9 @@ module Control.Supermonad.Plugin.Environment
   , printConstraints
   ) where
 
-import Data.Maybe ( fromJust )
 import Data.List ( groupBy )
 
-import Control.Monad ( join, unless, forM_ )
+import Control.Monad ( unless, forM_ )
 import Control.Monad.Reader ( ReaderT, runReaderT, asks )
 import Control.Monad.State  ( StateT , runStateT , gets, modify )
 import Control.Monad.Except ( ExceptT, runExceptT, throwError, catchError )
@@ -53,29 +48,22 @@ import FastString ( unpackFS )
 import qualified Outputable as O
 
 import qualified Control.Supermonad.Plugin.Log as L
-import Control.Supermonad.Plugin.Names 
-  ( PluginClassName
-  , bindClassName
-  , returnClassName
-  , applicativeClassName )
+import Control.Supermonad.Plugin.Names ( PluginClassName )
 import Control.Supermonad.Plugin.Constraint
   ( GivenCt, WantedCt
   , constraintSourceLocation )
 import Control.Supermonad.Plugin.Detect
-  ( BindInst, ApplicativeInst, ReturnInst
-  , findModuleByQuery
+  ( findModuleByQuery
   , supermonadModuleQuery
   , supermonadClassQuery
   , findMonoTopTyConInstances
   , checkSupermonadInstances
   , findClassesAndInstancesInScope )
-import Control.Supermonad.Plugin.Utils 
-  ( errIndent
-  , t1st, t2nd, t3rd )
+import Control.Supermonad.Plugin.Utils ( errIndent )
 import Control.Supermonad.Plugin.ClassDict
   ( ClassDict
   , insertClsDict, emptyClsDict
-  , lookupClsDictClass, lookupClsDictInstances )
+  , lookupClsDictClass )
 import Control.Supermonad.Plugin.InstanceDict
   ( InstanceDict, lookupInstDict )
 
@@ -211,18 +199,6 @@ modifyCustomState sf = modify (\s -> s { smStateCustom = sf (smStateCustom s) })
 getClass :: PluginClassName -> SupermonadPluginM s (Maybe Class)
 getClass clsName = lookupClsDictClass clsName <$> asks smEnvClassDictionary
 
--- | Returns the 'Control.Supermonad.Bind' class.
-getBindClass :: SupermonadPluginM s Class
-getBindClass = (fromJust . lookupClsDictClass bindClassName) <$> asks smEnvClassDictionary
-
--- | Returns the 'Control.Supermonad.Applicative' class.
-getApplicativeClass :: SupermonadPluginM s Class
-getApplicativeClass = (fromJust . lookupClsDictClass applicativeClassName) <$> asks smEnvClassDictionary
-
--- | Returns the 'Control.Supermonad.Return' class.
-getReturnClass :: SupermonadPluginM s Class
-getReturnClass = (fromJust . lookupClsDictClass returnClassName) <$> asks smEnvClassDictionary
-
 -- | Returns all of the /given/ and /derived/ constraints of this plugin call.
 getGivenConstraints :: SupermonadPluginM s [GivenCt]
 getGivenConstraints = asks smEnvGivenConstraints
@@ -231,53 +207,13 @@ getGivenConstraints = asks smEnvGivenConstraints
 getWantedConstraints :: SupermonadPluginM s [WantedCt]
 getWantedConstraints = asks smEnvWantedConstraints
 
--- | Returns all bind instances including those given by
---   'getBindApplyInstance' and 'getBindFunctorInstance'.
-getBindInstances :: SupermonadPluginM s [ClsInst]
-getBindInstances = (fromJust . lookupClsDictInstances bindClassName) <$> asks smEnvClassDictionary
-
 -- | Shortcut to access the instance environments.
 getInstEnvs :: SupermonadPluginM s InstEnvs
 getInstEnvs = runTcPlugin TcPluginM.getInstEnvs
 
--- | Retrieves the supermonad instances of the given type constructor,
---   if the type constructor represents a supermonad in scope.
-getSupermonadFor :: TyCon -> SupermonadPluginM InstanceDict (Maybe (Maybe BindInst, ApplicativeInst, ReturnInst))
-getSupermonadFor tc = do
-  mBindCls        <- getClass bindClassName
-  mReturnCls      <- getClass returnClassName
-  mApplicativeCls <- getClass applicativeClassName
-  instDict <- getCustomState
-  return $ do
-    bindCls         <- mBindCls
-    returnCls      <- mReturnCls
-    applicativeCls <- mApplicativeCls
-    let bindInst     = lookupInstDict tc bindCls instDict
-    applicativeInst <- lookupInstDict tc applicativeCls instDict
-    returnInst      <- lookupInstDict tc returnCls instDict
-    return (bindInst, applicativeInst, returnInst)
-
 -- | Retrieves the associated instance of the given type constructor and class.
 getInstanceFor :: TyCon -> Class -> SupermonadPluginM InstanceDict (Maybe ClsInst)
 getInstanceFor tc cls = fmap (lookupInstDict tc cls) getCustomState
-
--- | Retrieves the supermonad 'Control.Supermonad.Bind' instances 
---   of the given type constructor, if the type constructor represents 
---   a supermonad in scope and there is a bind instance for that type constructor.
-getSupermonadBindFor :: TyCon -> SupermonadPluginM InstanceDict (Maybe BindInst)
-getSupermonadBindFor tc = fmap (join . fmap t1st) $ getSupermonadFor tc
-
--- | Retrieves the supermonad 'Control.Supermonad.Applicative' instances 
---   of the given type constructor, if the type constructor represents 
---   a supermonad in scope.
-getSupermonadApplicativeFor :: TyCon -> SupermonadPluginM InstanceDict (Maybe ApplicativeInst)
-getSupermonadApplicativeFor tc = fmap (fmap t2nd) $ getSupermonadFor tc
-
--- | Retrieves the supermonad 'Control.Supermonad.Return' instances 
---   of the given type constructor, if the type constructor represents 
---   a supermonad in scope.
-getSupermonadReturnFor :: TyCon -> SupermonadPluginM InstanceDict (Maybe ReturnInst)
-getSupermonadReturnFor tc = fmap (fmap t3rd) $ getSupermonadFor tc
 
 -- | Add another type variable equality to the derived equalities.
 addTyVarEquality :: Ct -> TyVar -> Type -> SupermonadPluginM s ()

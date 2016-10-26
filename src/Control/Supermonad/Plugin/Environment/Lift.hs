@@ -7,8 +7,6 @@ module Control.Supermonad.Plugin.Environment.Lift
     produceEvidenceForCt
   , produceEvidenceFor
   , isPotentiallyInstantiatedCt
-  -- * From 'Control.Supermonad.Plugin.Constraint'
-  , isBindConstraint, isReturnConstraint
   -- * From 'Control.Supermonad.Plugin.Utils'
   , partiallyApplyTyCons ) where
 
@@ -22,12 +20,7 @@ import InstEnv ( ClsInst )
 import Control.Supermonad.Plugin.Environment
   ( SupermonadPluginM
   , runTcPlugin
-  , getBindClass, getReturnClass
-  --, getIdentityTyCon --, getIdentityModule
-  , getGivenConstraints --, getWantedConstraints
-  --, setWantedConstraints
-  --, getInstEnvs
-  --, getBindInstances 
+  , getGivenConstraints
   )
 
 import qualified Control.Supermonad.Plugin.Utils as U
@@ -51,18 +44,6 @@ isPotentiallyInstantiatedCt :: Ct -> [(TyVar, Either TyCon TyVar)] -> Supermonad
 isPotentiallyInstantiatedCt ct assoc = do
   givenCts <- getGivenConstraints
   runTcPlugin $ E.isPotentiallyInstantiatedCt givenCts ct assoc
-  
--- | See 'getBindClass' and 'isClassConstraint'.
-isBindConstraint :: Ct -> SupermonadPluginM s Bool
-isBindConstraint ct = do
-  bindCls <- getBindClass
-  return $ isClassConstraint bindCls ct
-
--- | See 'getReturnClass' and 'isClassConstraint'.
-isReturnConstraint :: Ct -> SupermonadPluginM s Bool
-isReturnConstraint ct = do
-  returnCls <- getReturnClass
-  return $ isClassConstraint returnCls ct
 
 -- | See 'U.partiallyApplyTyCons'.
 partiallyApplyTyCons :: [(TyVar, Either TyCon TyVar)] -> SupermonadPluginM s (Either SDoc [(TyVar, Type, [TyVar])])
