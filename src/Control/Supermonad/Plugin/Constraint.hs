@@ -12,6 +12,7 @@ module Control.Supermonad.Plugin.Constraint
   , mkDerivedClassCt
     -- * Constraint inspection
   , isClassConstraint
+  , isAnyClassConstraint
   , constraintClassType
   , constraintClassTyArgs
   , constraintClassTyCon
@@ -91,6 +92,10 @@ isClassConstraint wantedClass ct =
   case constraintClassType ct of
     Just (cls, _args) -> cls == wantedClass
     _ -> False
+
+-- | Checks if the given constraint belongs to any of the given classes.
+isAnyClassConstraint :: [Class] -> Ct -> Bool
+isAnyClassConstraint clss ct = or $ fmap (($ ct) . isClassConstraint) clss
 
 -- | Retrieves the class and type arguments of the given
 --   type class constraint.
