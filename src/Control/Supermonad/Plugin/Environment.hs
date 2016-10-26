@@ -12,8 +12,10 @@ module Control.Supermonad.Plugin.Environment
   , getGivenConstraints, getWantedConstraints
   , getInstEnvs
   , getClassDictionary
+  , getClass
   , getCustomState, putCustomState, modifyCustomState
   , getBindInstances
+  , getInstanceFor
   , getSupermonadFor
   , getSupermonadBindFor, getSupermonadApplicativeFor, getSupermonadReturnFor
   , addTypeEqualities, addTypeEquality
@@ -254,7 +256,11 @@ getSupermonadFor tc = do
     applicativeInst <- lookupInstDict tc applicativeCls instDict
     returnInst      <- lookupInstDict tc returnCls instDict
     return (bindInst, applicativeInst, returnInst)
-  
+
+-- | Retrieves the associated instance of the given type constructor and class.
+getInstanceFor :: TyCon -> Class -> SupermonadPluginM InstanceDict (Maybe ClsInst)
+getInstanceFor tc cls = fmap (lookupInstDict tc cls) getCustomState
+
 -- | Retrieves the supermonad 'Control.Supermonad.Bind' instances 
 --   of the given type constructor, if the type constructor represents 
 --   a supermonad in scope and there is a bind instance for that type constructor.
