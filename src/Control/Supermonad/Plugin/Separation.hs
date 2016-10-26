@@ -2,7 +2,8 @@
 -- | Functions to separate a set of wanted constrains into groups of 
 --   constraints that require being solved together.
 module Control.Supermonad.Plugin.Separation 
-  ( separateContraints
+  ( ConstraintGroup
+  , separateContraints
   , componentTopTyCons
   , componentTopTcVars
   , componentMonoTyCon
@@ -10,8 +11,6 @@ module Control.Supermonad.Plugin.Separation
 
 import Data.Maybe ( fromJust )
 import qualified Data.Set as S
-
-import Control.Monad ( filterM, liftM2 )
 
 import Data.Graph.Inductive.Graph 
   ( LNode, Edge
@@ -23,29 +22,31 @@ import TcRnTypes ( Ct )
 import TyCon ( TyCon )
 import Type ( Type, TyVar )
 import TcType ( isAmbiguousTyVar )
+import Class ( Class )
 
 import Control.Supermonad.Plugin.Constraint
-  ( WantedCt, constraintClassTyArgs )
+  ( WantedCt
+  , constraintClassTyArgs
+  , isAnyClassConstraint )
 import Control.Supermonad.Plugin.Utils
-  ( collectTopTyCons, collectTopTcVars, anyM )
-import Control.Supermonad.Plugin.Environment
-  (  SupermonadPluginM )
-import Control.Supermonad.Plugin.Environment.Lift
-  ( isReturnConstraint, isBindConstraint )
+  ( collectTopTyCons, collectTopTcVars )
 
 type SCNode = LNode WantedCt
 
+type ConstraintGroup = [WantedCt]
+
 -- | Checks if the given component only involved exactly one top-level type constructor
---   in its supermonad constraints.
-componentMonoTyCon :: [WantedCt] -> SupermonadPluginM s (Maybe TyCon)
-componentMonoTyCon cts = do
-  -- Find all of the return and bind constraints
-  smCts <- filterM (\ct -> liftM2 (||) (isReturnConstraint ct) (isBindConstraint ct)) cts
-  -- Get the polymorphic type constructors
-  let tyVars = S.filter (not . isAmbiguousTyVar) $ componentTopTcVars smCts
-  -- Get the concrete type constructors
-  let tyCons = componentTopTyCons smCts
-  return $ case (S.toList tyCons, S.size tyVars) of
+--   in its supermonad constraints. Which classes make up the supermonad constraints
+--   is given by the list of classes.
+componentMonoTyCon :: [Class] -> ConstraintGroup -> Maybe TyCon
+componentMonoTyCon releventClss cts = 
+  let -- Find all of the return and bind constraints
+      smCts = filter (isAnyClassConstraint releventClss) cts
+      -- Get the polymorphic type constructors
+      tyVars = S.filter (not . isAmbiguousTyVar) $ componentTopTcVars smCts
+      -- Get the concrete type constructors
+      tyCons = componentTopTyCons smCts
+  in case (S.toList tyCons, S.size tyVars) of
     ([tc], 0) -> Just tc
     _ -> Nothing
 
@@ -75,15 +76,10 @@ collect f cts = S.unions $ fmap collectLocal cts
 --   Returns the connected components of that graph. 
 --   These components represent the groups of constraints that are in need of 
 --   solving and have to be handeled together.
-separateContraints :: [WantedCt] -> SupermonadPluginM s [[WantedCt]]
-separateContraints wantedCts = filterM containsBindOrReturn comps
+separateContraints :: [WantedCt] -> [ConstraintGroup]
+separateContraints wantedCts = comps
   where
-    -- | Checks if the given constraint group contains any 'Bind' or 'Return'
-    --   constraints.
-    containsBindOrReturn :: [WantedCt] -> SupermonadPluginM s Bool
-    containsBindOrReturn = anyM $ \ct -> liftM2 (||) (isBindConstraint ct) (isReturnConstraint ct)
-    
-    comps :: [[WantedCt]]
+    comps :: [ConstraintGroup]
     comps = fmap (\n -> fromJust $ lookup n nodes) <$> components g
     
     g :: Gr WantedCt ()

@@ -21,12 +21,16 @@ import Control.Supermonad.Plugin.Environment
   ( SupermonadPluginM
   , initSupermonadPlugin, runSupermonadPlugin
   , getWantedConstraints
+  , getClass
+  , throwPluginError
   , getTypeEqualities, getTyVarEqualities
   , printMsg
   -- , printObj, printConstraints
   )
 import Control.Supermonad.Plugin.Constraint 
   ( mkDerivedTypeEqCt, mkDerivedTypeEqCtOfTypes )
+import Control.Supermonad.Plugin.Names
+  ( bindClassName, returnClassName, applicativeClassName )
 
 -- -----------------------------------------------------------------------------
 -- The Plugin
@@ -88,7 +92,14 @@ supermonadSolve' = do
   --(getWantedConstraints >>= filterM isReturnConstraint) >>= (printConstraints . sortConstraintsByLine)
   --getGivenConstraints >>= (printConstraints . sortConstraintsByLine)
   
-  solveConstraints =<< getWantedConstraints 
+  mBindCls <- getClass bindClassName
+  mReturnCls <- getClass returnClassName
+  mApplicativeCls <- getClass applicativeClassName
+  case (mBindCls, mReturnCls, mApplicativeCls) of
+    (Just bindCls, Just returnCls, Just applicativeCls) -> do
+      wantedCts <- getWantedConstraints
+      solveConstraints [bindCls, returnCls, applicativeCls] wantedCts
+    _ -> throwPluginError "Missing 'Bind', 'Return' or 'Applicative' class!"
   
 
 noResult :: TcPluginResult
