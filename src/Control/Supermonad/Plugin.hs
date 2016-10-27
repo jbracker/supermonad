@@ -6,7 +6,9 @@
 module Control.Supermonad.Plugin
   ( plugin ) where
 
+import Data.Maybe ( isJust, isNothing, fromJust )
 import Data.Foldable ( foldrM )
+import Control.Monad ( forM )
 
 import Plugins ( Plugin(tcPlugin), defaultPlugin )
 import TcRnTypes
@@ -14,6 +16,7 @@ import TcRnTypes
   , TcPlugin(..), TcPluginResult(..) )
 import TcPluginM ( TcPluginM )
 import Outputable ( SDoc, hang, text, vcat, ($$) )
+import qualified Outputable as O
 import Module ( Module )
 
 import Control.Supermonad.Plugin.Utils ( errIndent )
@@ -84,17 +87,18 @@ supermonadSolve _s given derived wanted = do
   runSupermonadPluginAndReturn (given ++ derived) wanted initSupermonadPlugin $ do
       printMsg "Invoke supermonad plugin..."
       
-      mBindCls <- getClass bindClassName
-      mReturnCls <- getClass returnClassName
-      mApplicativeCls <- getClass applicativeClassName
-      
-      case (mBindCls, mReturnCls, mApplicativeCls) of
-        
-        (Just bindCls, Just returnCls, Just applicativeCls) -> do
+      forM solvingGroups $ \solvingGroup -> do
+        mClss <- forM solvingGroup $ \clsName -> do
+          mCls <- getClass clsName
+          return (clsName, mCls)
+        if all (isJust . snd) mClss then do 
           wantedCts <- getWantedConstraints
-          solveConstraints [bindCls, returnCls, applicativeCls] wantedCts
-        
-        _ -> throwPluginError "Missing 'Bind', 'Return' or 'Applicative' class!"
+          solveConstraints (fmap (fromJust . snd) mClss) wantedCts
+        else do
+          throwPluginErrorSDoc $ O.hang (O.text "Missing classes:") errIndent 
+                               $ O.hcat $ O.punctuate (O.text ", ") 
+                               $ fmap (O.quotes . O.text . fst) 
+                               $ filter (isNothing . snd) mClss  
 
 -- -----------------------------------------------------------------------------
 -- Supermonad specific initialization
