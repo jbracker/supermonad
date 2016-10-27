@@ -186,12 +186,15 @@ getClassName cls = getTyConName $ classTyCon cls
 atIndex :: [a] -> Int -> Maybe a
 atIndex xs i = listToMaybe $ drop i xs
 
+-- | Select first element of triple.
 t1st :: (a, b, c) -> a
 t1st (a, _, _) = a
 
+-- | Select second element of triple.
 t2nd :: (a, b, c) -> b
 t2nd (_, b, _) = b
 
+-- | Select thrid element of triple.
 t3rd :: (a, b, c) -> c
 t3rd (_, _, c) = c
 

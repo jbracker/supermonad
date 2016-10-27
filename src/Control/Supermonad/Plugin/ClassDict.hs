@@ -12,6 +12,8 @@ import qualified Data.Map.Strict as M
 import Class ( Class )
 import InstEnv ( ClsInst(..) )
 
+-- | Dictionary type to lookup classes and their available instances based
+--   on string identifiers.
 newtype ClassDict = ClassDict (M.Map String (Class, [ClsInst]))
 
 -- | The empty class dictionary.
