@@ -6,6 +6,8 @@
 module Control.Supermonad.Plugin
   ( plugin ) where
 
+import Data.Foldable ( foldrM )
+
 import Plugins ( Plugin(tcPlugin), defaultPlugin )
 import TcRnTypes
   ( Ct(..)
@@ -41,7 +43,8 @@ import Control.Supermonad.Plugin.Detect
   , findMonoTopTyConInstances
   , defaultFindEitherModuleErrMsg )
 import Control.Supermonad.Plugin.Names
-  ( supermonadModuleName, supermonadCtModuleName
+  ( PluginClassName
+  , supermonadModuleName, supermonadCtModuleName
   , supermonadPreludeModuleName, supermonadCtPreludeModuleName
   , bindClassName, returnClassName, applicativeClassName )
 
@@ -97,6 +100,20 @@ supermonadSolve _s given derived wanted = do
 -- Supermonad specific initialization
 -- -----------------------------------------------------------------------------
 
+-- | Configure which groups of classes need to be solved together.
+solvingGroups :: [[PluginClassName]]
+solvingGroups = 
+  [ [ bindClassName, returnClassName, applicativeClassName ] -- Supermonad group
+  ]
+
+-- | Configure the classes the plugin works with.
+pluginClassQueries :: [ClassQuery]
+pluginClassQueries = [ supermonadClassQuery ]
+
+-- | Configure which instance implications the plugin needs to verify.
+pluginInstanceImplications :: ClassDict -> [InstanceImplication]
+pluginInstanceImplications clsDict = supermonadInstanceImplications clsDict
+
 -- | Queries the module providing the supermonad classes.
 supermonadModuleQuery :: ModuleQuery
 supermonadModuleQuery = EitherModule
@@ -145,11 +162,11 @@ initSupermonadPlugin = do
   
   -- Find the supermonad classes and instances and add the to the class dictionary.
   oldClsDict <- getClassDictionary
-  newClsDict <- findClassesAndInstancesInScope supermonadClassQuery oldClsDict
+  newClsDict <- foldrM findClassesAndInstancesInScope oldClsDict pluginClassQueries
   
   -- Calculate the supermonads in scope and check for rogue bind and return instances.
   let smInsts = findMonoTopTyConInstances newClsDict
-  let smErrors = fmap snd $ checkInstances newClsDict smInsts (supermonadInstanceImplications newClsDict)
+  let smErrors = fmap snd $ checkInstances newClsDict smInsts (pluginInstanceImplications newClsDict)
   
   -- Try to construct the environment or throw errors
   case smErrors of
