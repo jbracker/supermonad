@@ -8,7 +8,10 @@ module Control.Supermonad.Plugin.Environment.Lift
   , produceEvidenceFor
   , isPotentiallyInstantiatedCt
   -- * From 'Control.Supermonad.Plugin.Utils'
-  , partiallyApplyTyCons ) where
+  , partiallyApplyTyCons
+  -- * From 'Control.Supermonad.Plugin.Detect'
+  , findClassesAndInstancesInScope
+  ) where
 
 import TcRnTypes ( Ct )
 import TcEvidence ( EvTerm )
@@ -21,11 +24,14 @@ import Control.Supermonad.Plugin.Environment
   ( SupermonadPluginM
   , runTcPlugin
   , getGivenConstraints
+  , getClassDictionary
+  , throwPluginErrorSDoc
   )
+import Control.Supermonad.Plugin.ClassDict ( ClassDict, insertClsDict )
 
 import qualified Control.Supermonad.Plugin.Utils as U
+import qualified Control.Supermonad.Plugin.Detect as D
 import qualified Control.Supermonad.Plugin.Evidence as E
-import Control.Supermonad.Plugin.Constraint ( isClassConstraint )
 
 -- | See 'E.produceEvidenceForCt'.
 produceEvidenceForCt :: Ct -> SupermonadPluginM s (Either SDoc EvTerm)
@@ -49,3 +55,16 @@ isPotentiallyInstantiatedCt ct assoc = do
 partiallyApplyTyCons :: [(TyVar, Either TyCon TyVar)] -> SupermonadPluginM s (Either SDoc [(TyVar, Type, [TyVar])])
 partiallyApplyTyCons = runTcPlugin . U.partiallyApplyTyCons
 
+-- | See 'D.findClassesAndInstancesInScope'. In addition to calling the 
+--   function from the @Detect@ module it also throws an error if the call
+--   fails and inserts the found classes and instances into the environments 
+--   class dictionary and return the updated dictionary.
+findClassesAndInstancesInScope :: D.ClassQuery -> SupermonadPluginM s ClassDict
+findClassesAndInstancesInScope clsQuery = do
+  eFoundClsInsts <- runTcPlugin $ D.findClassesAndInstancesInScope clsQuery
+  foundClsInsts <- case eFoundClsInsts of
+    Right clsInsts -> return clsInsts
+    Left errMsg -> throwPluginErrorSDoc errMsg
+  
+  oldClsDict <- getClassDictionary
+  return $ foldr (\(clsName, cls, clsInsts) -> insertClsDict clsName cls clsInsts) oldClsDict foundClsInsts
