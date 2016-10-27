@@ -5,6 +5,7 @@ module Control.Supermonad.Plugin.Environment
   ( -- * Supermonad Plugin Monad
     SupermonadPluginM
   , runSupermonadPlugin
+  , runSupermonadPluginAndReturn
   , runTcPlugin
     -- * Supermonad Plugin Environment Access
   , getGivenConstraints, getWantedConstraints
@@ -38,7 +39,7 @@ import Class ( Class )
 import InstEnv ( InstEnvs, ClsInst )
 import Type ( TyVar, Type )
 import TyCon ( TyCon )
-import TcRnTypes ( Ct )
+import TcRnTypes ( Ct, TcPluginResult(..) )
 import TcPluginM ( TcPluginM, tcPluginIO )
 import qualified TcPluginM
 import Outputable ( Outputable )
@@ -50,7 +51,8 @@ import qualified Control.Supermonad.Plugin.Log as L
 import Control.Supermonad.Plugin.Names ( PluginClassName )
 import Control.Supermonad.Plugin.Constraint
   ( GivenCt, WantedCt
-  , constraintSourceLocation )
+  , constraintSourceLocation
+  , mkDerivedTypeEqCt, mkDerivedTypeEqCtOfTypes )
 import Control.Supermonad.Plugin.ClassDict
   ( ClassDict
   , emptyClsDict
@@ -93,6 +95,34 @@ data SupermonadPluginState s = SupermonadPluginState
   -- ^ Custom state of the environment.
   }
 
+-- | Runs the given supermonad plugin solver within the type checker plugin 
+--   monad. Handles errors and produces a plugin result based on the environment.
+runSupermonadPluginAndReturn 
+  :: [GivenCt] -- ^ /Given/ and /derived/ constraints. 
+  -> [WantedCt] -- ^ /Wanted/ constraints.
+  -> SupermonadPluginM () (ClassDict, s) -- ^ Initialize the custom state of the plugin.
+  -> SupermonadPluginM s a -- ^ Plugin code to run. Result value is ignored.
+  -> TcPluginM TcPluginResult -- ^ The plugin result.
+runSupermonadPluginAndReturn givenCts wantedCts initStateM pluginM = do
+  eResult <- runSupermonadPlugin givenCts wantedCts initStateM $ do
+    if not $ null wantedCts then do
+      _ <- pluginM
+      
+      tyVarEqs <- getTyVarEqualities
+      let tyVarEqCts = fmap (\(baseCt, tv, ty) -> mkDerivedTypeEqCt baseCt tv ty) tyVarEqs
+      
+      tyEqs <- getTypeEqualities
+      let tyEqCts = fmap (\(baseCt, ta, tb) -> mkDerivedTypeEqCtOfTypes baseCt ta tb) tyEqs
+      
+      return $ TcPluginOk [] $ tyVarEqCts ++ tyEqCts
+    else
+      return $ TcPluginOk [] [] -- No result
+  case eResult of
+    Left err -> do
+      L.printErr $ L.sDocToStr err
+      return $ TcPluginOk [] [] -- No result
+    Right solution -> return solution
+  
 -- | Runs the given supermonad plugin solver within the type checker plugin 
 --   monad.
 runSupermonadPlugin 

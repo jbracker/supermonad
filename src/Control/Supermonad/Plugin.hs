@@ -15,7 +15,6 @@ import Outputable ( SDoc, hang, text, vcat, ($$) )
 import Module ( Module )
 
 import Control.Supermonad.Plugin.Utils ( errIndent )
-import Control.Supermonad.Plugin.Log ( sDocToStr )
 import qualified Control.Supermonad.Plugin.Log as L
 import Control.Supermonad.Plugin.InstanceDict ( InstanceDict )
 import Control.Supermonad.Plugin.ClassDict ( ClassDict, insertClsDict )
@@ -23,7 +22,7 @@ import Control.Supermonad.Plugin.Solving
   ( solveConstraints )
 import Control.Supermonad.Plugin.Environment
   ( SupermonadPluginM
-  , runSupermonadPlugin, runTcPlugin
+  , runSupermonadPluginAndReturn, runTcPlugin
   , getWantedConstraints
   , getClass, getClassDictionary
   , throwPluginError, throwPluginErrorSDoc
@@ -42,8 +41,6 @@ import Control.Supermonad.Plugin.Detect
   , findModuleByQuery
   , findMonoTopTyConInstances
   , defaultFindEitherModuleErrMsg )
-import Control.Supermonad.Plugin.Constraint 
-  ( mkDerivedTypeEqCt, mkDerivedTypeEqCtOfTypes )
 import Control.Supermonad.Plugin.Names
   ( supermonadModuleName, supermonadCtModuleName
   , supermonadPreludeModuleName, supermonadCtPreludeModuleName
@@ -82,46 +79,20 @@ supermonadStop _s = return ()
 -- | The plugin code wrapper. Handles execution of the monad stack.
 supermonadSolve :: SupermonadState -> [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginResult
 supermonadSolve _s given derived wanted = do
-  res <- runSupermonadPlugin (given ++ derived) wanted initSupermonadPlugin $
-    if not $ null wanted then do
+  runSupermonadPluginAndReturn (given ++ derived) wanted initSupermonadPlugin $ do
       printMsg "Invoke supermonad plugin..."
-      supermonadSolve'
       
-      tyVarEqs <- getTyVarEqualities
-      let tyVarEqCts = fmap (\(baseCt, tv, ty) -> mkDerivedTypeEqCt baseCt tv ty) tyVarEqs
+      mBindCls <- getClass bindClassName
+      mReturnCls <- getClass returnClassName
+      mApplicativeCls <- getClass applicativeClassName
       
-      tyEqs <- getTypeEqualities
-      let tyEqCts = fmap (\(baseCt, ta, tb) -> mkDerivedTypeEqCtOfTypes baseCt ta tb) tyEqs
-      
-      return $ TcPluginOk [] $ tyVarEqCts ++ tyEqCts
-    else 
-      return noResult
-  case res of
-    Left err -> do
-      L.printErr $ sDocToStr err
-      return noResult
-    Right solution -> return solution
-
--- | The actual plugin code.
-supermonadSolve' :: SupermonadPluginM InstanceDict ()
-supermonadSolve' = do
-  --(getWantedConstraints >>= filterM isBindConstraint) >>= (printConstraints . sortConstraintsByLine)
-  --(getWantedConstraints >>= filterM isReturnConstraint) >>= (printConstraints . sortConstraintsByLine)
-  --getGivenConstraints >>= (printConstraints . sortConstraintsByLine)
-  
-  mBindCls <- getClass bindClassName
-  mReturnCls <- getClass returnClassName
-  mApplicativeCls <- getClass applicativeClassName
-  case (mBindCls, mReturnCls, mApplicativeCls) of
-    (Just bindCls, Just returnCls, Just applicativeCls) -> do
-      wantedCts <- getWantedConstraints
-      solveConstraints [bindCls, returnCls, applicativeCls] wantedCts
-    _ -> throwPluginError "Missing 'Bind', 'Return' or 'Applicative' class!"
-  
-
-noResult :: TcPluginResult
-noResult = TcPluginOk [] []
-
+      case (mBindCls, mReturnCls, mApplicativeCls) of
+        
+        (Just bindCls, Just returnCls, Just applicativeCls) -> do
+          wantedCts <- getWantedConstraints
+          solveConstraints [bindCls, returnCls, applicativeCls] wantedCts
+        
+        _ -> throwPluginError "Missing 'Bind', 'Return' or 'Applicative' class!"
 
 -- -----------------------------------------------------------------------------
 -- Supermonad specific initialization
