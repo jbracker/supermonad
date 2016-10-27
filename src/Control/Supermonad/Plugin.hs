@@ -15,9 +15,9 @@ import Outputable ( SDoc, hang, text, vcat, ($$) )
 import Module ( Module )
 
 import Control.Supermonad.Plugin.Utils ( errIndent )
-import qualified Control.Supermonad.Plugin.Log as L
+--import qualified Control.Supermonad.Plugin.Log as L
 import Control.Supermonad.Plugin.InstanceDict ( InstanceDict )
-import Control.Supermonad.Plugin.ClassDict ( ClassDict, insertClsDict )
+import Control.Supermonad.Plugin.ClassDict ( ClassDict )
 import Control.Supermonad.Plugin.Solving
   ( solveConstraints )
 import Control.Supermonad.Plugin.Environment
@@ -26,7 +26,6 @@ import Control.Supermonad.Plugin.Environment
   , getWantedConstraints
   , getClass, getClassDictionary
   , throwPluginError, throwPluginErrorSDoc
-  , getTypeEqualities, getTyVarEqualities
   , printMsg
   -- , printObj, printConstraints
   )
@@ -144,8 +143,9 @@ initSupermonadPlugin = do
     Right smMdl -> return smMdl
     Left mdlErrMsg -> throwPluginErrorSDoc mdlErrMsg
   
-  -- Find the supermonad classes and instances.
-  newClsDict <- findClassesAndInstancesInScope supermonadClassQuery
+  -- Find the supermonad classes and instances and add the to the class dictionary.
+  oldClsDict <- getClassDictionary
+  newClsDict <- findClassesAndInstancesInScope supermonadClassQuery oldClsDict
   
   -- Calculate the supermonads in scope and check for rogue bind and return instances.
   let smInsts = findMonoTopTyConInstances newClsDict

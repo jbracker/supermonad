@@ -24,7 +24,6 @@ import Control.Supermonad.Plugin.Environment
   ( SupermonadPluginM
   , runTcPlugin
   , getGivenConstraints
-  , getClassDictionary
   , throwPluginErrorSDoc
   )
 import Control.Supermonad.Plugin.ClassDict ( ClassDict, insertClsDict )
@@ -57,14 +56,12 @@ partiallyApplyTyCons = runTcPlugin . U.partiallyApplyTyCons
 
 -- | See 'D.findClassesAndInstancesInScope'. In addition to calling the 
 --   function from the @Detect@ module it also throws an error if the call
---   fails and inserts the found classes and instances into the environments 
---   class dictionary and return the updated dictionary.
-findClassesAndInstancesInScope :: D.ClassQuery -> SupermonadPluginM s ClassDict
-findClassesAndInstancesInScope clsQuery = do
+--   fails. Otherwise, inserts the found classes and instances into the provided 
+--   class dictionary and returns the updated dictionary.
+findClassesAndInstancesInScope :: D.ClassQuery -> ClassDict -> SupermonadPluginM s ClassDict
+findClassesAndInstancesInScope clsQuery oldClsDict = do
   eFoundClsInsts <- runTcPlugin $ D.findClassesAndInstancesInScope clsQuery
   foundClsInsts <- case eFoundClsInsts of
     Right clsInsts -> return clsInsts
     Left errMsg -> throwPluginErrorSDoc errMsg
-  
-  oldClsDict <- getClassDictionary
   return $ foldr (\(clsName, cls, clsInsts) -> insertClsDict clsName cls clsInsts) oldClsDict foundClsInsts
