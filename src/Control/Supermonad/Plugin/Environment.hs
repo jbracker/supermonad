@@ -7,7 +7,6 @@ module Control.Supermonad.Plugin.Environment
   , runSupermonadPlugin
   , runTcPlugin
     -- * Supermonad Plugin Environment Access
-  , initSupermonadPlugin
   , getGivenConstraints, getWantedConstraints
   , getInstEnvs
   , getClassDictionary
@@ -52,17 +51,9 @@ import Control.Supermonad.Plugin.Names ( PluginClassName )
 import Control.Supermonad.Plugin.Constraint
   ( GivenCt, WantedCt
   , constraintSourceLocation )
-import Control.Supermonad.Plugin.Detect
-  ( findModuleByQuery
-  , supermonadModuleQuery
-  , supermonadClassQuery
-  , findMonoTopTyConInstances
-  , checkSupermonadInstances
-  , findClassesAndInstancesInScope )
-import Control.Supermonad.Plugin.Utils ( errIndent )
 import Control.Supermonad.Plugin.ClassDict
   ( ClassDict
-  , insertClsDict, emptyClsDict
+  , emptyClsDict
   , lookupClsDictClass )
 import Control.Supermonad.Plugin.InstanceDict
   ( InstanceDict, lookupInstDict )
@@ -101,34 +92,6 @@ data SupermonadPluginState s = SupermonadPluginState
   , smStateCustom :: s
   -- ^ Custom state of the environment.
   }
-
-initSupermonadPlugin :: SupermonadPluginM () (ClassDict, InstanceDict)
-initSupermonadPlugin = do
-  -- Determine if the supermonad module is available.
-  eSupermonadMdl <- runTcPlugin $ findModuleByQuery supermonadModuleQuery
-  _supermonadMdl <- case eSupermonadMdl of
-    Right smMdl -> return smMdl
-    Left mdlErrMsg -> throwPluginErrorSDoc mdlErrMsg
-  
-  -- Find the supermonad classes and instances.
-  eFoundClsInsts <- runTcPlugin $ findClassesAndInstancesInScope supermonadClassQuery
-  foundClsInsts <- case eFoundClsInsts of
-    Right clsInsts -> return clsInsts
-    Left errMsg -> throwPluginErrorSDoc errMsg
-  
-  -- Construct the initialized class dictionary.
-  oldClsDict <- getClassDictionary
-  let newClsDict = foldr (\(clsName, cls, clsInsts) -> insertClsDict clsName cls clsInsts) oldClsDict foundClsInsts
-  
-  -- Calculate the supermonads in scope and check for rogue bind and return instances.
-  let smInsts = findMonoTopTyConInstances newClsDict
-  let smErrors = fmap snd $ checkSupermonadInstances newClsDict smInsts
-  
-  -- Try to construct the environment or throw errors
-  case smErrors of
-    [] -> return (newClsDict, smInsts)
-    _ -> do
-      throwPluginErrorSDoc $ O.hang (O.text "Problems when finding supermonad instances:") errIndent $ O.vcat smErrors
 
 -- | Runs the given supermonad plugin solver within the type checker plugin 
 --   monad.

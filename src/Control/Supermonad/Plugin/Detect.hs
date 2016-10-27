@@ -6,6 +6,7 @@ module Control.Supermonad.Plugin.Detect
     ModuleQuery(..)
   , findModuleByQuery
   , findModule
+  , defaultFindEitherModuleErrMsg
     -- * Searching for Classes
   , ClassQuery(..)
   , findClassesByQuery
@@ -15,13 +16,15 @@ module Control.Supermonad.Plugin.Detect
   , findInstancesInScope
   , findClassAndInstancesInScope
   , findClassesAndInstancesInScope
+  , findMonoTopTyConInstances
+    -- * Instance implications
+  , InstanceImplication
+  , (===>), (<==>)
+  , clsDictInstImp, clsDictInstEquiv
+  , checkInstanceImplications
+  , checkInstances
     -- * Supermonad class detection
   , BindInst, ApplicativeInst, ReturnInst
-  , supermonadModuleQuery
-  , supermonadClassQuery
-  , supermonadInstanceImplications
-  , findMonoTopTyConInstances
-  , checkSupermonadInstances
   ) where
 
 import Data.List  ( find )
@@ -93,32 +96,6 @@ import Control.Supermonad.Plugin.Names
 -- Supermonad Class Detection
 -- -----------------------------------------------------------------------------
 
-findSupermonadModulesErrMsg :: [Either SDoc Module] -> SDoc
-findSupermonadModulesErrMsg [Left errA, Left errB] = 
-  hang (text "Could not find supermonad or constrained supermonad modules!") errIndent (errA $$ errB)
-findSupermonadModulesErrMsg [Right _mdlA, Right _mdlB] =
-  text "Found unconstrained and constrained supermonad modules!"
-findSupermonadModulesErrMsg mdls = defaultFindEitherModuleErrMsg mdls
-
--- | Queries the module providing the supermonad classes.
-supermonadModuleQuery :: ModuleQuery
-supermonadModuleQuery = EitherModule
-  [ AnyModule [ ThisModule supermonadModuleName Nothing
-              , ThisModule supermonadPreludeModuleName Nothing
-              ]
-  , AnyModule [ ThisModule supermonadCtModuleName Nothing
-              , ThisModule supermonadCtPreludeModuleName Nothing
-              ]
-  ] $ Just findSupermonadModulesErrMsg
-
--- | Queries the supermonad classes.
-supermonadClassQuery :: ClassQuery
-supermonadClassQuery = ClassQuery supermonadModuleQuery 
-  [ (bindClassName       , 3)
-  , (returnClassName     , 1)
-  , (applicativeClassName, 3)
-  ]
-
 -- | Type of @Bind@ instances.
 type BindInst = ClsInst
 -- | Type of @Applicative@ instances.
@@ -148,15 +125,6 @@ clsDictInstEquiv clsDict caName cbName = do
   clsA <- maybeToList $ lookupClsDictClass caName clsDict
   clsB <- maybeToList $ lookupClsDictClass cbName clsDict
   clsA <==> clsB
-  
-supermonadInstanceImplications :: ClassDict -> [InstanceImplication]
-supermonadInstanceImplications clsDict =
-    (applicativeClassName <=> returnClassName) ++
-    (bindClassName        ==> returnClassName)
-  where
-    (==>) = clsDictInstImp clsDict
-    (<=>) = clsDictInstEquiv clsDict
-  
 
 checkInstanceImplications :: InstanceDict -> [InstanceImplication] -> [((TyCon,Class), SDoc)]
 checkInstanceImplications _instDict [] = []
@@ -175,19 +143,18 @@ checkInstanceImplications instDict (imp : imps) = do
 
 -- | Check if there are any supermonad instances that clearly 
 --   do not belong to a specific supermonad.
-checkSupermonadInstances {-
-  :: (Class, [BindInst]) -- ^ The @Bind@ class and instances.
-  -> (Class, [ApplicativeInst]) -- ^ The @Applicative@ class and instances.
-  -> (Class, [ReturnInst]) -- ^ The @Return@ class and instances.
-    -}
+checkInstances
   :: ClassDict
+  -- ^ The class dictionary to lookup instances of specific classes.
   -> InstanceDict
   -- ^ The instance dictionary to check for validity.
-  --   This should be the instance calculated by 'findMonoTopTyConInstances'
+  --   This should be the instances calculated by 'findMonoTopTyConInstances'
   --   from the given class dict. If not the validity of the checks cannot be
   --   guarenteed.
+  -> [InstanceImplication]
+  -- ^ The instance implications to check on the given instance dictionary.
   -> [(Either (TyCon, Class) ClsInst, SDoc)]
-checkSupermonadInstances clsDict instDict = 
+checkInstances clsDict instDict instImplications = 
   monoCheckErrMsgs ++ polyCheckErrMsgs
   where 
     -- Check if all instances for each supermonad type constructor exist.
@@ -195,7 +162,7 @@ checkSupermonadInstances clsDict instDict =
     monoCheckErrMsgs = fmap (\(tc, msg) -> (Left tc, msg)) 
                      $ removeDupByIndex
                      $ checkInstanceImplications instDict 
-                     $ supermonadInstanceImplications clsDict
+                     $ instImplications
    
     -- Check if there are any instance that involve different type constructors...
     polyCheckErrMsgs :: [(Either (TyCon, Class) ClsInst, SDoc)]
