@@ -13,6 +13,7 @@ import qualified Data.Map.Strict as M
 import Class ( Class )
 import InstEnv ( ClsInst )
 import TyCon ( TyCon )
+import qualified Outputable as O
 
 -- | A dictionary associating supermonad type constructors and classes with 
 --   their instances.
@@ -23,6 +24,9 @@ newtype InstanceDict = InstanceDict (M.Map (TyCon, Class) ClsInst)
 instance Monoid InstanceDict where
   mappend (InstanceDict a) (InstanceDict b) = InstanceDict $ mappend a b
   mempty = emptyInstDict
+
+instance O.Outputable InstanceDict where
+  ppr (InstanceDict instDict) = O.text "InstanceDict " O.<> O.parens (O.ppr instDict)
 
 -- | The empty instance dictionary.
 emptyInstDict :: InstanceDict

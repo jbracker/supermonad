@@ -11,10 +11,19 @@ import qualified Data.Map.Strict as M
 
 import Class ( Class )
 import InstEnv ( ClsInst(..) )
+import qualified Outputable as O
 
 -- | Dictionary type to lookup classes and their available instances based
 --   on string identifiers.
 newtype ClassDict = ClassDict (M.Map String (Class, [ClsInst]))
+
+-- | See 'M.union'.
+instance Monoid ClassDict where
+  mempty = emptyClsDict
+  mappend (ClassDict clsDictA) (ClassDict clsDictB) = ClassDict $ mappend clsDictA clsDictB
+
+instance O.Outputable ClassDict where
+  ppr (ClassDict clsDict) = O.text "ClassDict " O.<> O.parens (O.ppr clsDict)
 
 -- | The empty class dictionary.
 emptyClsDict :: ClassDict
