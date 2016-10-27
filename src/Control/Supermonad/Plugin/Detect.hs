@@ -22,6 +22,7 @@ module Control.Supermonad.Plugin.Detect
   , (===>), (<==>)
   , clsDictInstImp, clsDictInstEquiv
   , checkInstanceImplications
+    -- * Validation
   , checkInstances
     -- * Supermonad class detection
   , BindInst, ApplicativeInst, ReturnInst
@@ -92,10 +93,6 @@ import Control.Supermonad.Plugin.InstanceDict
   , lookupInstDictByTyCon )
 import Control.Supermonad.Plugin.Names
 
--- -----------------------------------------------------------------------------
--- Supermonad Class Detection
--- -----------------------------------------------------------------------------
-
 -- | Type of @Bind@ instances.
 type BindInst = ClsInst
 -- | Type of @Applicative@ instances.
@@ -103,43 +100,9 @@ type ApplicativeInst = ClsInst
 -- | Type of @Return@ instance.
 type ReturnInst = ClsInst  
 
-data InstanceImplication = InstanceImplies Class Class
-
-infix 7 ===>
-infix 7 <==>
-
-(===>) :: Class -> Class -> [InstanceImplication]
-(===>) ca cb = [InstanceImplies ca cb]
-
-(<==>) :: Class -> Class -> [InstanceImplication]
-(<==>) ca cb = ca ===> cb ++ cb ===> ca
-
-clsDictInstImp :: ClassDict -> PluginClassName -> PluginClassName -> [InstanceImplication]
-clsDictInstImp clsDict caName cbName = do
-  clsA <- maybeToList $ lookupClsDictClass caName clsDict
-  clsB <- maybeToList $ lookupClsDictClass cbName clsDict
-  clsA ===> clsB
-
-clsDictInstEquiv :: ClassDict -> PluginClassName -> PluginClassName -> [InstanceImplication]
-clsDictInstEquiv clsDict caName cbName = do
-  clsA <- maybeToList $ lookupClsDictClass caName clsDict
-  clsB <- maybeToList $ lookupClsDictClass cbName clsDict
-  clsA <==> clsB
-
-checkInstanceImplications :: InstanceDict -> [InstanceImplication] -> [((TyCon,Class), SDoc)]
-checkInstanceImplications _instDict [] = []
-checkInstanceImplications instDict (imp : imps) = do
-  tc <- S.toList $ allInstDictTyCons instDict
-  let tcDict = lookupInstDictByTyCon tc instDict
-  case imp of
-    InstanceImplies ca cb -> case (M.member ca tcDict, M.member cb tcDict) of
-      (False, _    ) -> rest
-      (True , True ) -> rest
-      (True , False) -> 
-        let errMsg = text $ "There is no unique instance of '" ++ getClassName cb ++ "' for the type '" ++ getTyConName tc ++ "'!"
-        in ((tc,cb), errMsg) : rest
-  where
-    rest = checkInstanceImplications instDict imps
+-- -----------------------------------------------------------------------------
+-- Validation
+-- -----------------------------------------------------------------------------
 
 -- | Check if there are any supermonad instances that clearly 
 --   do not belong to a specific supermonad.
@@ -170,40 +133,6 @@ checkInstances clsDict instDict instImplications =
       (cls, insts) <- allClsDictEntries clsDict
       polyInst <- filter (isPolyTyConInstance cls) insts
       return (Right polyInst, text "Instance involves more then one top-level type constructor: " $$ ppr polyInst)
-    
-
--- | Constructs the map between type constructors and their supermonad instances.
---   It essentially collects all of the instances that only use a single top-level
---   constructor and stores them in the instance dictionary. If there are several
---   instances for a single type constructor none is added to the dictionary.
---   This function only searches for the instances and constructs the lookup table.
-findMonoTopTyConInstances
-  :: ClassDict
-  -- ^ The set of classes and instances to calculate the instance dictionary from.
-  -> InstanceDict
-  -- ^ Association between type constructors and their supermonad instances.
-findMonoTopTyConInstances clsDict =
-  mconcat $ do
-    tc <- supermonadTyCons
-    (cls, insts) <- dictEntries
-    return $ findMonoClassInstance tc cls insts
-  where
-    dictEntries :: [(Class, [ClsInst])]
-    dictEntries = allClsDictEntries clsDict
-    
-    -- Collect all type constructors that are used for supermonads
-    supermonadTyCons :: [TyCon]
-    supermonadTyCons = S.toList 
-                       $ S.unions
-                       $ fmap instanceTopTyCons
-                       $ concat $ fmap snd dictEntries
-    
-    findMonoClassInstance :: TyCon -> Class -> [ClsInst] -> InstanceDict
-    findMonoClassInstance tc cls insts = 
-      case filter (isMonoTyConInstance tc cls) insts of
-        [foundInst] -> insertInstDict tc cls foundInst $ emptyInstDict
-        _ -> emptyInstDict
-
 
 -- -----------------------------------------------------------------------------
 -- Searching for Modules
@@ -389,9 +318,79 @@ findInstancesInScope cls = do
   instEnvs <- TcPluginM.getInstEnvs
   return $ classInstances instEnvs cls
 
+-- | Constructs the map between type constructors and their supermonad instances.
+--   It essentially collects all of the instances that only use a single top-level
+--   constructor and stores them in the instance dictionary. If there are several
+--   instances for a single type constructor none is added to the dictionary.
+--   This function only searches for the instances and constructs the lookup table.
+findMonoTopTyConInstances
+  :: ClassDict
+  -- ^ The set of classes and instances to calculate the instance dictionary from.
+  -> InstanceDict
+  -- ^ Association between type constructors and their supermonad instances.
+findMonoTopTyConInstances clsDict =
+  mconcat $ do
+    tc <- supermonadTyCons
+    (cls, insts) <- dictEntries
+    return $ findMonoClassInstance tc cls insts
+  where
+    dictEntries :: [(Class, [ClsInst])]
+    dictEntries = allClsDictEntries clsDict
+    
+    -- Collect all type constructors that are used for supermonads
+    supermonadTyCons :: [TyCon]
+    supermonadTyCons = S.toList 
+                       $ S.unions
+                       $ fmap instanceTopTyCons
+                       $ concat $ fmap snd dictEntries
+    
+    findMonoClassInstance :: TyCon -> Class -> [ClsInst] -> InstanceDict
+    findMonoClassInstance tc cls insts = 
+      case filter (isMonoTyConInstance tc cls) insts of
+        [foundInst] -> insertInstDict tc cls foundInst $ emptyInstDict
+        _ -> emptyInstDict
 
+-- -----------------------------------------------------------------------------
+-- Instance implications
+-- -----------------------------------------------------------------------------
 
+data InstanceImplication = InstanceImplies Class Class
 
+infix 7 ===>
+infix 7 <==>
+
+(===>) :: Class -> Class -> [InstanceImplication]
+(===>) ca cb = [InstanceImplies ca cb]
+
+(<==>) :: Class -> Class -> [InstanceImplication]
+(<==>) ca cb = ca ===> cb ++ cb ===> ca
+
+clsDictInstImp :: ClassDict -> PluginClassName -> PluginClassName -> [InstanceImplication]
+clsDictInstImp clsDict caName cbName = do
+  clsA <- maybeToList $ lookupClsDictClass caName clsDict
+  clsB <- maybeToList $ lookupClsDictClass cbName clsDict
+  clsA ===> clsB
+
+clsDictInstEquiv :: ClassDict -> PluginClassName -> PluginClassName -> [InstanceImplication]
+clsDictInstEquiv clsDict caName cbName = do
+  clsA <- maybeToList $ lookupClsDictClass caName clsDict
+  clsB <- maybeToList $ lookupClsDictClass cbName clsDict
+  clsA <==> clsB
+
+checkInstanceImplications :: InstanceDict -> [InstanceImplication] -> [((TyCon,Class), SDoc)]
+checkInstanceImplications _instDict [] = []
+checkInstanceImplications instDict (imp : imps) = do
+  tc <- S.toList $ allInstDictTyCons instDict
+  let tcDict = lookupInstDictByTyCon tc instDict
+  case imp of
+    InstanceImplies ca cb -> case (M.member ca tcDict, M.member cb tcDict) of
+      (False, _    ) -> rest
+      (True , True ) -> rest
+      (True , False) -> 
+        let errMsg = text $ "There is no unique instance of '" ++ getClassName cb ++ "' for the type '" ++ getTyConName tc ++ "'!"
+        in ((tc,cb), errMsg) : rest
+  where
+    rest = checkInstanceImplications instDict imps
 
 
 
