@@ -3,13 +3,13 @@
 --   that are lifted into 'SupermonadPluginM'.
 module Control.Supermonad.Plugin.Environment.Lift
   (
-  -- * From 'Control.Supermonad.Plugin.Evidence'
+  -- * From "Control.Supermonad.Plugin.Evidence"
     produceEvidenceForCt
   , produceEvidenceFor
   , isPotentiallyInstantiatedCt
-  -- * From 'Control.Supermonad.Plugin.Utils'
+  -- * From "Control.Supermonad.Plugin.Utils"
   , partiallyApplyTyCons
-  -- * From 'Control.Supermonad.Plugin.Detect'
+  -- * From "Control.Supermonad.Plugin.Detect"
   , findClassesAndInstancesInScope
   ) where
 

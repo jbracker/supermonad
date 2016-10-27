@@ -24,8 +24,6 @@ module Control.Supermonad.Plugin.Detect
   , checkInstanceImplications
     -- * Validation
   , checkInstances
-    -- * Supermonad class detection
-  , BindInst, ApplicativeInst, ReturnInst
   ) where
 
 import Data.List  ( find )
@@ -92,13 +90,6 @@ import Control.Supermonad.Plugin.InstanceDict
   , allInstDictTyCons
   , lookupInstDictByTyCon )
 import Control.Supermonad.Plugin.Names
-
--- | Type of @Bind@ instances.
-type BindInst = ClsInst
--- | Type of @Applicative@ instances.
-type ApplicativeInst = ClsInst
--- | Type of @Return@ instance.
-type ReturnInst = ClsInst  
 
 -- -----------------------------------------------------------------------------
 -- Validation
@@ -369,14 +360,14 @@ infix 7 <==>
 (<==>) :: Class -> Class -> [InstanceImplication]
 (<==>) ca cb = ca ===> cb ++ cb ===> ca
 
--- | Instance implication based on lookup of names in class dictionary. See '(===>)'.
+-- | Instance implication based on lookup of names in class dictionary. See '===>'.
 clsDictInstImp :: ClassDict -> PluginClassName -> PluginClassName -> [InstanceImplication]
 clsDictInstImp clsDict caName cbName = do
   clsA <- maybeToList $ lookupClsDictClass caName clsDict
   clsB <- maybeToList $ lookupClsDictClass cbName clsDict
   clsA ===> clsB
 
--- | Instance equivalence based on lookup of names in class dictionary. See '(<==>)'.
+-- | Instance equivalence based on lookup of names in class dictionary. See '<==>'.
 clsDictInstEquiv :: ClassDict -> PluginClassName -> PluginClassName -> [InstanceImplication]
 clsDictInstEquiv clsDict caName cbName = do
   clsA <- maybeToList $ lookupClsDictClass caName clsDict
