@@ -28,7 +28,7 @@ module Control.Supermonad.Plugin.Detect
 
 import Data.List  ( find )
 import Data.Either ( isLeft, isRight )
-import Data.Maybe ( isNothing, maybeToList )
+import Data.Maybe ( isJust, isNothing, fromJust, maybeToList )
 import Data.Set ( Set )
 import qualified Data.Set as S
 import qualified Data.Map as M
@@ -66,7 +66,7 @@ import InstEnv
   , classInstances )
 import PrelNames ( mAIN_NAME )
 import Outputable ( SDoc, ($$), text, vcat, ppr, hang )
---import qualified Outputable as O
+import qualified Outputable as O
 
 --import Control.Supermonad.Plugin.Log ( printObj, printObjTrace, printMsg )
 import Control.Supermonad.Plugin.Wrapper
@@ -145,15 +145,10 @@ data ModuleQuery
   --   the rest will be ignored. If no module could be found an error message
   --   will be returned.
 
-{- We don't actually need this.
--- | Defines the equality of module queries up to the error message construction
---   functions.
-instance Eq ModuleQuery where
-  (ThisModule mdlNameA unitIdA) == (ThisModule mdlNameB unitIdB) = mdlNameA == mdlNameB && unitIdA == unitIdB
-  (EitherModule qas _) == (EitherModule qbs _) = qas == qbs
-  (AnyModule qas) == (AnyModule qbs) = qas == qbs
-  _ == _ = False
--}
+instance O.Outputable ModuleQuery where
+  ppr (ThisModule mdlName mUnitId) = O.text mdlName O.<> (if isJust mUnitId then O.ppr (fromJust mUnitId) else O.text "")
+  ppr (EitherModule mdlQueries _errF) = O.text "XOR " O.<> (O.brackets $ O.hcat $ O.punctuate (O.text ", ") $ fmap O.ppr mdlQueries)
+  ppr (AnyModule mdlQueries) = O.text "OR " O.<> (O.brackets $ O.hcat $ O.punctuate (O.text ", ") $ fmap O.ppr mdlQueries)
 
 collectModuleNames :: ModuleQuery -> Set ModuleName
 collectModuleNames (ThisModule name _) = S.singleton $ mkModuleName name
@@ -235,6 +230,11 @@ defaultFindAnyModuleErrMsg mdlErrs = hang (text "Could not find any of the modul
 
 -- | Find a collection of classes in the given module.
 data ClassQuery = ClassQuery ModuleQuery [(PluginClassName, Arity)]
+
+instance O.Outputable ClassQuery where
+  ppr (ClassQuery mdlQuery clsNames)
+    = O.hang (O.text "In module:") errIndent (O.ppr mdlQuery) 
+    O.<> O.hang (O.text "find classes:") errIndent (O.ppr clsNames)
 
 -- | Search for a collection of classes using the given query.
 --   If any one of the classes could not be found an error is returned.
@@ -348,6 +348,9 @@ findMonoTopTyConInstances clsDict =
 -- | Representation of instance implying the existence of other instances that
 --   are using the same type constructor.
 data InstanceImplication = InstanceImplies Class Class
+
+instance O.Outputable InstanceImplication where
+  ppr (InstanceImplies ca cb) = O.text (getClassName ca) O.<> O.text " ===> " O.<> O.text (getClassName cb)
 
 infix 7 ===>
 infix 7 <==>
