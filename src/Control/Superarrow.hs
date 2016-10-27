@@ -102,12 +102,18 @@ class ArrowSelect f g where
 instance ArrowSelect (->) (->) where
   first = A.first
   second = A.second
+
 -- FIXME/TODO: Can we do this without using UndecidableInstances?
 instance (Bind m n n, Return n) => ArrowSelect (A.Kleisli m) (A.Kleisli n) where
   type ArrowSelectCts (A.Kleisli m) (A.Kleisli n) = (BindCts m n n, ReturnCts n)
   first  (A.Kleisli f) = A.Kleisli (\ ~(b,d) -> f b >>= \c -> return (c,d))
   second (A.Kleisli f) = A.Kleisli (\ ~(d,b) -> f b >>= \c -> return (d,c))
-
+{- This also works:
+instance (Bind m m n, Return m) => ArrowSelect (A.Kleisli m) (A.Kleisli n) where
+  type ArrowSelectCts (A.Kleisli m) (A.Kleisli n) = (BindCts m m n, ReturnCts m)
+  first  (A.Kleisli f) = A.Kleisli (\ ~(b,d) -> f b >>= \c -> return (c,d))
+  second (A.Kleisli f) = A.Kleisli (\ ~(d,b) -> f b >>= \c -> return (d,c))
+-}
 infixr 3 ***
 infixr 3 &&&
 
