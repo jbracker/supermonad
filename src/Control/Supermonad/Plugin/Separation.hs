@@ -33,6 +33,7 @@ import Control.Supermonad.Plugin.Utils
 
 type SCNode = LNode WantedCt
 
+-- | A group of constraints that is connected by common ambiguous type variables.
 type ConstraintGroup = [WantedCt]
 
 -- | Checks if the given component only involved exactly one top-level type constructor

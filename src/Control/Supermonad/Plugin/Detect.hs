@@ -354,29 +354,37 @@ findMonoTopTyConInstances clsDict =
 -- Instance implications
 -- -----------------------------------------------------------------------------
 
+-- | Representation of instance implying the existence of other instances that
+--   are using the same type constructor.
 data InstanceImplication = InstanceImplies Class Class
 
 infix 7 ===>
 infix 7 <==>
 
+-- | Instance of first class implies the existence of an instance from the second class.
 (===>) :: Class -> Class -> [InstanceImplication]
 (===>) ca cb = [InstanceImplies ca cb]
 
+-- | Instances of either class imply the respective other instance.
 (<==>) :: Class -> Class -> [InstanceImplication]
 (<==>) ca cb = ca ===> cb ++ cb ===> ca
 
+-- | Instance implication based on lookup of names in class dictionary. See '(===>)'.
 clsDictInstImp :: ClassDict -> PluginClassName -> PluginClassName -> [InstanceImplication]
 clsDictInstImp clsDict caName cbName = do
   clsA <- maybeToList $ lookupClsDictClass caName clsDict
   clsB <- maybeToList $ lookupClsDictClass cbName clsDict
   clsA ===> clsB
 
+-- | Instance equivalence based on lookup of names in class dictionary. See '(<==>)'.
 clsDictInstEquiv :: ClassDict -> PluginClassName -> PluginClassName -> [InstanceImplication]
 clsDictInstEquiv clsDict caName cbName = do
   clsA <- maybeToList $ lookupClsDictClass caName clsDict
   clsB <- maybeToList $ lookupClsDictClass cbName clsDict
   clsA <==> clsB
 
+-- | Check a given instance dictionary against a set of 'InstanceImplication's 
+--   and return error messages if there are violations.
 checkInstanceImplications :: InstanceDict -> [InstanceImplication] -> [((TyCon,Class), SDoc)]
 checkInstanceImplications _instDict [] = []
 checkInstanceImplications instDict (imp : imps) = do
