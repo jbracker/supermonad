@@ -61,6 +61,7 @@ library
                  , Control.Supermonad.Constrained.Functor
                  , Control.Supermonad.Constrained.Prelude
                  , Control.Supermonad.Constrained.Functions
+                 , Control.Superarrow
   other-modules: Control.Supermonad.Plugin.Utils
                , Control.Supermonad.Plugin.Names
                , Control.Supermonad.Plugin.Wrapper
