@@ -1,7 +1,7 @@
 
 -- | Utility functions useful for debugging the plugin. Some of these 
 --   may be unsafe to use in general.
-module Control.Supermonad.Plugin.Debug
+module Control.Super.Plugin.Debug
   ( containsAnyOf
   , containsAllOf
   , containsNoneOf

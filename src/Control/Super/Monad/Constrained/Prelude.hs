@@ -1,8 +1,8 @@
 
 -- | Custom prelude to use if supermonads need to support constrained monads as well. 
-module Control.Supermonad.Constrained.Prelude 
+module Control.Super.Monad.Constrained.Prelude 
   ( -- * Supermonads
-    module Control.Supermonad.Constrained
+    module Control.Super.Monad.Constrained
     -- ** Replacement functions
   , F.mapM_, F.sequence_, (F.=<<)
     -- ** Traversable replacement functions
@@ -10,10 +10,10 @@ module Control.Supermonad.Constrained.Prelude
     -- * Fix rebindable syntax
   , F.ifThenElse
     -- * Prelude functions
-  , module Control.Supermonad.PreludeWithoutMonad
+  , module Control.Super.Monad.PreludeWithoutMonad
   ) where
 
-import Control.Supermonad.PreludeWithoutMonad hiding ( Functor(..) )
-import Control.Supermonad.Constrained
-import qualified Control.Supermonad.Constrained.Functions as F
+import Control.Super.Monad.PreludeWithoutMonad hiding ( Functor(..) )
+import Control.Super.Monad.Constrained
+import qualified Control.Super.Monad.Constrained.Functions as F
 

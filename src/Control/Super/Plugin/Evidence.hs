@@ -3,7 +3,7 @@
 --   arguments to instantiate it, is actually instantiated by those arguments.
 --   Also provides functions to produce evidence for the instantiations if
 --   necessary.
-module Control.Supermonad.Plugin.Evidence
+module Control.Super.Plugin.Evidence
   ( matchInstanceTyVars
   , matchInstanceTyVars'
   , produceEvidenceFor
@@ -50,24 +50,24 @@ import FamInstEnv ( normaliseType )
 import Outputable ( ($$), SDoc )
 import qualified Outputable as O
 
-import Control.Supermonad.Plugin.Wrapper
+import Control.Super.Plugin.Wrapper
   ( mkTypeVarSubst
   , mkTcCoercion
   , lookupInstEnv
   , produceTupleEvidence
   , isTupleTyCon )
-import Control.Supermonad.Plugin.Constraint 
+import Control.Super.Plugin.Constraint 
   ( GivenCt
   , constraintClassType
   , constraintPredicateType )
-import Control.Supermonad.Plugin.Utils
+import Control.Super.Plugin.Utils
   ( fromLeft, fromRight
   , allM
   , collectTyVars
   , partiallyApplyTyCons
   , skolemVarsBindFun )
-import qualified Control.Supermonad.Plugin.Log as L
---import qualified Control.Supermonad.Plugin.Debug as D
+import qualified Control.Super.Plugin.Log as L
+--import qualified Control.Super.Plugin.Debug as D
 
 -- | Try to evaluate the given type as far as possible by evaluating contained
 --   type families and expanding type synonyms.

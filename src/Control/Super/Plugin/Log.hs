@@ -1,6 +1,6 @@
 
 -- | Log message formatting and debuging functions.
-module Control.Supermonad.Plugin.Log
+module Control.Super.Plugin.Log
   ( pprToStr, sDocToStr
   , missingCaseError
   , smErrMsg, smDebugMsg, smObjMsg, smWarnMsg
@@ -30,9 +30,9 @@ import TcRnTypes
 import TcPluginM ( TcPluginM, tcPluginIO, unsafeTcPluginTcM )
 import IOEnv ( failWithM )
 
-import Control.Supermonad.Plugin.Debug ( pprToStr, sDocToStr )
-import Control.Supermonad.Plugin.Utils ( removeDup )
-import Control.Supermonad.Plugin.Constraint ( constraintSourceLocation )
+import Control.Super.Plugin.Debug ( pprToStr, sDocToStr )
+import Control.Super.Plugin.Utils ( removeDup )
+import Control.Super.Plugin.Constraint ( constraintSourceLocation )
 
 -- | @prefixMsg prefix msg@ prefixes a message with the given string.
 prefixMsg :: String -> String -> String

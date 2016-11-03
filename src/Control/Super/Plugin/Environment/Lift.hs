@@ -1,7 +1,7 @@
 
 -- | Provides versions of functions written for 'TcPluginM'
 --   that are lifted into 'SupermonadPluginM'.
-module Control.Supermonad.Plugin.Environment.Lift
+module Control.Super.Plugin.Environment.Lift
   (
   -- * From "Control.Supermonad.Plugin.Evidence"
     produceEvidenceForCt
@@ -20,17 +20,17 @@ import Type ( Type, TyVar )
 import TyCon ( TyCon )
 import InstEnv ( ClsInst )
 
-import Control.Supermonad.Plugin.Environment
+import Control.Super.Plugin.Environment
   ( SupermonadPluginM
   , runTcPlugin
   , getGivenConstraints
   , throwPluginErrorSDoc
   )
-import Control.Supermonad.Plugin.ClassDict ( ClassDict, insertClsDict )
+import Control.Super.Plugin.ClassDict ( ClassDict, insertClsDict )
 
-import qualified Control.Supermonad.Plugin.Utils as U
-import qualified Control.Supermonad.Plugin.Detect as D
-import qualified Control.Supermonad.Plugin.Evidence as E
+import qualified Control.Super.Plugin.Utils as U
+import qualified Control.Super.Plugin.Detect as D
+import qualified Control.Super.Plugin.Evidence as E
 
 -- | See 'E.produceEvidenceForCt'.
 produceEvidenceForCt :: Ct -> SupermonadPluginM s (Either SDoc EvTerm)

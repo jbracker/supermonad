@@ -19,7 +19,7 @@
 #endif
 
 -- | Definition of supermonads that support constrained monads.
-module Control.Supermonad.Constrained 
+module Control.Super.Monad.Constrained 
   ( -- * Supermonads
     Bind(..), Return(..), Fail(..)
     -- * Super-Applicatives
@@ -79,7 +79,7 @@ import qualified Control.Monad.Trans.Writer.Lazy   as WriterL ( WriterT(..) )
 import qualified Control.Monad.Trans.Writer.Strict as WriterS ( WriterT(..) )
 
 -- To define 'Bind' class:
-import Control.Supermonad.Constrained.Functor 
+import Control.Super.Monad.Constrained.Functor 
   ( Functor(..) )
 
 

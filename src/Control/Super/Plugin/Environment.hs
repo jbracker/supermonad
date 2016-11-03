@@ -1,7 +1,7 @@
 
 -- | Provides the plugins monadic envionment,
 --   access to the environment and message printing capabilities.
-module Control.Supermonad.Plugin.Environment
+module Control.Super.Plugin.Environment
   ( -- * Supermonad Plugin Monad
     SupermonadPluginM
   , runSupermonadPlugin
@@ -47,17 +47,17 @@ import SrcLoc ( srcSpanFileName_maybe )
 import FastString ( unpackFS )
 import qualified Outputable as O
 
-import qualified Control.Supermonad.Plugin.Log as L
-import Control.Supermonad.Plugin.Names ( PluginClassName )
-import Control.Supermonad.Plugin.Constraint
+import qualified Control.Super.Plugin.Log as L
+import Control.Super.Plugin.Names ( PluginClassName )
+import Control.Super.Plugin.Constraint
   ( GivenCt, WantedCt
   , constraintSourceLocation
   , mkDerivedTypeEqCt, mkDerivedTypeEqCtOfTypes )
-import Control.Supermonad.Plugin.ClassDict
+import Control.Super.Plugin.ClassDict
   ( ClassDict
   , emptyClsDict
   , lookupClsDictClass )
-import Control.Supermonad.Plugin.InstanceDict
+import Control.Super.Plugin.InstanceDict
   ( InstanceDict, lookupInstDict )
 
 -- -----------------------------------------------------------------------------

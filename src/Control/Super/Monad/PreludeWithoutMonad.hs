@@ -1,7 +1,7 @@
 
 -- | A verson of the standard prelude that does not export anything that 
 --   involves standard monads.
-module Control.Supermonad.PreludeWithoutMonad
+module Control.Super.Monad.PreludeWithoutMonad
   ( -- * Prelude
     -- ** Standard types, classes and related functions
     -- *** Basic data types

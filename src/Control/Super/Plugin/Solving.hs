@@ -1,6 +1,6 @@
 
 -- | Functions to solve wanted constraints.
-module Control.Supermonad.Plugin.Solving 
+module Control.Super.Plugin.Solving 
   ( solveConstraints
   ) where
 
@@ -26,11 +26,11 @@ import Unify ( tcUnifyTy )
 import qualified Outputable as O
 
 
-import Control.Supermonad.Plugin.Debug ( sDocToStr )
-import Control.Supermonad.Plugin.InstanceDict ( InstanceDict )
-import Control.Supermonad.Plugin.Wrapper 
+import Control.Super.Plugin.Debug ( sDocToStr )
+import Control.Super.Plugin.InstanceDict ( InstanceDict )
+import Control.Super.Plugin.Wrapper 
   ( TypeVarSubst, mkTypeVarSubst )
-import Control.Supermonad.Plugin.Environment 
+import Control.Super.Plugin.Environment 
   ( SupermonadPluginM
   , getGivenConstraints, getWantedConstraints
   , getInstanceFor
@@ -40,27 +40,27 @@ import Control.Supermonad.Plugin.Environment
   , printMsg, printObj, printErr --, printConstraints
   , addWarning, displayWarnings
   , throwPluginError, throwPluginErrorSDoc )
-import Control.Supermonad.Plugin.Environment.Lift
+import Control.Super.Plugin.Environment.Lift
   ( isPotentiallyInstantiatedCt
   , partiallyApplyTyCons )
-import Control.Supermonad.Plugin.Constraint 
+import Control.Super.Plugin.Constraint 
   ( WantedCt
   , isClassConstraint
   , isAnyClassConstraint
   , constraintClassType
   , constraintClassTyArgs )
-import Control.Supermonad.Plugin.Separation 
+import Control.Super.Plugin.Separation 
   ( ConstraintGroup
   , separateContraints
   , componentTopTyCons, componentTopTcVars
   , componentMonoTyCon )
-import Control.Supermonad.Plugin.Utils 
+import Control.Super.Plugin.Utils 
   ( collectTopTcVars
   , collectTopTyCons
   , collectTyVars
   , associations
   , allM )
-import Control.Supermonad.Plugin.Log 
+import Control.Super.Plugin.Log 
   ( formatConstraint )
 
   

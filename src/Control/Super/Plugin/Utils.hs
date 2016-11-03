@@ -1,6 +1,6 @@
 
 -- | Provides all kinds of functions that are needed by the plugin.
-module Control.Supermonad.Plugin.Utils (
+module Control.Super.Plugin.Utils (
     errIndent
   -- * Type inspection
   , collectTopTyCons
@@ -61,7 +61,7 @@ import TcPluginM ( TcPluginM, newFlexiTyVar )
 import Outputable ( ($$) )
 import qualified Outputable as O
 
-import Control.Supermonad.Plugin.Wrapper 
+import Control.Super.Plugin.Wrapper 
   ( TypeVarSubst
   , mkTypeVarSubst
   , splitKindFunTys

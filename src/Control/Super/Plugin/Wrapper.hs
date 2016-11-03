@@ -4,7 +4,7 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
 -- | Provides version safe wrappers around GHC functions.
-module Control.Supermonad.Plugin.Wrapper 
+module Control.Super.Plugin.Wrapper 
   ( -- * General Utilities (To avoid import loop)
     fromLeft, fromRight
   , -- * Type Variable Substitutions

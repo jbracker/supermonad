@@ -3,7 +3,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 
 -- | Provides the supermonad plugin for GHC.
-module Control.Supermonad.Plugin
+module Control.Super.Monad.Plugin
   ( plugin ) where
 
 import Data.Maybe ( isJust, isNothing, fromJust )
@@ -19,24 +19,24 @@ import Outputable ( SDoc, hang, text, vcat, ($$) )
 import qualified Outputable as O
 import Module ( Module )
 
-import Control.Supermonad.Plugin.Utils ( errIndent )
---import qualified Control.Supermonad.Plugin.Log as L
-import Control.Supermonad.Plugin.InstanceDict ( InstanceDict )
-import Control.Supermonad.Plugin.ClassDict ( ClassDict )
-import Control.Supermonad.Plugin.Solving
+import Control.Super.Plugin.Utils ( errIndent )
+--import qualified Control.Super.Plugin.Log as L
+import Control.Super.Plugin.InstanceDict ( InstanceDict )
+import Control.Super.Plugin.ClassDict ( ClassDict )
+import Control.Super.Plugin.Solving
   ( solveConstraints )
-import Control.Supermonad.Plugin.Environment
+import Control.Super.Plugin.Environment
   ( SupermonadPluginM
   , runSupermonadPluginAndReturn, runTcPlugin
   , getWantedConstraints
   , getClass, getClassDictionary
-  , throwPluginError, throwPluginErrorSDoc
+  , throwPluginErrorSDoc
   , printMsg
   -- , printObj, printConstraints
   )
-import Control.Supermonad.Plugin.Environment.Lift
+import Control.Super.Plugin.Environment.Lift
   ( findClassesAndInstancesInScope )
-import Control.Supermonad.Plugin.Detect 
+import Control.Super.Plugin.Detect 
   ( ModuleQuery(..)
   , ClassQuery(..)
   , InstanceImplication
@@ -45,10 +45,12 @@ import Control.Supermonad.Plugin.Detect
   , findModuleByQuery
   , findMonoTopTyConInstances
   , defaultFindEitherModuleErrMsg )
-import Control.Supermonad.Plugin.Names
+import Control.Super.Plugin.Names
   ( PluginClassName
   , supermonadModuleName, supermonadCtModuleName
+  , legacySupermonadModuleName, legacySupermonadCtModuleName
   , supermonadPreludeModuleName, supermonadCtPreludeModuleName
+  , legacySupermonadPreludeModuleName, legacySupermonadCtPreludeModuleName
   , bindClassName, returnClassName, applicativeClassName )
 
 -- -----------------------------------------------------------------------------
@@ -123,9 +125,13 @@ supermonadModuleQuery :: ModuleQuery
 supermonadModuleQuery = EitherModule
   [ AnyModule [ ThisModule supermonadModuleName Nothing
               , ThisModule supermonadPreludeModuleName Nothing
+              , ThisModule legacySupermonadModuleName Nothing
+              , ThisModule legacySupermonadPreludeModuleName Nothing
               ]
   , AnyModule [ ThisModule supermonadCtModuleName Nothing
               , ThisModule supermonadCtPreludeModuleName Nothing
+              , ThisModule legacySupermonadCtModuleName Nothing
+              , ThisModule legacySupermonadCtPreludeModuleName Nothing
               ]
   ] $ Just findSupermonadModulesErrMsg
 

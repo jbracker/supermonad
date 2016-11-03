@@ -1,7 +1,7 @@
 
 -- | Functions and utilities to detect the importent modules, classes
 --   and types of the plugin.
-module Control.Supermonad.Plugin.Detect
+module Control.Super.Plugin.Detect
   ( -- * Searching for Modules
     ModuleQuery(..)
   , findModuleByQuery
@@ -68,28 +68,28 @@ import PrelNames ( mAIN_NAME )
 import Outputable ( SDoc, ($$), text, vcat, ppr, hang )
 import qualified Outputable as O
 
---import Control.Supermonad.Plugin.Log ( printObj, printObjTrace, printMsg )
-import Control.Supermonad.Plugin.Wrapper
+--import Control.Super.Plugin.Log ( printObj, printObjTrace, printMsg )
+import Control.Super.Plugin.Wrapper
   ( UnitId, moduleUnitId )
-import Control.Supermonad.Plugin.Instance
+import Control.Super.Plugin.Instance
   ( instanceTopTyCons
   , isMonoTyConInstance 
   , isPolyTyConInstance )
-import Control.Supermonad.Plugin.Utils
+import Control.Super.Plugin.Utils
   ( errIndent
   , removeDupByIndex
   , fromRight, fromLeft
   , getClassName, getTyConName )
-import Control.Supermonad.Plugin.ClassDict
+import Control.Super.Plugin.ClassDict
   ( ClassDict
   , allClsDictEntries
   , lookupClsDictClass )
-import Control.Supermonad.Plugin.InstanceDict
+import Control.Super.Plugin.InstanceDict
   ( InstanceDict
   , insertInstDict, emptyInstDict
   , allInstDictTyCons
   , lookupInstDictByTyCon )
-import Control.Supermonad.Plugin.Names
+import Control.Super.Plugin.Names
 
 -- -----------------------------------------------------------------------------
 -- Validation

@@ -1,7 +1,7 @@
 
 -- | Functions to separate a set of wanted constrains into groups of 
 --   constraints that require being solved together.
-module Control.Supermonad.Plugin.Separation 
+module Control.Super.Plugin.Separation 
   ( ConstraintGroup
   , separateContraints
   , componentTopTyCons
@@ -24,11 +24,11 @@ import Type ( Type, TyVar )
 import TcType ( isAmbiguousTyVar )
 import Class ( Class )
 
-import Control.Supermonad.Plugin.Constraint
+import Control.Super.Plugin.Constraint
   ( WantedCt
   , constraintClassTyArgs
   , isAnyClassConstraint )
-import Control.Supermonad.Plugin.Utils
+import Control.Super.Plugin.Utils
   ( collectTopTyCons, collectTopTcVars )
 
 type SCNode = LNode WantedCt

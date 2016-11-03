@@ -1,7 +1,7 @@
 
 -- Use the polymonad plugin.
 {-# LANGUAGE RebindableSyntax #-}
-{-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
+{-# OPTIONS_GHC -fplugin Control.Super.Monad.Plugin #-}
 
 -- for arrow class definitions:
 {-# LANGUAGE MultiParamTypeClasses  #-}
@@ -12,10 +12,10 @@
 {-# LANGUAGE UndecidableInstances   #-}
 
 -- | Representation of superarrows in Haskell.
-module Control.Superarrow
+module Control.Super.Arrow
   ( CategoryId(..)
   , CategoryCompose(..)
-  , (Control.Superarrow.>>>), (Control.Superarrow.<<<)
+  , (Control.Super.Arrow.>>>), (Control.Super.Arrow.<<<)
   , ArrowArr(..)
   , ArrowSelect(..)
   , ArrowCombine(..)
@@ -24,8 +24,8 @@ module Control.Superarrow
 import Data.Type.Equality ( (:~:)(Refl) )
 import Data.Type.Coercion ( Coercion(Coercion) )
 
-import Control.Supermonad.Prelude hiding ( id, (.) )
-import qualified Control.Supermonad.Prelude as P
+import Control.Super.Monad.Prelude hiding ( id, (.) )
+import qualified Control.Super.Monad.Prelude as P
 
 --import Control.Monad as M
 import Control.Arrow as A

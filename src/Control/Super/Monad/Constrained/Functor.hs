@@ -8,7 +8,7 @@
 
 -- | Definition of constrained functors as they are required to work with
 --   constrained monads and constrained supermonads.
-module Control.Supermonad.Constrained.Functor 
+module Control.Super.Monad.Constrained.Functor 
   ( Functor(..)
   ) where
 

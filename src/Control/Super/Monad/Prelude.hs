@@ -7,10 +7,10 @@
 --   to 'P.Monad's are replaced with their supermonad counterparts.
 --
 --   A replacement for the functions in "Control.Monad" can be found 
---   in "Control.Supermonad.Functions".
-module Control.Supermonad.Prelude
+--   in "Control.Super.Monad.Functions".
+module Control.Super.Monad.Prelude
   ( -- * Supermonads
-    module Control.Supermonad
+    module Control.Super.Monad
     -- ** Replacement functions
   , F.mapM_, F.sequence_, (F.=<<)
     -- ** Traversable replacement functions
@@ -18,10 +18,10 @@ module Control.Supermonad.Prelude
     -- * Fix rebindable syntax
   , F.ifThenElse
     -- * Prelude functions
-  , module Control.Supermonad.PreludeWithoutMonad
+  , module Control.Super.Monad.PreludeWithoutMonad
   ) where
 
 
-import Control.Supermonad
-import Control.Supermonad.PreludeWithoutMonad
-import qualified Control.Supermonad.Functions as F
+import Control.Super.Monad
+import Control.Super.Monad.PreludeWithoutMonad
+import qualified Control.Super.Monad.Functions as F

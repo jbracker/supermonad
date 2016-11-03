@@ -1,7 +1,7 @@
 
 -- | Functions and utilities to work with and inspect class instances
 --   of the GHC API.
-module Control.Supermonad.Plugin.Instance
+module Control.Super.Plugin.Instance
   ( instanceClass
   , instanceClassTyCon
   , instanceTopTyCons
@@ -20,7 +20,7 @@ import Type ( Type )
 import Class ( Class, classTyCon )
 import TyCon ( TyCon )
 
-import Control.Supermonad.Plugin.Utils ( collectTopTyCons )
+import Control.Super.Plugin.Utils ( collectTopTyCons )
 
 -- | Checks if the given instance is of the given type class.
 isClassInstance :: Class -> ClsInst -> Bool

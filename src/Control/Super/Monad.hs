@@ -19,7 +19,7 @@
 #endif
 
 -- | Representation of supermonads in Haskell.
-module Control.Supermonad
+module Control.Super.Monad
   ( -- * Supermonads
     Bind(..), Return(..), Fail(..)
     -- * Super-Applicatives

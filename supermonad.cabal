@@ -52,31 +52,40 @@ source-repository head
   location: https://github.com/jbracker/supermonad.git
 
 library
-  exposed-modules: Control.Supermonad
+  exposed-modules: Control.Super.Monad
+                 , Control.Super.Monad.Prelude
+                 , Control.Super.Monad.Functions
+                 , Control.Super.Monad.Plugin
+                 , Control.Super.Monad.PreludeWithoutMonad
+                 , Control.Super.Monad.Constrained
+                 , Control.Super.Monad.Constrained.Functor
+                 , Control.Super.Monad.Constrained.Prelude
+                 , Control.Super.Monad.Constrained.Functions
+                 , Control.Super.Arrow
+                 -- Legacy Modules
+                 , Control.Supermonad
                  , Control.Supermonad.Prelude
-                 , Control.Supermonad.Functions
                  , Control.Supermonad.Plugin
-                 , Control.Supermonad.PreludeWithoutMonad
                  , Control.Supermonad.Constrained
-                 , Control.Supermonad.Constrained.Functor
                  , Control.Supermonad.Constrained.Prelude
-                 , Control.Supermonad.Constrained.Functions
                  , Control.Superarrow
-  other-modules: Control.Supermonad.Plugin.Utils
-               , Control.Supermonad.Plugin.Names
-               , Control.Supermonad.Plugin.Wrapper
-               , Control.Supermonad.Plugin.Log
-               , Control.Supermonad.Plugin.Detect
-               , Control.Supermonad.Plugin.Debug
-               , Control.Supermonad.Plugin.Constraint
-               , Control.Supermonad.Plugin.Instance
-               , Control.Supermonad.Plugin.Evidence
-               , Control.Supermonad.Plugin.Environment
-               , Control.Supermonad.Plugin.Environment.Lift
-               , Control.Supermonad.Plugin.Separation
-               , Control.Supermonad.Plugin.Solving
-               , Control.Supermonad.Plugin.InstanceDict
-               , Control.Supermonad.Plugin.ClassDict
+                 , Control.Superarrow.Plugin
+                 , Control.Superarrow.Constrained
+  other-modules: Control.Super.Plugin.Utils
+               , Control.Super.Plugin.Names
+               , Control.Super.Plugin.Wrapper
+               , Control.Super.Plugin.Log
+               , Control.Super.Plugin.Detect
+               , Control.Super.Plugin.Debug
+               , Control.Super.Plugin.Constraint
+               , Control.Super.Plugin.Instance
+               , Control.Super.Plugin.Evidence
+               , Control.Super.Plugin.Environment
+               , Control.Super.Plugin.Environment.Lift
+               , Control.Super.Plugin.Separation
+               , Control.Super.Plugin.Solving
+               , Control.Super.Plugin.InstanceDict
+               , Control.Super.Plugin.ClassDict
   other-extensions:
   build-depends: base         >=4.8  && <5
                , ghc          >=7.10.1 && <8.1

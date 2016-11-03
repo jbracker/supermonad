@@ -1,6 +1,6 @@
 
 -- | Provides the type to store classes and instances used by the plugin.
-module Control.Supermonad.Plugin.ClassDict 
+module Control.Super.Plugin.ClassDict 
   ( ClassDict
   , emptyClsDict, insertClsDict, lookupClsDict
   , lookupClsDictClass, lookupClsDictInstances

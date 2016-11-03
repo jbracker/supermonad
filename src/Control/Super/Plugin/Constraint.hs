@@ -3,7 +3,7 @@
 
 -- | Functions and utilities to work with and inspect constraints
 --   of the GHC API.
-module Control.Supermonad.Plugin.Constraint
+module Control.Super.Plugin.Constraint
   ( -- * Types
     GivenCt, WantedCt, DerivedCt
     -- * Constraint Creation
@@ -40,9 +40,9 @@ import Type
   )
 import TyCon ( TyCon )
 
-import Control.Supermonad.Plugin.Wrapper
+import Control.Super.Plugin.Wrapper
   ( mkEqualityCtType, constraintSourceLocation )
-import Control.Supermonad.Plugin.Utils
+import Control.Super.Plugin.Utils
   ( collectTopTyCons
   , collectTopTcVars
   , collectTyVars )
