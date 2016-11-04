@@ -87,6 +87,7 @@ library
                , Control.Super.Plugin.Solving
                , Control.Super.Plugin.InstanceDict
                , Control.Super.Plugin.ClassDict
+               , Control.Super.Plugin.Prototype
   other-extensions:
   build-depends: base         >=4.8  && <5
                , ghc          >=7.10.1 && <8.1

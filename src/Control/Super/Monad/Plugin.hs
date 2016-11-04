@@ -6,44 +6,21 @@
 module Control.Super.Monad.Plugin
   ( plugin ) where
 
-import Data.Maybe ( isJust, isNothing, fromJust )
-import Data.Foldable ( foldrM )
-import Control.Monad ( forM )
-
-import Plugins ( Plugin(tcPlugin), defaultPlugin )
-import TcRnTypes
-  ( Ct(..)
-  , TcPlugin(..), TcPluginResult(..) )
-import TcPluginM ( TcPluginM )
-import Outputable ( SDoc, hang, text, vcat, ($$) )
-import qualified Outputable as O
+import Plugins ( Plugin )
+import Outputable ( SDoc, hang, text, ($$) )
 import Module ( Module )
+
+import Control.Super.Plugin.Prototype ( pluginPrototype )
 
 import Control.Super.Plugin.Utils ( errIndent )
 --import qualified Control.Super.Plugin.Log as L
 import Control.Super.Plugin.InstanceDict ( InstanceDict )
 import Control.Super.Plugin.ClassDict ( ClassDict )
-import Control.Super.Plugin.Solving
-  ( solveConstraints )
-import Control.Super.Plugin.Environment
-  ( SupermonadPluginM
-  , runSupermonadPluginAndReturn, runTcPlugin
-  , getWantedConstraints
-  , getClass, getClassDictionary
-  , throwPluginErrorSDoc
-  , printMsg
-  -- , printObj, printConstraints
-  )
-import Control.Super.Plugin.Environment.Lift
-  ( findClassesAndInstancesInScope )
 import Control.Super.Plugin.Detect 
   ( ModuleQuery(..)
   , ClassQuery(..)
   , InstanceImplication
   , clsDictInstImp, clsDictInstEquiv
-  , checkInstances
-  , findModuleByQuery
-  , findMonoTopTyConInstances
   , defaultFindEitherModuleErrMsg )
 import Control.Super.Plugin.Names
   ( PluginClassName
@@ -59,48 +36,10 @@ import Control.Super.Plugin.Names
 
 -- | The supermonad type checker plugin for GHC.
 plugin :: Plugin
-plugin = defaultPlugin { tcPlugin = \_clOpts -> Just supermonadPlugin }
-
--- -----------------------------------------------------------------------------
--- Actual Plugin Code
--- -----------------------------------------------------------------------------
-
-type SupermonadState = ()
-
--- | The type checker plugin.
-supermonadPlugin :: TcPlugin
-supermonadPlugin = TcPlugin
-  { tcPluginInit  = supermonadInit
-  , tcPluginSolve = supermonadSolve
-  , tcPluginStop  = supermonadStop
-  }
-
--- | No initialization needs takes place.
-supermonadInit :: TcPluginM SupermonadState
-supermonadInit = return ()
-
--- | No clean up needs to take place.
-supermonadStop :: SupermonadState -> TcPluginM ()
-supermonadStop _s = return ()
-
--- | The plugin code wrapper. Handles execution of the monad stack.
-supermonadSolve :: SupermonadState -> [Ct] -> [Ct] -> [Ct] -> TcPluginM TcPluginResult
-supermonadSolve _s given derived wanted = do
-  runSupermonadPluginAndReturn (given ++ derived) wanted initSupermonadPlugin $ do
-      printMsg "Invoke supermonad plugin..."
-      
-      forM solvingGroups $ \solvingGroup -> do
-        mClss <- forM solvingGroup $ \clsName -> do
-          mCls <- getClass clsName
-          return (clsName, mCls)
-        if all (isJust . snd) mClss then do 
-          wantedCts <- getWantedConstraints
-          solveConstraints (fmap (fromJust . snd) mClss) wantedCts
-        else do
-          throwPluginErrorSDoc $ O.hang (O.text "Missing classes:") errIndent 
-                               $ O.hcat $ O.punctuate (O.text ", ") 
-                               $ fmap (O.quotes . O.text . fst) 
-                               $ filter (isNothing . snd) mClss  
+plugin = pluginPrototype supermonadModuleQuery
+                         [supermonadClassQuery]
+                         solvingGroups
+                         supermonadInstanceImplications
 
 -- -----------------------------------------------------------------------------
 -- Supermonad specific initialization
@@ -111,14 +50,6 @@ solvingGroups :: [[PluginClassName]]
 solvingGroups = 
   [ [ bindClassName, returnClassName, applicativeClassName ] -- Supermonad group
   ]
-
--- | Configure the classes the plugin works with.
-pluginClassQueries :: [ClassQuery]
-pluginClassQueries = [ supermonadClassQuery ]
-
--- | Configure which instance implications the plugin needs to verify.
-pluginInstanceImplications :: ClassDict -> [InstanceImplication]
-pluginInstanceImplications clsDict = supermonadInstanceImplications clsDict
 
 -- | Queries the module providing the supermonad classes.
 supermonadModuleQuery :: ModuleQuery
@@ -160,30 +91,5 @@ findSupermonadModulesErrMsg [Left errA, Left errB] =
 findSupermonadModulesErrMsg [Right _mdlA, Right _mdlB] =
   text "Found unconstrained and constrained supermonad modules!"
 findSupermonadModulesErrMsg mdls = defaultFindEitherModuleErrMsg mdls
-
--- | Initialize the plugin environment.
-initSupermonadPlugin :: SupermonadPluginM () (ClassDict, InstanceDict)
-initSupermonadPlugin = do
-  -- Determine if the supermonad module is available.
-  eSupermonadMdl <- runTcPlugin $ findModuleByQuery supermonadModuleQuery
-  _supermonadMdl <- case eSupermonadMdl of
-    Right smMdl -> return smMdl
-    Left mdlErrMsg -> throwPluginErrorSDoc mdlErrMsg
-  
-  -- Find the supermonad classes and instances and add the to the class dictionary.
-  oldClsDict <- getClassDictionary
-  newClsDict <- foldrM findClassesAndInstancesInScope oldClsDict pluginClassQueries
-  
-  -- Calculate the supermonads in scope and check for rogue bind and return instances.
-  let smInsts = findMonoTopTyConInstances newClsDict
-  let smErrors = fmap snd $ checkInstances newClsDict smInsts (pluginInstanceImplications newClsDict)
-  
-  -- Try to construct the environment or throw errors
-  case smErrors of
-    [] -> return (newClsDict, smInsts)
-    _ -> do
-      throwPluginErrorSDoc $ hang (text "Problems when finding supermonad instances:") errIndent $ vcat smErrors
-
-
 
 
