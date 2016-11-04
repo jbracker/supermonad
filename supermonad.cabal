@@ -65,6 +65,7 @@ library
                  -- Legacy Modules
                  , Control.Supermonad
                  , Control.Supermonad.Prelude
+                 , Control.Supermonad.Functions
                  , Control.Supermonad.Plugin
                  , Control.Supermonad.Constrained
                  , Control.Supermonad.Constrained.Prelude
