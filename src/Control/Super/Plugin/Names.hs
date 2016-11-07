@@ -4,7 +4,7 @@ module Control.Super.Plugin.Names
   ( -- * Types
     PluginModuleName
   , PluginClassName
-    -- * Module Names
+    -- * Supermonad Module Names
   , supermonadModuleName
   , supermonadCtModuleName
   , legacySupermonadModuleName
@@ -14,11 +14,19 @@ module Control.Super.Plugin.Names
   , legacySupermonadPreludeModuleName
   , legacySupermonadCtPreludeModuleName
   , functorModuleName
-    -- * Class Names
+    -- * Supermonad Class Names
   , bindClassName
   , returnClassName
   , functorClassName
   , applicativeClassName
+    -- * Superarrow Module Names
+  , superarrowModuleName
+  , legacySuperarrowModuleName
+    -- * Superarrow Class Names
+  , arrowArrClassName
+  , arrowSequenceClassName
+  , arrowSelectClassName
+  , arrowCombineClassName
   ) where
 
 -- | Type of module names the plugin uses.
@@ -28,7 +36,7 @@ type PluginModuleName = String
 type PluginClassName = String  
 
 -- -----------------------------------------------------------------------------
--- Constant Names (Magic Numbers...)
+-- Constant Supermonad Names (Magic Numbers...)
 -- -----------------------------------------------------------------------------
 
 -- | Name of the "Control.Supermonad" module.
@@ -86,3 +94,37 @@ supermonadCtPreludeModuleName = "Control.Super.Monad.Constrained.Prelude"
 -- | Name of the "Data.Functor" module.
 functorModuleName :: PluginModuleName
 functorModuleName = "Data.Functor"
+
+-- -----------------------------------------------------------------------------
+-- Constant Superarrow Names (Magic Numbers...)
+-- -----------------------------------------------------------------------------
+
+-- | Name of the "Control.Superarrow" module.
+legacySuperarrowModuleName :: PluginModuleName
+legacySuperarrowModuleName = "Control.Superarrow"
+
+-- | Name of the "Control.Super.Arrow" module.
+superarrowModuleName :: PluginModuleName
+superarrowModuleName = "Control.Super.Arrow"
+
+-- | Name of the @ArrowArr@ type class.
+--   Also used as dictionary key for the @ArrowArr@ class.
+arrowArrClassName :: PluginClassName
+arrowArrClassName = "ArrowArr"
+
+-- | Name of the @ArrowSequence@ class.
+--   Also used as dictionary key for the @ArrowSequence@ class.
+arrowSequenceClassName :: PluginClassName
+arrowSequenceClassName = "ArrowSequence"
+
+-- | Name of the @ArrowSelect@ type class.
+--   Also used as dictionary key for the @ArrowSelect@ class.
+arrowSelectClassName :: PluginClassName
+arrowSelectClassName = "ArrowSelect"
+
+-- | Name of the @ArrowCombine@ class.
+--   Also used as dictionary key for the @ArrowCombine@ class.
+arrowCombineClassName :: PluginClassName
+arrowCombineClassName = "ArrowCombine"
+
+
