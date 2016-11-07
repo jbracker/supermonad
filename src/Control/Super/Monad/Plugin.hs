@@ -14,7 +14,6 @@ import Control.Super.Plugin.Prototype ( pluginPrototype )
 
 import Control.Super.Plugin.Utils ( errIndent )
 --import qualified Control.Super.Plugin.Log as L
-import Control.Super.Plugin.InstanceDict ( InstanceDict )
 import Control.Super.Plugin.ClassDict ( ClassDict )
 import Control.Super.Plugin.Detect 
   ( ModuleQuery(..)
