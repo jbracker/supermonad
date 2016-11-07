@@ -70,9 +70,6 @@ library
                  , Control.Supermonad.Plugin
                  , Control.Supermonad.Constrained
                  , Control.Supermonad.Constrained.Prelude
-                 , Control.Superarrow
-                 , Control.Superarrow.Plugin
-                 , Control.Superarrow.Constrained
   other-modules: Control.Super.Plugin.Utils
                , Control.Super.Plugin.Names
                , Control.Super.Plugin.Wrapper
