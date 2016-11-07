@@ -13,70 +13,19 @@
 
 -- | Representation of superarrows in Haskell.
 module Control.Super.Arrow
-  ( CategoryId(..)
-  , CategoryCompose(..)
-  , (Control.Super.Arrow.>>>), (Control.Super.Arrow.<<<)
-  , ArrowArr(..)
+  ( ArrowArr(..)
+  , ArrowSequence(..)
   , ArrowSelect(..)
   , ArrowCombine(..)
   ) where
-
-import Data.Type.Equality ( (:~:)(Refl) )
-import Data.Type.Coercion ( Coercion(Coercion) )
 
 import Control.Super.Monad.Prelude hiding ( id, (.) )
 import qualified Control.Super.Monad.Prelude as P
 
 --import Control.Monad as M
-import Control.Arrow as A
+import qualified Control.Arrow as A
 
-import GHC.Exts ( Constraint, coerce )
-
--- -----------------------------------------------------------------------------
--- Definition of generalized categories
--- -----------------------------------------------------------------------------
-
-infixr 9 .
-infixr 1 <<<
-infixr 1 >>>
-
-class CategoryId cat where
-  type CategoryIdCts cat :: Constraint
-  type CategoryIdCts cat = ()
-  id :: (CategoryIdCts cat) => cat a a
-
-class CategoryCompose ca cb cc where
-  type CategoryComposeCts ca cb cc :: Constraint
-  type CategoryComposeCts ca cb cc = ()
-  (.) :: (CategoryComposeCts ca cb cc) => ca b c -> cb a b -> cc a c
-
-(<<<) :: ( CategoryCompose ca cb cc, CategoryComposeCts ca cb cc
-         ) => ca b c -> cb a b -> cc a c
-(<<<) = (.)
-
-(>>>) :: ( CategoryCompose ca cb cc, CategoryComposeCts ca cb cc
-         ) => cb a b -> ca b c -> cc a c
-(>>>) = flip (.)
-
-instance CategoryId (->) where
-  id x = x
-instance (Return m) => CategoryId (A.Kleisli m) where
-  type CategoryIdCts (A.Kleisli m) = (ReturnCts m)
-  id = A.Kleisli return
-instance CategoryId (:~:) where
-  id = Refl
-instance CategoryId Coercion where
-  id = Coercion
-
-instance CategoryCompose (->) (->) (->) where
-  (f . g) x = f (g x)
-instance (Bind n m p) => CategoryCompose (A.Kleisli m) (A.Kleisli n) (A.Kleisli p) where
-  type CategoryComposeCts (A.Kleisli m) (A.Kleisli n) (A.Kleisli p) = (BindCts n m p)
-  (A.Kleisli f) . (A.Kleisli g) = A.Kleisli (\b -> g b >>= f)
-instance CategoryCompose (:~:) (:~:) (:~:) where
-  Refl . Refl = Refl
-instance CategoryCompose Coercion Coercion Coercion where
-  (.) Coercion = coerce
+import GHC.Exts ( Constraint )
 
 -- -----------------------------------------------------------------------------
 -- Definition of generalized arrows (Superarrows)
@@ -92,6 +41,24 @@ instance ArrowArr (->) where
 instance (Return m) => ArrowArr (A.Kleisli m) where
   type ArrowArrCts (A.Kleisli m) = (ReturnCts m)
   arr f = A.Kleisli $ return P.. f
+
+infixr 1 <<<
+infixr 1 >>>  
+  
+class ArrowSequence f g h  where
+  type ArrowSequenceCts f g h :: Constraint
+  type ArrowSequenceCts f g h = ()
+  (<<<) :: (ArrowSequenceCts f g h) => g b c -> f a b -> h a c
+  (<<<) = flip (>>>)
+  (>>>) :: (ArrowSequenceCts f g h) => f a b -> g b c -> h a c
+  (>>>) = flip (<<<)
+
+instance ArrowSequence (->) (->) (->) where
+  (>>>) = (A.>>>)
+  (<<<) = (A.<<<)
+instance (Bind m n p) => ArrowSequence (A.Kleisli m) (A.Kleisli n) (A.Kleisli p) where
+  type ArrowSequenceCts (A.Kleisli m) (A.Kleisli n) (A.Kleisli p) = (BindCts m n p)
+  (>>>) (A.Kleisli mf) (A.Kleisli mg) = A.Kleisli $ \a -> mf a >>= \b -> mg b
 
 class ArrowSelect f g where
   type ArrowSelectCts f g :: Constraint
