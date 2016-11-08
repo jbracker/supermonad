@@ -8,6 +8,7 @@
   drop in replacement for the standard functor type class.
 * Introduced support for superarrows through the `ArrowArr`, `ArrowSequence`,
   `ArrowSelect` and `ArrowCombine` type classes.
+  * Added `ebba` examples that uses superarrows.
 * Restructure modules to put common plugin code into a module that is not 
   associated with supermonad or superarrows specifically. The old modules
   are still provided so that people coming from the paper can still rely on
