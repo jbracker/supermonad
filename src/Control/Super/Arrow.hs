@@ -16,7 +16,8 @@ module Control.Super.Arrow
   ( ArrowArr(..)
   , ArrowSequence(..)
   , ArrowSelect(..)
-  , ArrowCombine(..)
+  , ArrowParallel(..)
+  , ArrowFanOut(..)
   ) where
 
 import Control.Super.Monad.Prelude hiding ( id, (.) )
@@ -42,9 +43,11 @@ instance (Return m) => ArrowArr (A.Kleisli m) where
   type ArrowArrCts (A.Kleisli m) = (ReturnCts m)
   arr f = A.Kleisli $ return P.. f
 
+
+
 infixr 1 <<<
 infixr 1 >>>  
-  
+
 class ArrowSequence f g h  where
   type ArrowSequenceCts f g h :: Constraint
   type ArrowSequenceCts f g h = ()
@@ -59,6 +62,8 @@ instance ArrowSequence (->) (->) (->) where
 instance (Bind m n p) => ArrowSequence (A.Kleisli m) (A.Kleisli n) (A.Kleisli p) where
   type ArrowSequenceCts (A.Kleisli m) (A.Kleisli n) (A.Kleisli p) = (BindCts m n p)
   (>>>) (A.Kleisli mf) (A.Kleisli mg) = A.Kleisli $ \a -> mf a >>= \b -> mg b
+
+
 
 class ArrowSelect f g where
   type ArrowSelectCts f g :: Constraint
@@ -81,22 +86,35 @@ instance (Bind m m n, Return m) => ArrowSelect (A.Kleisli m) (A.Kleisli n) where
   first  (A.Kleisli f) = A.Kleisli (\ ~(b,d) -> f b >>= \c -> return (c,d))
   second (A.Kleisli f) = A.Kleisli (\ ~(d,b) -> f b >>= \c -> return (d,c))
 -}
+
+
 infixr 3 ***
 infixr 3 &&&
 
-class ArrowCombine f g h where
-  type ArrowCombineCts f g h :: Constraint
-  type ArrowCombineCts f g h = ()
-  (***) :: (ArrowCombineCts f g h) => f b c -> g b' c' -> h (b, b') (c, c')
-  (&&&) :: (ArrowCombineCts f g h) => f b c -> g b  c' -> h b (c, c')
+class ArrowParallel f g h where
+  type ArrowParallelCts f g h :: Constraint
+  type ArrowParallelCts f g h = ()
+  (***) :: (ArrowParallelCts f g h) => f b c -> g b' c' -> h (b, b') (c, c')
 
-instance ArrowCombine (->) (->) (->) where
+instance ArrowParallel (->) (->) (->) where
   (***) = (A.***)
-  (&&&) = (A.&&&)
-instance (Bind m n p, Functor n) => ArrowCombine (A.Kleisli m) (A.Kleisli n) (A.Kleisli p) where
-  type ArrowCombineCts (A.Kleisli m) (A.Kleisli n) (A.Kleisli p) = (BindCts m n p)
+instance (Bind m n p, Functor n) => ArrowParallel (A.Kleisli m) (A.Kleisli n) (A.Kleisli p) where
+  type ArrowParallelCts (A.Kleisli m) (A.Kleisli n) (A.Kleisli p) = (BindCts m n p)
   -- (b -> m c) -> (b' -> n c') -> ((b, b') -> p (c, c'))
   (A.Kleisli f) *** (A.Kleisli g) = A.Kleisli $ \(b, b') -> f b >>= \c -> fmap (\c' -> (c, c')) (g b')
+
+
+
+class ArrowFanOut f g h where
+  type ArrowFanOutCts f g h :: Constraint
+  type ArrowFanOutCts f g h = ()
+  (&&&) :: (ArrowFanOutCts f g h) => f b c -> g b  c' -> h b (c, c')
+
+instance ArrowFanOut (->) (->) (->) where
+  (&&&) = (A.&&&)
+
+instance (Bind m n p, Functor n) => ArrowFanOut (A.Kleisli m) (A.Kleisli n) (A.Kleisli p) where
+  type ArrowFanOutCts (A.Kleisli m) (A.Kleisli n) (A.Kleisli p) = (BindCts m n p)
   -- (b -> m c) -> (b  -> n c') -> (b       -> p (c, c'))
   (A.Kleisli f) &&& (A.Kleisli g) = A.Kleisli $ \b -> f b >>= \c -> fmap (\c' -> (c, c')) (g b)
 

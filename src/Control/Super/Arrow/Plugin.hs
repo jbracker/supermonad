@@ -28,7 +28,8 @@ import Control.Super.Plugin.Names
   , arrowArrClassName
   , arrowSequenceClassName
   , arrowSelectClassName
-  , arrowCombineClassName )
+  , arrowParallelClassName
+  , arrowFanOutClassName )
 
 -- -----------------------------------------------------------------------------
 -- The Plugin
@@ -45,7 +46,9 @@ plugin = pluginPrototype moduleQuery [classQuery] solvingGroups instanceImplicat
 -- | Configure which groups of classes need to be solved together.
 solvingGroups :: [[PluginClassName]]
 solvingGroups = 
-  [ [ arrowArrClassName, arrowSequenceClassName, arrowSelectClassName, arrowCombineClassName ] ]
+  [ [ arrowArrClassName
+    , arrowSequenceClassName, arrowSelectClassName
+    , arrowParallelClassName, arrowFanOutClassName ] ]
 
 -- | Queries the module providing the superarrow classes.
 moduleQuery :: ModuleQuery
@@ -66,7 +69,8 @@ classQuery = ClassQuery moduleQuery
   [ (arrowArrClassName     , 1)
   , (arrowSequenceClassName, 3)
   , (arrowSelectClassName  , 2)
-  , (arrowCombineClassName , 3)
+  , (arrowParallelClassName, 3)
+  , (arrowFanOutClassName  , 3)
   ]
 
 -- | Ensures that all supermonad instance implications with the group of 
@@ -75,7 +79,8 @@ instanceImplications :: ClassDict -> [InstanceImplication]
 instanceImplications clsDict =
     (arrowArrClassName <=> arrowSequenceClassName) ++
     (arrowArrClassName <=> arrowSelectClassName  ) ++
-    (arrowArrClassName <=> arrowCombineClassName )
+    (arrowArrClassName <=> arrowParallelClassName) ++
+    (arrowArrClassName <=> arrowFanOutClassName  )
   where
     (==>) = clsDictInstImp clsDict
     (<=>) = clsDictInstEquiv clsDict

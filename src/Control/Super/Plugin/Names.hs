@@ -26,7 +26,8 @@ module Control.Super.Plugin.Names
   , arrowArrClassName
   , arrowSequenceClassName
   , arrowSelectClassName
-  , arrowCombineClassName
+  , arrowParallelClassName
+  , arrowFanOutClassName
   ) where
 
 -- | Type of module names the plugin uses.
@@ -122,9 +123,16 @@ arrowSequenceClassName = "ArrowSequence"
 arrowSelectClassName :: PluginClassName
 arrowSelectClassName = "ArrowSelect"
 
--- | Name of the @ArrowCombine@ class.
---   Also used as dictionary key for the @ArrowCombine@ class.
-arrowCombineClassName :: PluginClassName
-arrowCombineClassName = "ArrowCombine"
+-- | Name of the @ArrowParallel@ class.
+--   Also used as dictionary key for the @ArrowParallel@ class.
+arrowParallelClassName :: PluginClassName
+arrowParallelClassName = "ArrowParallel"
+
+-- | Name of the @ArrowFanOut@ class.
+--   Also used as dictionary key for the @ArrowFanOut@ class.
+arrowFanOutClassName :: PluginClassName
+arrowFanOutClassName = "ArrowFanOut"
+
+
 
 
