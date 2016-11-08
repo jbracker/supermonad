@@ -1,4 +1,6 @@
 
+DIR:=$(shell pwd)
+
 install: init
 	cabal install
 
@@ -12,6 +14,10 @@ clean: init
 	rm -fR ./examples/hmtc/supermonad/dist
 	rm -fR ./examples/hmtc/monad-param/dist
 	rm -fR ./examples/constrained/dist
+	rm -fR ./examples/ebba/dist
+	cabal sandbox delete-source $(DIR)/examples/ebba/gnewplot
+	rm -fR ./examples/ebba/gnewplot
+	rm -f  ./examples/ebba/*.eps
 	rm -fR ./dist
 
 clean-sandbox:
@@ -27,7 +33,7 @@ opendoc:
 init:
 	[ -f ./cabal.sandbox.config ] || [ -d ./.cabal-sandbox ] || cabal sandbox init
 
-supermonad-examples: install minimal-example session-example session-chat-supermonad-example effect-example constrained-example hmtc-supermonad-example
+supermonad-examples: install minimal-example session-example session-chat-supermonad-example effect-example constrained-example hmtc-supermonad-example ebba-example
 
 minimal-example: install
 	cabal install ./examples/minimal
@@ -55,3 +61,12 @@ hmtc-supermonad-example: install
 	
 hmtc-monad-param-example: init
 	cabal install ./examples/hmtc/monad-param
+
+ebba-example:
+	[ -d ./gnewplot ] || git clone https://github.com/glutamate/gnewplot.git ./examples/ebba/gnewplot
+	cabal sandbox add-source ./examples/ebba/gnewplot
+	cabal install ./examples/ebba
+
+
+
+

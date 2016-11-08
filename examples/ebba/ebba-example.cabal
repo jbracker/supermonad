@@ -1,0 +1,26 @@
+name:                ebba-example
+version:             0.1
+synopsis:            Example
+category:
+description:         Example
+author:              Henrik Nilsson <nhn@cs.nott.ac.uk>
+maintainer:          Henrik Nilsson <nhn@cs.nott.ac.uk>
+stability:           experimental
+copyright:           Copyright (c) 2014, Henrik Nilsson
+build-type:          Simple
+cabal-version:       >=1.10
+
+executable ebba-example
+  build-depends: base, random, containers, gnewplot
+  main-is:             Ebba.hs
+  hs-source-dirs:      .
+  default-language:    Haskell2010
+  ghc-options:         -Wall
+
+executable ebba-example-sa
+  build-depends: base, random, containers, gnewplot
+               , supermonad == 0.2
+  main-is:             EbbaSuperarrow.hs
+  hs-source-dirs:      .
+  default-language:    Haskell2010
+  ghc-options:         -Wall -dynamic -dcore-lint
