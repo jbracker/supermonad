@@ -133,6 +133,7 @@ import qualified Data.Map as M	-- Try to import Data.Map.Strict instead.
 import Graphics.Gnewplot.Histogram
 import Graphics.Gnewplot (gnuplotOnScreen, gnuplotToPS)
 
+import qualified Control.Super.Arrow as A
 
 infixr 3 ***
 infixr 3 &&&
@@ -651,6 +652,9 @@ arr f = mkCP $ \x_e _ _ -> do
                 lpds = neutrSummand
             return (y_e, x_o, lpds, M.empty, arrE)
 
+instance A.ArrowArr (CP U) where
+  arr = arr
+
 -- Rarr: reversible arrow
 -- 
 -- TODO: Need to verify that the reverse mapping does not affect
@@ -686,6 +690,8 @@ cp1 *** cp2 = mkCP $ \(x1_e, x2_e) ~(x1_f, x2_f) ~(y1_o, y2_o) -> do
             return ((y1_e, y2_e), (x1_o, x2_o), lpds1 + lpds2, M.union ps1 ps2,
                     e1' *** e2')
 
+instance (o3 ~ (o1 *** o2)) => A.ArrowParallel (CP o1) (CP o2) (CP o3) where
+  (***) = (***)
 
 -- Sequential composition
 -- Data flow:
@@ -728,6 +734,9 @@ cp1 *** cp2 = mkCP $ \(x1_e, x2_e) ~(x1_f, x2_f) ~(y1_o, y2_o) -> do
             return ((y_e, z_e), x_o, lpds1 + lpds2, M.union ps1 ps2,
                     e1' &&& e2')
 
+instance (o3 ~ (o1 &&& o2)) => A.ArrowFanOut (CP o1) (CP o2) (CP o3) where
+  type ArrowFanOutCts (CP o1) (CP o2) (CP o3) = () -- Selectable o1 o2 ?
+  (&&&) = (&&&)
 
 -- N-ary fan out. The integer parameter is only used in the forward
 -- direction; ignored when estimating.
