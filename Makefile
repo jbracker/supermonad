@@ -63,8 +63,9 @@ hmtc-monad-param-example: init
 	cabal install ./examples/hmtc/monad-param
 
 ebba-example:
-	[ -d ./gnewplot ] || git clone https://github.com/glutamate/gnewplot.git ./examples/ebba/gnewplot
-	cabal sandbox add-source ./examples/ebba/gnewplot
+	[ -d ./examples/ebba/gnewplot ] || ( \
+		git clone https://github.com/glutamate/gnewplot.git ./examples/ebba/gnewplot && \
+		cabal sandbox add-source ./examples/ebba/gnewplot )
 	cabal install ./examples/ebba
 
 
