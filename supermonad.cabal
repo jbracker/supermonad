@@ -64,6 +64,7 @@ library
                  , Control.Super.Arrow
                  , Control.Super.Arrow.Plugin
                  , Control.Super.Arrow.Prelude
+                 , Control.Super.Arrow.Constrained
                  -- Legacy Modules
                  , Control.Supermonad
                  , Control.Supermonad.Prelude
