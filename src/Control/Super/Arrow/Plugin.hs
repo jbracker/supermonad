@@ -24,7 +24,7 @@ import Control.Super.Plugin.Detect
 import Control.Super.Plugin.Names
   ( PluginClassName
   , superarrowModuleName
-  , legacySuperarrowModuleName
+  , superarrowCtModuleName
   , arrowArrClassName
   , arrowSequenceClassName
   , arrowSelectClassName
@@ -53,15 +53,9 @@ solvingGroups =
 -- | Queries the module providing the superarrow classes.
 moduleQuery :: ModuleQuery
 moduleQuery = EitherModule
-  [ AnyModule [ ThisModule superarrowModuleName Nothing
-              , ThisModule legacySuperarrowModuleName Nothing
-              ]
-  ]{-, AnyModule [ ThisModule supermonadCtModuleName Nothing
-              , ThisModule supermonadCtPreludeModuleName Nothing
-              , ThisModule legacySupermonadCtModuleName Nothing
-              , ThisModule legacySupermonadCtPreludeModuleName Nothing
-              ]
-  ]-} $ Just findSuperarrowModulesErrMsg
+  [ AnyModule [ ThisModule superarrowModuleName Nothing ]
+  , AnyModule [ ThisModule superarrowCtModuleName Nothing ]
+  ] $ Just findSuperarrowModulesErrMsg
 
 -- | Queries the superarrow classes.
 classQuery :: ClassQuery

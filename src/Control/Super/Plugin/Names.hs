@@ -21,7 +21,7 @@ module Control.Super.Plugin.Names
   , applicativeClassName
     -- * Superarrow Module Names
   , superarrowModuleName
-  , legacySuperarrowModuleName
+  , superarrowCtModuleName
     -- * Superarrow Class Names
   , arrowArrClassName
   , arrowSequenceClassName
@@ -100,13 +100,13 @@ functorModuleName = "Data.Functor"
 -- Constant Superarrow Names (Magic Numbers...)
 -- -----------------------------------------------------------------------------
 
--- | Name of the "Control.Superarrow" module.
-legacySuperarrowModuleName :: PluginModuleName
-legacySuperarrowModuleName = "Control.Superarrow"
-
 -- | Name of the "Control.Super.Arrow" module.
 superarrowModuleName :: PluginModuleName
 superarrowModuleName = "Control.Super.Arrow"
+
+-- | Name of the "Control.Super.Arrow.Constrained" module.
+superarrowCtModuleName :: PluginModuleName
+superarrowCtModuleName = "Control.Super.Arrow.Constrained"
 
 -- | Name of the @ArrowArr@ type class.
 --   Also used as dictionary key for the @ArrowArr@ class.
