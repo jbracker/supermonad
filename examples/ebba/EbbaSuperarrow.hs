@@ -8,6 +8,8 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+
 
 -- TODO:
 -- * Observations should really only be fed in once! And then
@@ -133,7 +135,7 @@ import qualified Data.Map as M	-- Try to import Data.Map.Strict instead.
 import Graphics.Gnewplot.Histogram
 import Graphics.Gnewplot (gnuplotOnScreen, gnuplotToPS)
 
-import qualified Control.Super.Arrow as A
+import qualified Control.Super.Arrow.Constrained as A
 
 infixr 3 ***
 infixr 3 &&&
@@ -719,6 +721,10 @@ instance (o3 ~ (o1 *** o2)) => A.ArrowParallel (CP o1) (CP o2) (CP o3) where
                         y_f)
             return (fst fp)
 
+instance (o3 ~ (o1 >>> o2)) => A.ArrowSequence (CP o1) (CP o2) (CP o3) where
+  type ArrowSequenceCts (CP o1) (CP o2) (CP o3) a b c = (Fusable o2 b)
+  (>>>) = (>>>)
+
 -- Fan out
 (&&&) :: Selectable o1 o2 a => CP o1 a b -> CP o2 a c -> CP (o1 &&& o2) a (b,c)
 (&&&) cp1 cp2 = mkCP $ \x_e x_f ~(y_o, z_o) -> do
@@ -735,8 +741,49 @@ instance (o3 ~ (o1 *** o2)) => A.ArrowParallel (CP o1) (CP o2) (CP o3) where
                     e1' &&& e2')
 
 instance (o3 ~ (o1 &&& o2)) => A.ArrowFanOut (CP o1) (CP o2) (CP o3) where
-  type ArrowFanOutCts (CP o1) (CP o2) (CP o3) = () -- Selectable o1 o2 ?
+  type ArrowFanOutCts (CP o1) (CP o2) (CP o3) a b c = (Selectable o1 o2 a)
   (&&&) = (&&&)
+
+{-
+data CP o a b = CP {
+    cp         :: a -> Prob b,
+    initEstim  :: a -> a -> b -> Prob (b, a, Double, Parameters, E o a b)
+}
+
+data E o a b = E {
+    estimate :: Bool -> a -> a -> b -> Prob (b, a, Double, Parameters, E o a b)
+}
+-}
+
+first :: forall o a b c. CP o a b -> CP o (a, c) (b, c)
+first (CP cp initEstim) = CP 
+  { cp = \(a, c) -> fmap (\b -> (b, c)) (cp a)
+  , initEstim = \(a, c0) (a', c1) (b, c2) -> 
+      let g :: E o a b -> E o (a,c) (b,c)
+          g (E est) = E $ \bool (a, c) (a', c') (b, c'') -> fmap f (est bool a a' b)
+          f :: (b, a, Double, Parameters, E o a b) 
+            -> ((b, c), (a, c), Double, Parameters, E o (a,c) (b,c))
+          f (b', a'', d, p, e) = ((b', c2), (a'', c0 {- or c1? -}), d, p, g e)
+      in fmap f (initEstim a a' b)
+  }
+
+second :: CP o a b -> CP o (c, a) (c, b)
+second (CP cp initEstim) = CP 
+  { cp = undefined
+  , initEstim = undefined
+  }
+
+instance A.ArrowSelect (CP o) (CP o) where
+  first = first
+  second = second
+  {-
+  type ArrowSelectFstCts f g a b c :: Constraint
+  type ArrowSelectFstCts f g a b c = ()
+  type ArrowSelectSndCts f g a b c :: Constraint
+  type ArrowSelectSndCts f g a b c = ()
+  first  :: (ArrowSelectFstCts f g a b c) => f a b -> g (a, c) (b, c)
+  second :: (ArrowSelectSndCts f g a b c) => f a b -> g (c, a) (c, b)  
+  -}
 
 -- N-ary fan out. The integer parameter is only used in the forward
 -- direction; ignored when estimating.
