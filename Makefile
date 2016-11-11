@@ -19,6 +19,7 @@ clean: init
 	rm -fR ./examples/ebba/gnewplot
 	rm -f  ./examples/ebba/*.eps
 	rm -fR ./dist
+	rm -f  ./*.eps
 
 clean-sandbox:
 	rm -fR ./.cabal-sandbox
