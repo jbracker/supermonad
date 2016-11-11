@@ -773,9 +773,17 @@ second (CP cp initEstim) = CP
   , initEstim = undefined
   }
 
-instance A.ArrowSelect (CP o) (CP o) where
-  first = first
-  second = second
+first' :: CP o a b -> CP (o *** (O '[])) (a, c) (b, c)
+first' f = f *** rarr id id
+
+second' :: CP o a b -> CP ((O '[]) *** o) (c, a) (c, b)
+second' f = rarr id id *** f
+
+instance A.ArrowSelect (CP o1) (CP o2) where
+  type ArrowSelectFstCts (CP o1) (CP o2) a b c = (o2 ~ (o1 *** (O '[])))
+  type ArrowSelectSndCts (CP o1) (CP o2) a b c = (o2 ~ ((O '[]) *** o1))
+  first = first'
+  second = second'
   {-
   type ArrowSelectFstCts f g a b c :: Constraint
   type ArrowSelectFstCts f g a b c = ()
