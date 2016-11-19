@@ -68,6 +68,7 @@ ebba-example:
 		cabal sandbox add-source ./examples/ebba/gnewplot )
 	cabal install ./examples/ebba
 
-
+reversible-arrows-example: init
+	cabal install ./examples/reversible-arrows
 
 
