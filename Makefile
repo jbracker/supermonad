@@ -19,6 +19,7 @@ clean: init
 	rm -fR ./examples/ebba/gnewplot
 	rm -f  ./examples/ebba/*.eps
 	rm -fR ./dist
+	rm -f  ./*.eps
 
 clean-sandbox:
 	rm -fR ./.cabal-sandbox
@@ -62,7 +63,7 @@ hmtc-supermonad-example: install
 hmtc-monad-param-example: init
 	cabal install ./examples/hmtc/monad-param
 
-ebba-example:
+ebba-example: install
 	[ -d ./examples/ebba/gnewplot ] || ( \
 		git clone https://github.com/glutamate/gnewplot.git ./examples/ebba/gnewplot && \
 		cabal sandbox add-source ./examples/ebba/gnewplot )
