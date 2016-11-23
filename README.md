@@ -5,8 +5,8 @@ Implementation of supermonads for GHC. See the
 of version 0.1.
 
 The library offers two definitions for supermonads. The version 
-in `Control.Supermonad` does not have support for constrained
-monads. The version in `Control.Supermonad.Constrained` has 
+in `Control.Super.Monad` does not have support for constrained
+monads. The version in `Control.Super.Monad.Constrained` has 
 support for constrained monads. The different versions are 
 provided, because working with the additional constraints 
 required for constrained monads can be cumbersome sometimes.
@@ -39,11 +39,11 @@ To use supermonads in a module you need to do the following:
   
 * Enable the plugin in that modules using the the `OPTIONS_GHC` pragma:
   
-  ```{-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}```
+  ```{-# OPTIONS_GHC -fplugin Control.Super.Monad.Plugin #-}```
   
-* Import the supermonad prelude `Control.Supermonad.Prelude`.
+* Import the supermonad prelude `Control.Super.Monad.Prelude`.
   If you choose to work with constrained monads you will need to
-  import `Control.Supermonad.Constrained.Prelude` instead.
+  import `Control.Super.Monad.Constrained.Prelude` instead.
 * Make sure to compile the module with the `-dynamic` flag.
   This is required for GHC's plugin mechanism to work properly.
 
