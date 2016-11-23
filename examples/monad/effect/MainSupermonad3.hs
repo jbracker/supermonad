@@ -10,7 +10,7 @@
 -- Ignore our orphan instance in this file.
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
--- Use the polymonad plugin.
+-- Use the supermonad plugin.
 {-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
 
 import Control.Supermonad.Prelude

@@ -2,7 +2,7 @@
 -- Requires for instances
 {-# LANGUAGE MultiParamTypeClasses #-}
 
--- Use the polymonad plugin.
+-- Use the supermonad plugin.
 {-# LANGUAGE RebindableSyntax #-}
 {-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
 

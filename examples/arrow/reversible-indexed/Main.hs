@@ -9,7 +9,7 @@
 
 {-# LANGUAGE GADTs #-}
 
--- Use the polymonad plugin.
+-- Use the supermonad plugin.
 {-# LANGUAGE RebindableSyntax #-}
 {-# OPTIONS_GHC -fplugin Control.Super.Arrow.Plugin #-}
 

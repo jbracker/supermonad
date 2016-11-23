@@ -6,7 +6,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleInstances #-}
 
--- Use the polymonad plugin.
+-- Use the supermonad plugin.
 {-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
