@@ -6,18 +6,24 @@ install: init
 
 clean: init
 	cabal clean
-	rm -fR ./examples/session/dist
-	rm -fR ./examples/session-chat/original/dist
-	rm -fR ./examples/session-chat/supermonad/dist
-	rm -fR ./examples/effect/dist
-	rm -fR ./examples/hmtc/original/dist
-	rm -fR ./examples/hmtc/supermonad/dist
-	rm -fR ./examples/hmtc/monad-param/dist
-	rm -fR ./examples/constrained/dist
-	rm -fR ./examples/ebba/dist
-	cabal sandbox delete-source $(DIR)/examples/ebba/gnewplot
-	rm -fR ./examples/ebba/gnewplot
-	rm -f  ./examples/ebba/*.eps
+	rm -fR ./examples/monad/session/dist
+	rm -fR ./examples/monad/effect/dist
+	rm -fR ./examples/monad/constrained/dist
+	
+	rm -fR ./examples/monad/session-chat/original/dist
+	rm -fR ./examples/monad/session-chat/supermonad/dist
+	
+	rm -fR ./examples/monad/hmtc/original/dist
+	rm -fR ./examples/monad/hmtc/supermonad/dist
+	rm -fR ./examples/monad/hmtc/monad-param/dist
+	
+	rm -fR ./examples/arrow/ebba/dist
+	cabal sandbox delete-source $(DIR)/examples/arrow/ebba/gnewplot
+	rm -fR ./examples/arrow/ebba/gnewplot
+	rm -f  ./examples/arrow/ebba/*.eps
+	
+	rm -fR ./examples/arrow/reversible-indexed/dist
+	
 	rm -fR ./dist
 	rm -f  ./*.eps
 
@@ -34,42 +40,44 @@ opendoc:
 init:
 	[ -f ./cabal.sandbox.config ] || [ -d ./.cabal-sandbox ] || cabal sandbox init
 
-supermonad-examples: install minimal-example session-example session-chat-supermonad-example effect-example constrained-example hmtc-supermonad-example ebba-example
+supermonad-examples: install minimal-example session-example session-chat-supermonad-example effect-example constrained-example hmtc-supermonad-example
+
+superarrow-examples: install ebba-example reversible-indexed-example
 
 minimal-example: install
-	cabal install ./examples/minimal
+	cabal install ./examples/monad/minimal
 
 session-example: install
-	cabal install ./examples/session
+	cabal install ./examples/monad/session
 
 session-chat-orig-example: init
-	cabal install ./examples/session-chat/original
+	cabal install ./examples/monad/session-chat/original
 
 session-chat-supermonad-example: init
-	cabal install ./examples/session-chat/supermonad
+	cabal install ./examples/monad/session-chat/supermonad
 
 effect-example: install
-	cabal install ./examples/effect
+	cabal install ./examples/monad/effect
 
 constrained-example: install
-	cabal install ./examples/constrained
+	cabal install ./examples/monad/constrained
 
 hmtc-orig-example: init
-	cabal install ./examples/hmtc/original
+	cabal install ./examples/monad/hmtc/original
 
 hmtc-supermonad-example: install
-	cabal install ./examples/hmtc/supermonad
+	cabal install ./examples/monad/hmtc/supermonad
 	
 hmtc-monad-param-example: init
-	cabal install ./examples/hmtc/monad-param
+	cabal install ./examples/monad/hmtc/monad-param
 
 ebba-example: install
-	[ -d ./examples/ebba/gnewplot ] || ( \
-		git clone https://github.com/glutamate/gnewplot.git ./examples/ebba/gnewplot && \
-		cabal sandbox add-source ./examples/ebba/gnewplot )
-	cabal install ./examples/ebba
+	[ -d ./examples/arrow/ebba/gnewplot ] || ( \
+		git clone https://github.com/glutamate/gnewplot.git ./examples/arrow/ebba/gnewplot && \
+		cabal sandbox add-source ./examples/arrow/ebba/gnewplot )
+	cabal install ./examples/arrow/ebba
 
-reversible-arrows-example: init
-	cabal install ./examples/reversible-arrows
+reversible-indexed-example: init
+	cabal install ./examples/arrow/reversible-indexed
 
 
