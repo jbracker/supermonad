@@ -8,20 +8,19 @@
       http://www.staff.science.uu.nl/~swier101/Papers/1996/DetErrCorrComPars.pdf
 -}
 
-import Data.List ( nub )
 import Data.Char ( isAlpha, isDigit, isSpace )
 
 import Control.Applicative ( Applicative(..), Alternative(..) )
 import Control.Monad ( forM_, guard )
 
--- Parser with additional static information.
---   pEmpty   : Does the parser require to consume input?
---   pAccepted: Is the given token accepted by the parser? Predicate to judge lookahead.
---   pParse   : Actual parsing function.
-data Parser s a = P { pEmpty :: Bool, pAccepted :: s -> Bool, pParse :: [s] -> Maybe (a, [s]) }
+-- Parser with additional static information:
+--   * Does the parser require to consume input?
+--   * Is the given token accepted by the parser? Predicate to judge lookahead.
+--   * Actual parsing function.
+data Parser s a = P Bool (s -> Bool) ([s] -> Maybe (a, [s]))
 
 instance Functor (Parser s) where
-  fmap f (P empty accept p) = P empty accept $ \ss -> fmap (\(a, ss') -> (f a, ss')) $ p ss
+  fmap f (P e accept p) = P e accept $ \ss -> fmap (\(a, ss') -> (f a, ss')) $ p ss
 
 instance Applicative (Parser s) where
   pure a = P True (const True) $ \ss -> Just (a, ss)
@@ -32,8 +31,8 @@ instance Applicative (Parser s) where
       return (f a, ss3)
     where
       execDP :: Parser s a -> [s] -> Maybe (a, [s])
-      execDP ~(P empty accepts p) ss = case ss of
-        [] | empty     -> p ss
+      execDP ~(P e accepts p) ss = case ss of
+        [] | e         -> p ss
            | otherwise -> Nothing
         (s:_) | accepts s -> p ss
               | otherwise -> Nothing
@@ -63,15 +62,12 @@ predicate :: (s -> Bool) -> Parser s s
 predicate p = P False p $ \(s:ss) -> Just (s, ss)
 
 parse :: Parser s a -> [s] -> Maybe (a, [s])
-parse ~(P empty accepts p) [] 
-  | empty = p []
+parse ~(P e _accepts p) [] 
+  | e         = p []
   | otherwise = Nothing
-parse (P empty accepts p) ss@(s:_)
-  | accepts s || empty = p ss
-  | otherwise  = Nothing
-
-anyOf :: (Eq s) => [s] -> Parser s s
-anyOf xs = predicate (`elem` xs)
+parse (P e accepts p) ss@(s:_)
+  | accepts s || e = p ss
+  | otherwise      = Nothing
 
 equal :: Parser Char Token
 equal = symbol '=' *> pure TEqual
@@ -94,6 +90,7 @@ data Token = TNumber Int
            | TSemicolon
            deriving (Show, Eq, Ord)
 
+isIdent, isNumber :: Token -> Bool
 isIdent  t = case t of { TIdent  _ -> True ; _ -> False }
 isNumber t = case t of { TNumber _ -> True ; _ -> False }
 
