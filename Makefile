@@ -6,6 +6,7 @@ install: init
 
 clean: init
 	cabal clean
+	
 	rm -fR ./examples/monad/session/dist
 	rm -fR ./examples/monad/effect/dist
 	rm -fR ./examples/monad/constrained/dist
@@ -16,6 +17,8 @@ clean: init
 	rm -fR ./examples/monad/hmtc/original/dist
 	rm -fR ./examples/monad/hmtc/supermonad/dist
 	rm -fR ./examples/monad/hmtc/monad-param/dist
+	
+	rm -fR ./examples/applicative/ll1-parser/dist
 	
 	rm -fR ./examples/arrow/ebba/dist
 	cabal sandbox delete-source $(DIR)/examples/arrow/ebba/gnewplot
