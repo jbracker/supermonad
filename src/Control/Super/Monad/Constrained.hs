@@ -82,10 +82,11 @@ import qualified Control.Monad.Trans.Writer.Strict as WriterS ( WriterT(..) )
 import Control.Super.Monad.Constrained.Functor 
   ( Functor(..) )
 
-
 -- -----------------------------------------------------------------------------
 -- Super-Applicative Type Class
 -- -----------------------------------------------------------------------------
+
+infixl 4 <*>, <*, *>
 
 -- | TODO
 class (Functor m, Functor n, Functor p) => Applicative m n p where
@@ -427,6 +428,8 @@ instance (P.Monoid w, Applicative m n p) => Applicative (WriterS.WriterT w m) (W
 -- -----------------------------------------------------------------------------
 -- Supermonad Type Class
 -- -----------------------------------------------------------------------------
+
+infixl 1  >>, >>=
 
 -- | See @Control.Supermonad.@'Control.Supermonad.Bind' for details on laws and requirements.
 class (Applicative m n p) => Bind m n p where

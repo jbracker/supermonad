@@ -62,15 +62,16 @@ import Prelude
 
 import Control.Super.Monad.Constrained
 
-infixr 1 =<<
-infixr 1 >=>
-infixr 1 <=<
 
 -- | Standard implementation of if-then-else. Necessary because we are
 --   going to use @RebindableSyntax@ together with this prelude.
 ifThenElse :: Bool -> a -> a -> a
 ifThenElse True  t _f = t
 ifThenElse False _t f = f
+
+infixr 1 =<<
+infixr 1 >=>
+infixr 1 <=<
 
 -- | Same as '>>=', but with the arguments interchanged.
 (=<<) :: (Bind m n p, BindCts m n p a b) => (a -> n b) -> m a -> p b
@@ -277,6 +278,8 @@ ap mf na = do
   -- Remove the necessity of a 'Return' constraint.
   --return $ f a
 
+infixl 4 <$>
+
 -- | Apply the given function to the result of a computation.
 (<$>) :: ( Return n, ReturnCts n b
          , Bind m n n, BindCts m n n a b
@@ -284,6 +287,8 @@ ap mf na = do
 f <$> m = do
   x <- m
   return $ f x
+
+infixl 4 <$!>
 
 -- | Strict version of '<$>'.
 (<$!>) :: ( Return n, ReturnCts n b

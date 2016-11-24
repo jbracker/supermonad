@@ -60,6 +60,8 @@ import qualified Control.Monad.Trans.State.Strict  as StateS  ( StateT(..) )
 import qualified Control.Monad.Trans.Writer.Lazy   as WriterL ( WriterT(..), mapWriterT )
 import qualified Control.Monad.Trans.Writer.Strict as WriterS ( WriterT(..), mapWriterT )
 
+infixl 4  <$
+
 -- -----------------------------------------------------------------------------
 -- Constrained functor class
 -- -----------------------------------------------------------------------------
