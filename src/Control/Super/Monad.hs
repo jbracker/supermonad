@@ -74,6 +74,8 @@ import qualified Control.Monad.Trans.State.Strict  as StateS  ( StateT(..) )
 import qualified Control.Monad.Trans.Writer.Lazy   as WriterL ( WriterT(..) )
 import qualified Control.Monad.Trans.Writer.Strict as WriterS ( WriterT(..) )
 
+infixl 1 >>, >>=
+infixl 4 <*>, <*, *>
 
 -- -----------------------------------------------------------------------------
 -- Super-Applicative Type Class
