@@ -44,6 +44,9 @@ supermonad-examples: install minimal-example session-example session-chat-superm
 
 superarrow-examples: install ebba-example reversible-indexed-example
 
+superapplicative-examples: install ll1-parser-example
+
+# Compilation of (super)monad examples.
 minimal-example: install
 	cabal install ./examples/monad/minimal
 
@@ -71,6 +74,12 @@ hmtc-supermonad-example: install
 hmtc-monad-param-example: init
 	cabal install ./examples/monad/hmtc/monad-param
 
+# Compilation of (super)applicative examples.
+ll1-parser-example: install
+	cabal install ./examples/applicative/ll1-parser
+	
+
+# Compilation of (super)arrow examples.
 ebba-example: install
 	[ -d ./examples/arrow/ebba/gnewplot ] || ( \
 		git clone https://github.com/glutamate/gnewplot.git ./examples/arrow/ebba/gnewplot && \
