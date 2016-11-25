@@ -7,6 +7,8 @@ install: init
 clean: init
 	cabal clean
 	
+	rm -fR ./examples/test/missing-functions/dist
+	
 	rm -fR ./examples/monad/session/dist
 	rm -fR ./examples/monad/effect/dist
 	rm -fR ./examples/monad/constrained/dist
@@ -42,6 +44,11 @@ opendoc:
 
 init:
 	[ -f ./cabal.sandbox.config ] || [ -d ./.cabal-sandbox ] || cabal sandbox init
+
+
+missing-function-test:
+	cabal install ./examples/test/missing-functions
+
 
 supermonad-examples: install minimal-example session-example session-chat-supermonad-example effect-example constrained-example hmtc-supermonad-example
 
