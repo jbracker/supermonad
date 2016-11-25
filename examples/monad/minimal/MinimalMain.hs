@@ -3,7 +3,7 @@
 {-# LANGUAGE RebindableSyntax #-}
 {-# OPTIONS_GHC -fplugin Control.Super.Monad.Plugin #-}
 
-import Control.Supermonad.Prelude
+import Control.Super.Monad.Prelude
 
 main :: IO ()
 main = return ()
