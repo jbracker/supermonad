@@ -24,6 +24,7 @@ module Control.Super.Monad
     Bind(..), Return(..), Fail(..)
     -- * Super-Applicatives
   , Applicative(..), pure
+  , Functor(..)
     -- * Conveniences
   , Monad
   ) where
