@@ -60,6 +60,7 @@ import qualified Text.ParserCombinators.ReadP as Read ( ReadP )
 import qualified Text.ParserCombinators.ReadPrec as Read ( ReadPrec )
 
 import qualified GHC.Conc as STM ( STM )
+import qualified GHC.Generics as Generics
 
 -- To define "transformers" instances:
 import qualified Control.Monad.Trans.Cont     as Cont     ( ContT(..) )
@@ -231,13 +232,23 @@ instance (Arrow.Arrow a) => Applicative (Arrow.ArrowMonad a) (Arrow.ArrowMonad a
 instance (Applicative m m m, P.Monad m) => Applicative (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) where
   type ApplicativeCts (App.WrappedMonad m) (App.WrappedMonad m) (App.WrappedMonad m) = ApplicativeCts m m m
   mf <*> na = App.WrapMonad $ (App.unwrapMonad mf) <*> (App.unwrapMonad na)
-  mf *> na = App.WrapMonad $ (App.unwrapMonad mf) *> (App.unwrapMonad na)
-  mf <* na = App.WrapMonad $ (App.unwrapMonad mf) <* (App.unwrapMonad na)
+  mf  *> na = App.WrapMonad $ (App.unwrapMonad mf)  *> (App.unwrapMonad na)
+  mf <*  na = App.WrapMonad $ (App.unwrapMonad mf) <*  (App.unwrapMonad na)
 
 instance Applicative STM.STM STM.STM STM.STM where
   (<*>) = (P.<*>)
   (<*)  = (P.<*)
   (*>)  = (P.*>)
+
+instance Applicative Generics.U1 Generics.U1 Generics.U1 where
+  (<*>) = (P.<*>)
+  (<*)  = (P.<*)
+  (*>)  = (P.*>)
+instance (Applicative f g h) => Applicative (Generics.Rec1 f) (Generics.Rec1 g) (Generics.Rec1 h) where
+  type ApplicativeCts (Generics.Rec1 f) (Generics.Rec1 g) (Generics.Rec1 h) = ApplicativeCts f g h
+  (Generics.Rec1 mf) <*> (Generics.Rec1 ma) = Generics.Rec1 $ mf <*> ma
+  (Generics.Rec1 mf)  *> (Generics.Rec1 ma) = Generics.Rec1 $ mf  *> ma
+  (Generics.Rec1 mf) <*  (Generics.Rec1 ma) = Generics.Rec1 $ mf <*  ma
 
 -- "transformers" package instances: -------------------------------------------
 
@@ -428,6 +439,12 @@ instance (Bind m m m, P.Monad m) => Bind (App.WrappedMonad m) (App.WrappedMonad 
 instance Bind STM.STM STM.STM STM.STM where
   (>>=) = (P.>>=)
 
+instance Bind Generics.U1 Generics.U1 Generics.U1 where
+  (>>=) = (P.>>=)
+instance (Bind m n p) => Bind (Generics.Rec1 m) (Generics.Rec1 n) (Generics.Rec1 p) where
+  type BindCts (Generics.Rec1 m) (Generics.Rec1 n) (Generics.Rec1 p) = BindCts m n p
+  (Generics.Rec1 mf) >>= f = Generics.Rec1 $ mf >>= (Generics.unRec1 . f)
+
 -- "transformers" package instances: -------------------------------------------
 
 -- Continuations are so wierd...
@@ -603,6 +620,12 @@ instance (Return m, P.Monad m) => Return (App.WrappedMonad m) where
 
 instance Return STM.STM where
   return = P.return
+
+instance Return Generics.U1 where
+  return = P.return
+instance (Return m) => Return (Generics.Rec1 m) where
+  type ReturnCts (Generics.Rec1 m)= ReturnCts m
+  return = Generics.Rec1 . return
   
 -- "transformers" package instances: -------------------------------------------
 
@@ -749,6 +772,12 @@ instance (Fail m, P.Monad m) => Fail (App.WrappedMonad m) where
 
 instance Fail STM.STM where
   fail = P.fail
+
+instance Fail Generics.U1 where
+  fail = P.fail
+instance (Fail m) => Fail (Generics.Rec1 m) where
+  type FailCts (Generics.Rec1 m)= FailCts m
+  fail = Generics.Rec1 . fail
 
 -- "transformers" package instances: -------------------------------------------
 
