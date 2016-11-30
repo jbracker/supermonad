@@ -55,12 +55,14 @@ library
   exposed-modules: Control.Super.Monad
                  , Control.Super.Monad.Prelude
                  , Control.Super.Monad.Functions
+                 , Control.Super.Monad.Alternative
                  , Control.Super.Monad.Plugin
                  , Control.Super.Monad.PreludeWithoutMonad
                  , Control.Super.Monad.Constrained
                  , Control.Super.Monad.Constrained.Functor
                  , Control.Super.Monad.Constrained.Prelude
                  , Control.Super.Monad.Constrained.Functions
+                 , Control.Super.Monad.Constrained.Alternative
                  , Control.Super.Arrow
                  , Control.Super.Arrow.Plugin
                  , Control.Super.Arrow.Prelude
