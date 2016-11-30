@@ -20,8 +20,7 @@ module Control.Super.Arrow
   , ArrowFanOut(..)
   ) where
 
-import Control.Super.Monad.Prelude hiding ( id, (.) )
-import qualified Control.Super.Monad.Prelude as P
+import Control.Super.Monad.Prelude
 
 --import Control.Monad as M
 import qualified Control.Arrow as A
@@ -41,7 +40,7 @@ instance ArrowArr (->) where
   arr = A.arr
 instance (Return m) => ArrowArr (A.Kleisli m) where
   type ArrowArrCts (A.Kleisli m) = (ReturnCts m)
-  arr f = A.Kleisli $ return P.. f
+  arr f = A.Kleisli $ return . f
 
 
 
