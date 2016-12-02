@@ -12,6 +12,8 @@
 {-# LANGUAGE ScopedTypeVariables  #-} -- for 'ListT' instance.
 {-# LANGUAGE UndecidableInstances #-} -- for 'ListT' instance.
 
+{-# LANGUAGE TypeOperators #-} -- For ':*:' instance and others.
+
 #if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 -- Some of the constraints may be unnecessary, but they are intentional.
 -- This is especially true for the 'Fail' instances.
@@ -259,8 +261,8 @@ instance (Applicative m n p) => Applicative (App.WrappedMonad m) (App.WrappedMon
   type ApplicativeCtsR (App.WrappedMonad m) (App.WrappedMonad n) (App.WrappedMonad p) a b = ApplicativeCtsR m n p a b
   type ApplicativeCtsL (App.WrappedMonad m) (App.WrappedMonad n) (App.WrappedMonad p) a b = ApplicativeCtsL m n p a b
   mf <*> na = App.WrapMonad $ (App.unwrapMonad mf) <*> (App.unwrapMonad na)
-  mf *> na = App.WrapMonad $ (App.unwrapMonad mf) *> (App.unwrapMonad na)
-  mf <* na = App.WrapMonad $ (App.unwrapMonad mf) <* (App.unwrapMonad na)
+  mf  *> na = App.WrapMonad $ (App.unwrapMonad mf)  *> (App.unwrapMonad na)
+  mf <*  na = App.WrapMonad $ (App.unwrapMonad mf) <*  (App.unwrapMonad na)
 
 instance Applicative STM.STM STM.STM STM.STM where
   (<*>) = (P.<*>)
@@ -278,6 +280,24 @@ instance (Applicative f g h) => Applicative (Generics.Rec1 f) (Generics.Rec1 g) 
   (Generics.Rec1 mf) <*> (Generics.Rec1 ma) = Generics.Rec1 $ mf <*> ma
   (Generics.Rec1 mf)  *> (Generics.Rec1 ma) = Generics.Rec1 $ mf  *> ma
   (Generics.Rec1 mf) <*  (Generics.Rec1 ma) = Generics.Rec1 $ mf <*  ma
+instance (Applicative f g h, Applicative f' g' h') => Applicative (f Generics.:*: f') (g Generics.:*: g') (h Generics.:*: h') where
+  type ApplicativeCts  (f Generics.:*: f') (g Generics.:*: g') (h Generics.:*: h') a b = (ApplicativeCts  f g h a b, ApplicativeCts  f' g' h' a b)
+  type ApplicativeCtsL (f Generics.:*: f') (g Generics.:*: g') (h Generics.:*: h') a b = (ApplicativeCtsL f g h a b, ApplicativeCtsL f' g' h' a b)
+  type ApplicativeCtsR (f Generics.:*: f') (g Generics.:*: g') (h Generics.:*: h') a b = (ApplicativeCtsR f g h a b, ApplicativeCtsR f' g' h' a b)
+  (f Generics.:*: g) <*> (f' Generics.:*: g') = (f <*> f') Generics.:*: (g <*> g')
+  (f Generics.:*: g)  *> (f' Generics.:*: g') = (f  *> f') Generics.:*: (g  *> g')
+  (f Generics.:*: g) <*  (f' Generics.:*: g') = (f <*  f') Generics.:*: (g <*  g')
+-- TODO: Is there a nicer way to implement this for ':.:'?
+instance (Applicative f g h, Applicative f' g' h') => Applicative (f Generics.:.: f') (g Generics.:.: g') (h Generics.:.: h') where
+  type ApplicativeCts  (f Generics.:.: f') (g Generics.:.: g') (h Generics.:.: h') a b = ( ApplicativeCts f g h (g' a) (h' b), ApplicativeCts  f' g' h' a b
+                                                                                         , FunctorCts f (f' (a -> b)) (g' a -> h' b))
+  type ApplicativeCtsL (f Generics.:.: f') (g Generics.:.: g') (h Generics.:.: h') a b = ( ApplicativeCts f g h (g' b) (h' a), ApplicativeCtsL f' g' h' a b
+                                                                                         , FunctorCts f (f' a) (g' b -> h' a) )
+  type ApplicativeCtsR (f Generics.:.: f') (g Generics.:.: g') (h Generics.:.: h') a b = ( ApplicativeCts f g h (g' b) (h' b), ApplicativeCtsR f' g' h' a b
+                                                                                         , FunctorCts f (f' a) (g' b -> h' b) )
+  (Generics.Comp1 mf) <*> (Generics.Comp1 ma) = Generics.Comp1 $ fmap (<*>) mf <*> ma
+  (Generics.Comp1 ma)  *> (Generics.Comp1 mb) = Generics.Comp1 $ fmap ( *>) ma <*> mb
+  (Generics.Comp1 ma) <*  (Generics.Comp1 mb) = Generics.Comp1 $ fmap (<* ) ma <*> mb
 
 -- Constrained Instances -------------------------------------------------------
 
@@ -531,6 +551,9 @@ instance Bind Generics.U1 Generics.U1 Generics.U1 where
 instance (Bind m n p) => Bind (Generics.Rec1 m) (Generics.Rec1 n) (Generics.Rec1 p) where
   type BindCts (Generics.Rec1 m) (Generics.Rec1 n) (Generics.Rec1 p) a b = BindCts m n p a b
   (Generics.Rec1 mf) >>= f = Generics.Rec1 $ mf >>= (Generics.unRec1 . f)
+instance (Bind f g h, Bind f' g' h') => Bind (f Generics.:*: f') (g Generics.:*: g') (h Generics.:*: h') where
+  type BindCts (f Generics.:*: f') (g Generics.:*: g') (h Generics.:*: h') a b = (BindCts f g h a b, BindCts f' g' h' a b)
+  (f Generics.:*: g) >>= m = (f >>= \a -> let (f' Generics.:*: _g') = m a in f') Generics.:*: (g >>= \a -> let (_f' Generics.:*: g') = m a in g')
 
 
 -- Constrained Instances -------------------------------------------------------
@@ -720,6 +743,12 @@ instance Return Generics.U1 where
 instance (Return m) => Return (Generics.Rec1 m) where
   type ReturnCts (Generics.Rec1 m) a = ReturnCts m a
   return = Generics.Rec1 . return
+instance (Return f, Return g) => Return (f Generics.:*: g) where
+  type ReturnCts (f Generics.:*: g) a = (ReturnCts f a, ReturnCts g a)
+  return a = return a Generics.:*: return a
+instance (Return f, Return g) => Return (f Generics.:.: g) where
+  type ReturnCts (f Generics.:.: g) a = (ReturnCts f (g a), ReturnCts g a)
+  return a = Generics.Comp1 $ return (return a)
 
 -- Constrained Instances -------------------------------------------------------
 
@@ -876,6 +905,9 @@ instance Fail Generics.U1 where
 instance (Fail m) => Fail (Generics.Rec1 m) where
   type FailCts (Generics.Rec1 m) a = FailCts m a
   fail = Generics.Rec1 . fail
+instance (Fail f, Fail g) => Fail (f Generics.:*: g) where
+  type FailCts (f Generics.:*: g) a = (FailCts f a, FailCts g a)
+  fail a = fail a Generics.:*: fail a
 
 -- Constrained Instances -------------------------------------------------------
 

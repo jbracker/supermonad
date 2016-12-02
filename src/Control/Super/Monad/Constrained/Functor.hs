@@ -6,6 +6,8 @@
 
 {-# LANGUAGE UndecidableInstances #-} -- Required for some of the 'transformer' instances.
 
+{-# LANGUAGE TypeOperators #-} -- For ':*:' instance and others.
+
 -- | Definition of constrained functors as they are required to work with
 --   constrained monads and constrained supermonads.
 module Control.Super.Monad.Constrained.Functor 
@@ -185,6 +187,13 @@ instance (Functor f) => Functor (Generics.Rec1 f) where
   type FunctorCts (Generics.Rec1 f) a b = FunctorCts f a b
   fmap f (Generics.Rec1 ma) = Generics.Rec1 $ fmap f ma
   a <$ (Generics.Rec1 mb) = Generics.Rec1 $ a <$ mb
+
+instance (Functor f, Functor g) => Functor (f Generics.:*: g) where
+  type FunctorCts (f Generics.:*: g) a b = (FunctorCts f a b, FunctorCts g a b)
+  fmap f (a Generics.:*: b) = (fmap f a) Generics.:*: (fmap f b)
+instance (Functor f, Functor g) => Functor (f Generics.:.: g) where
+  type FunctorCts (f Generics.:.: g) a b = (FunctorCts f (g a) (g b), FunctorCts g a b)
+  fmap f (Generics.Comp1 ma) = Generics.Comp1 $ fmap (fmap f) ma
 
 -- Constrained instances -------------------------------------------------------
 

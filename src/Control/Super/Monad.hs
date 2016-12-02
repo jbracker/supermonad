@@ -12,6 +12,8 @@
 {-# LANGUAGE ScopedTypeVariables  #-} -- for 'ListT' instance.
 {-# LANGUAGE UndecidableInstances #-} -- for 'ListT' instance.
 
+{-# LANGUAGE TypeOperators #-} -- For ':*:' instance and others.
+
 #if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 -- Some of the constraints may be unnecessary, but they are intentional.
 -- This is especially true for the 'Fail' instances.
@@ -249,6 +251,14 @@ instance (Applicative f g h) => Applicative (Generics.Rec1 f) (Generics.Rec1 g) 
   (Generics.Rec1 mf) <*> (Generics.Rec1 ma) = Generics.Rec1 $ mf <*> ma
   (Generics.Rec1 mf)  *> (Generics.Rec1 ma) = Generics.Rec1 $ mf  *> ma
   (Generics.Rec1 mf) <*  (Generics.Rec1 ma) = Generics.Rec1 $ mf <*  ma
+instance (Applicative f g h, Applicative f' g' h') => Applicative (f Generics.:*: f') (g Generics.:*: g') (h Generics.:*: h') where
+  type ApplicativeCts (f Generics.:*: f') (g Generics.:*: g') (h Generics.:*: h') = (ApplicativeCts f g h, ApplicativeCts f' g' h')
+  (f Generics.:*: g) <*> (f' Generics.:*: g') = (f <*> f') Generics.:*: (g <*> g')
+  (f Generics.:*: g)  *> (f' Generics.:*: g') = (f  *> f') Generics.:*: (g  *> g')
+  (f Generics.:*: g) <*  (f' Generics.:*: g') = (f <*  f') Generics.:*: (g <*  g')
+instance (Applicative f g h, Applicative f' g' h') => Applicative (f Generics.:.: f') (g Generics.:.: g') (h Generics.:.: h') where
+  type ApplicativeCts (f Generics.:.: f') (g Generics.:.: g') (h Generics.:.: h') = (ApplicativeCts f g h, ApplicativeCts f' g' h')
+  (Generics.Comp1 mf) <*> (Generics.Comp1 ma) = Generics.Comp1 $ fmap (<*>) mf <*> ma
 
 -- "transformers" package instances: -------------------------------------------
 
@@ -444,6 +454,9 @@ instance Bind Generics.U1 Generics.U1 Generics.U1 where
 instance (Bind m n p) => Bind (Generics.Rec1 m) (Generics.Rec1 n) (Generics.Rec1 p) where
   type BindCts (Generics.Rec1 m) (Generics.Rec1 n) (Generics.Rec1 p) = BindCts m n p
   (Generics.Rec1 mf) >>= f = Generics.Rec1 $ mf >>= (Generics.unRec1 . f)
+instance (Bind f g h, Bind f' g' h') => Bind (f Generics.:*: f') (g Generics.:*: g') (h Generics.:*: h') where
+  type BindCts (f Generics.:*: f') (g Generics.:*: g') (h Generics.:*: h') = (BindCts f g h, BindCts f' g' h')
+  (f Generics.:*: g) >>= m = (f >>= \a -> let (f' Generics.:*: _g') = m a in f') Generics.:*: (g >>= \a -> let (_f' Generics.:*: g') = m a in g')
 
 -- "transformers" package instances: -------------------------------------------
 
@@ -626,6 +639,12 @@ instance Return Generics.U1 where
 instance (Return m) => Return (Generics.Rec1 m) where
   type ReturnCts (Generics.Rec1 m) = ReturnCts m
   return = Generics.Rec1 . return
+instance (Return f, Return g) => Return (f Generics.:*: g) where
+  type ReturnCts (f Generics.:*: g) = (ReturnCts f, ReturnCts g)
+  return a = return a Generics.:*: return a
+instance (Return f, Return g) => Return (f Generics.:.: g) where
+  type ReturnCts (f Generics.:.: g) = (ReturnCts f, ReturnCts g)
+  return a = Generics.Comp1 $ return (return a)
   
 -- "transformers" package instances: -------------------------------------------
 
@@ -778,6 +797,9 @@ instance Fail Generics.U1 where
 instance (Fail m) => Fail (Generics.Rec1 m) where
   type FailCts (Generics.Rec1 m) = FailCts m
   fail = Generics.Rec1 . fail
+instance (Fail f, Fail g) => Fail (f Generics.:*: g) where
+  type FailCts (f Generics.:*: g) = (FailCts f, FailCts g)
+  fail a = fail a Generics.:*: fail a
 
 -- "transformers" package instances: -------------------------------------------
 
