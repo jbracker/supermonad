@@ -23,6 +23,7 @@ import qualified Control.Arrow as Arrow
 import qualified Control.Applicative as Applic
 import qualified Data.Semigroup as Semigroup
 import qualified Data.Proxy as Proxy
+import qualified Data.Monoid as Mon
 import qualified Text.ParserCombinators.ReadP as ReadP
 import qualified Text.ParserCombinators.ReadPrec as ReadPrec
 
@@ -51,6 +52,9 @@ instance AlternativeEmpty Semigroup.Option where
   empty = A.empty
 instance AlternativeEmpty Proxy.Proxy where
   empty = A.empty
+instance (AlternativeEmpty f) => AlternativeEmpty (Mon.Alt f) where
+  type AlternativeEmptyCts (Mon.Alt f) a = AlternativeEmptyCts f a
+  empty = Mon.Alt $ empty
 
 -- TODO: ArrowMonad and WrappedMonad instances. These lead to cyclic dependencies.
 
@@ -88,6 +92,9 @@ instance AlternativeAlt Semigroup.Option Semigroup.Option Semigroup.Option where
   (<|>) = (A.<|>)
 instance AlternativeAlt Proxy.Proxy Proxy.Proxy Proxy.Proxy where
   (<|>) = (A.<|>)
+instance (AlternativeAlt f g h) => AlternativeAlt (Mon.Alt f) (Mon.Alt g) (Mon.Alt h) where
+  type AlternativeAltCts (Mon.Alt f) (Mon.Alt g) (Mon.Alt h) a = AlternativeAltCts f g h a
+  (Mon.Alt ma) <|> (Mon.Alt na) = Mon.Alt $ ma <|> na
 
 -- TODO: ArrowMonad and WrappedMonad instances. These lead to cyclic dependencies.
 

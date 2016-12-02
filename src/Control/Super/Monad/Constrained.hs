@@ -497,9 +497,9 @@ instance Bind Mon.Product Mon.Product Mon.Product where
 instance Bind Mon.Dual Mon.Dual Mon.Dual where
   (>>=) = (P.>>=)
 #endif
-instance (Bind f f f) => Bind (Mon.Alt f) (Mon.Alt f) (Mon.Alt f) where
-  type BindCts (Mon.Alt f) (Mon.Alt f) (Mon.Alt f) a b = BindCts f f f a b
-  m >>= f = Mon.Alt $ (Mon.getAlt m) >>= (Mon.getAlt . f)
+instance (Bind f g h) => Bind (Mon.Alt f) (Mon.Alt g) (Mon.Alt h) where
+  type BindCts (Mon.Alt f) (Mon.Alt g) (Mon.Alt h) a b = BindCts f g h a b
+  (Mon.Alt m) >>= f = Mon.Alt $ m >>= (Mon.getAlt . f)
 
 #if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 instance Bind Semigroup.Min Semigroup.Min Semigroup.Min where

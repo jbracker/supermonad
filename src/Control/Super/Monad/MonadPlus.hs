@@ -21,6 +21,7 @@ import qualified Control.Arrow as Arrow
 import qualified Control.Applicative as Applic
 import qualified Data.Semigroup as Semigroup
 import qualified Data.Proxy as Proxy
+import qualified Data.Monoid as Mon
 import qualified Text.ParserCombinators.ReadP as ReadP
 import qualified Text.ParserCombinators.ReadPrec as ReadPrec
 
@@ -52,6 +53,9 @@ instance MonadPlusZero Semigroup.Option where
   mzero = M.mzero
 instance MonadPlusZero Proxy.Proxy where
   mzero = M.mzero
+instance (MonadPlusZero f) => MonadPlusZero (Mon.Alt f) where
+  type MonadPlusZeroCts (Mon.Alt f) = MonadPlusZeroCts f
+  mzero = Mon.Alt $ mzero
 
 -- TODO: ArrowMonad and WrappedMonad instances. These lead to cyclic dependencies.
 
@@ -87,6 +91,9 @@ instance MonadPlusAdd Semigroup.Option Semigroup.Option Semigroup.Option where
   mplus = M.mplus
 instance MonadPlusAdd Proxy.Proxy Proxy.Proxy Proxy.Proxy where
   mplus = M.mplus
+instance (MonadPlusAdd f g h) => MonadPlusAdd (Mon.Alt f) (Mon.Alt g) (Mon.Alt h) where
+  type MonadPlusAddCts (Mon.Alt f) (Mon.Alt g) (Mon.Alt h) = MonadPlusAddCts f g h
+  mplus (Mon.Alt ma) (Mon.Alt na) = Mon.Alt $ mplus ma na
 
 -- TODO: ArrowMonad and WrappedMonad instances. These lead to cyclic dependencies.
 
