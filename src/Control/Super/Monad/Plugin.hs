@@ -22,7 +22,7 @@ import Control.Super.Plugin.Detect
   , clsDictInstImp, clsDictInstEquiv
   , defaultFindEitherModuleErrMsg )
 import Control.Super.Plugin.Names
-  ( PluginClassName
+  ( PluginClassName, PluginModuleName
   , supermonadModuleName, supermonadCtModuleName
   , legacySupermonadModuleName, legacySupermonadCtModuleName
   , supermonadPreludeModuleName, supermonadCtPreludeModuleName
@@ -36,7 +36,7 @@ import Control.Super.Plugin.Names
 -- | The supermonad type checker plugin for GHC.
 plugin :: Plugin
 plugin = pluginPrototype supermonadModuleQuery
-                         [supermonadClassQuery] --, alternativeClassQuery]
+                         [supermonadClassQuery, alternativeClassQuery]
                          solvingGroups
                          supermonadInstanceImplications
 
@@ -44,9 +44,11 @@ plugin = pluginPrototype supermonadModuleQuery
 -- Supermonad specific initialization
 -- -----------------------------------------------------------------------------
 
+alternativeEmptyClassName, alternativeAltClassName :: PluginClassName
 alternativeEmptyClassName = "AlternativeEmpty"
 alternativeAltClassName   = "AlternativeAlt"
 
+alternativeModuleName, alternativeCtModuleName :: PluginModuleName
 alternativeModuleName   = "Control.Super.Monad.Alternative"
 alternativeCtModuleName = "Control.Super.Monad.Constrained.Alternative"
 
@@ -54,7 +56,7 @@ alternativeCtModuleName = "Control.Super.Monad.Constrained.Alternative"
 solvingGroups :: [[PluginClassName]]
 solvingGroups = 
   [ [ bindClassName, returnClassName, applicativeClassName
-    ] --, alternativeEmptyClassName, alternativeAltClassName ] -- Supermonad group
+    , alternativeEmptyClassName, alternativeAltClassName ] -- Supermonad group
   ]
 
 -- | Queries the module providing the supermonad classes.
@@ -73,7 +75,10 @@ supermonadModuleQuery = EitherModule
   ] $ Just findSupermonadModulesErrMsg
 
 alternativeModuleQuery :: ModuleQuery
-alternativeModuleQuery = undefined
+alternativeModuleQuery = EitherModule
+  [ ThisModule alternativeModuleName   Nothing
+  , ThisModule alternativeCtModuleName Nothing
+  ] $ Just findAlternativeModulesErrMsg
 
 -- | Queries the supermonad classes.
 supermonadClassQuery :: ClassQuery
@@ -85,7 +90,7 @@ supermonadClassQuery = ClassQuery False supermonadModuleQuery
 
 alternativeClassQuery :: ClassQuery
 alternativeClassQuery = ClassQuery True alternativeModuleQuery
-  [ (alternativeAltClassName, 3)
+  [ (alternativeAltClassName  , 3)
   , (alternativeEmptyClassName, 1)
   ]
 
@@ -93,8 +98,9 @@ alternativeClassQuery = ClassQuery True alternativeModuleQuery
 --   one type constructor are obeyed.
 supermonadInstanceImplications :: ClassDict -> [InstanceImplication]
 supermonadInstanceImplications clsDict =
-    (applicativeClassName <=> returnClassName) ++
-    (bindClassName        ==> returnClassName)
+    (applicativeClassName      <=> returnClassName        ) ++
+    (bindClassName             ==> returnClassName        ) ++
+    (alternativeEmptyClassName <=> alternativeAltClassName)
   where
     (==>) = clsDictInstImp clsDict
     (<=>) = clsDictInstEquiv clsDict
@@ -107,4 +113,10 @@ findSupermonadModulesErrMsg [Right _mdlA, Right _mdlB] =
   text "Found unconstrained and constrained supermonad modules!"
 findSupermonadModulesErrMsg mdls = defaultFindEitherModuleErrMsg mdls
 
-
+-- | Function to produce proper error messages in the module query.
+findAlternativeModulesErrMsg :: [Either SDoc Module] -> SDoc
+findAlternativeModulesErrMsg [Left errA, Left errB] = 
+  hang (text "Could not find alternative or constrained alternative modules!") errIndent (errA $$ errB)
+findAlternativeModulesErrMsg [Right _mdlA, Right _mdlB] =
+  text "Found unconstrained and constrained alternative modules!"
+findAlternativeModulesErrMsg mdls = defaultFindEitherModuleErrMsg mdls
