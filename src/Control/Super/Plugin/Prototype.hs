@@ -37,6 +37,7 @@ import Control.Super.Plugin.Environment.Lift
 import Control.Super.Plugin.Detect 
   ( ModuleQuery(..)
   , ClassQuery(..)
+  , moduleQueryOf, isOptionalClassQuery
   , InstanceImplication
   , checkInstances
   , findModuleByQuery
@@ -50,17 +51,15 @@ import Control.Super.Plugin.Names ( PluginClassName )
 type SupermonadState = ()
 
 -- | The supermonad type checker plugin for GHC.
-pluginPrototype :: ModuleQuery
-                -- ^ Query the modules that a mandatory for the plugin to work.
-                -> [ClassQuery] 
-                -- ^ The classes that the plugin will solve.
+pluginPrototype :: [ClassQuery] 
+                -- ^ The classes that the plugin will solve for.
                 -> [[PluginClassName]]
                 -- ^ The sets of class names that require being solved together.
                 -> (ClassDict -> [InstanceImplication]) 
                 -- ^ The depedencies between different class instances, that 
-                --   cannot be implemented using the Haskell type class definitions.
+                --   cannot be implemented using the Haskell type class definitiisOptionalClassQueryons.
                 -> Plugin
-pluginPrototype mdlQuery clsQuery solvingGroups instImps = 
+pluginPrototype clsQueries solvingGroups instImps = 
   defaultPlugin { tcPlugin = \_clOpts -> Just plugin }
   where
     plugin :: TcPlugin
@@ -110,17 +109,23 @@ pluginPrototype mdlQuery clsQuery solvingGroups instImps =
     -- | Initialize the plugin environment.
     initSupermonadPlugin :: SupermonadPluginM () (ClassDict, InstanceDict)
     initSupermonadPlugin = do
-      -- Determine if the supermonad module is available.
-      eSupermonadMdl <- runTcPlugin $ findModuleByQuery mdlQuery
-      _supermonadMdl <- case eSupermonadMdl of
-        Right smMdl -> return smMdl
-        Left mdlErrMsg -> throwPluginErrorSDoc mdlErrMsg
+      -- Determine which modules are mandatory:
+      let getMandMdlQ :: ClassQuery -> Maybe ModuleQuery
+          getMandMdlQ clsQ = if isOptionalClassQuery clsQ then Nothing else Just (moduleQueryOf clsQ)
+      let mandMdlQs = catMaybes $ fmap getMandMdlQ clsQueries
       
-      -- Find the supermonad classes and instances and add the to the class dictionary.
+      -- Determine if the mandatory modules are available.
+      _foundMandMdls <- forM mandMdlQs $ \mdlQ -> do
+        eMandMdl <- runTcPlugin $ findModuleByQuery mdlQ
+        case eMandMdl of
+          Right mandMdl -> return mandMdl
+          Left mdlErrMsg -> throwPluginErrorSDoc mdlErrMsg
+      
+      -- Find the classes and instances and add the to the class dictionary.
       oldClsDict <- getClassDictionary
-      newClsDict <- foldrM findClassesAndInstancesInScope oldClsDict clsQuery
+      newClsDict <- foldrM findClassesAndInstancesInScope oldClsDict clsQueries
       
-      -- Calculate the supermonads in scope and check for rogue bind and return instances.
+      -- Calculate the mono-top-tycon instances in scope and check for rogue poly-top-tycon instances.
       let smInsts = findMonoTopTyConInstances newClsDict
       let smErrors = fmap snd $ checkInstances newClsDict smInsts (instImps newClsDict)
       
@@ -128,7 +133,7 @@ pluginPrototype mdlQuery clsQuery solvingGroups instImps =
       case smErrors of
         [] -> return (newClsDict, smInsts)
         _ -> do
-          throwPluginErrorSDoc $ hang (text "Problems when finding supermonad instances:") errIndent $ vcat smErrors
+          throwPluginErrorSDoc $ hang (text "Problems when finding instances:") errIndent $ vcat smErrors
 
 
 

@@ -10,7 +10,7 @@ module Control.Super.Plugin.Detect
     -- * Searching for Classes
   , ClassQuery(..)
   , isOptionalClassQuery
-  , queriedClasses
+  , queriedClasses, moduleQueryOf
   , findClassesByQuery
   , findClass
   , isClass
@@ -235,6 +235,7 @@ defaultFindAnyModuleErrMsg mdlErrs = hang (text "Could not find any of the modul
 
 -- | Find a collection of classes in the given module.
 data ClassQuery = ClassQuery Optional ModuleQuery [(PluginClassName, Arity)]
+
 instance O.Outputable ClassQuery where
   ppr (ClassQuery opt mdlQuery clsNames)
     = O.hang (O.text "In module:") errIndent (O.ppr mdlQuery) 
@@ -247,6 +248,10 @@ isOptionalClassQuery (ClassQuery opt _mdlQ _clss) = opt
 -- | Get the names of the classes that are queried for by the given query.
 queriedClasses :: ClassQuery -> [PluginClassName]
 queriedClasses (ClassQuery _opt _mdlQ clss) = fmap fst clss
+
+-- | Get the module query this class query uses to lookup modules of classes.
+moduleQueryOf :: ClassQuery -> ModuleQuery
+moduleQueryOf (ClassQuery _opt mdlQ _clss) = mdlQ
 
 -- | Search for a collection of classes using the given query.
 --   If any one of the classes could not be found an error is returned.

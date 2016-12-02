@@ -35,8 +35,7 @@ import Control.Super.Plugin.Names
 
 -- | The supermonad type checker plugin for GHC.
 plugin :: Plugin
-plugin = pluginPrototype supermonadModuleQuery
-                         [supermonadClassQuery, alternativeClassQuery, monadPlusClassQuery]
+plugin = pluginPrototype [supermonadClassQuery, alternativeClassQuery, monadPlusClassQuery]
                          solvingGroups
                          supermonadInstanceImplications
 

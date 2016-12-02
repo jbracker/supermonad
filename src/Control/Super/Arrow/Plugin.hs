@@ -37,7 +37,7 @@ import Control.Super.Plugin.Names
 
 -- | The supermonad type checker plugin for GHC.
 plugin :: Plugin
-plugin = pluginPrototype moduleQuery [classQuery] solvingGroups instanceImplications
+plugin = pluginPrototype [classQuery] solvingGroups instanceImplications
 
 -- -----------------------------------------------------------------------------
 -- Superarrow specific initialization
