@@ -64,6 +64,7 @@ library
                  , Control.Super.Monad.Constrained.Prelude
                  , Control.Super.Monad.Constrained.Functions
                  , Control.Super.Monad.Constrained.Alternative
+                 , Control.Super.Monad.Constrained.MonadPlus
                  , Control.Super.Arrow
                  , Control.Super.Arrow.Plugin
                  , Control.Super.Arrow.Prelude

@@ -56,8 +56,9 @@ monadPlusZeroClassName, monadPlusAddClassName :: PluginClassName
 monadPlusZeroClassName = "MonadPlusZero"
 monadPlusAddClassName  = "MonadPlusAdd"
 
-monadPlusModuleName :: PluginModuleName
-monadPlusModuleName = "Control.Super.Monad.MonadPlus"
+monadPlusModuleName, monadPlusCtModuleName :: PluginModuleName
+monadPlusModuleName   = "Control.Super.Monad.MonadPlus"
+monadPlusCtModuleName = "Control.Super.Monad.Constrained.MonadPlus"
 
 -- | Configure which groups of classes need to be solved together.
 solvingGroups :: [[PluginClassName]]
@@ -69,14 +70,14 @@ solvingGroups =
 -- | Queries the module providing the supermonad classes.
 supermonadModuleQuery :: ModuleQuery
 supermonadModuleQuery = EitherModule
-  [ AnyModule [ ThisModule supermonadModuleName Nothing
-              , ThisModule supermonadPreludeModuleName Nothing
-              , ThisModule legacySupermonadModuleName Nothing
+  [ AnyModule [ ThisModule supermonadModuleName              Nothing
+              , ThisModule supermonadPreludeModuleName       Nothing
+              , ThisModule legacySupermonadModuleName        Nothing
               , ThisModule legacySupermonadPreludeModuleName Nothing
               ]
-  , AnyModule [ ThisModule supermonadCtModuleName Nothing
-              , ThisModule supermonadCtPreludeModuleName Nothing
-              , ThisModule legacySupermonadCtModuleName Nothing
+  , AnyModule [ ThisModule supermonadCtModuleName              Nothing
+              , ThisModule supermonadCtPreludeModuleName       Nothing
+              , ThisModule legacySupermonadCtModuleName        Nothing
               , ThisModule legacySupermonadCtPreludeModuleName Nothing
               ]
   ] $ Just findSupermonadModulesErrMsg
@@ -88,7 +89,10 @@ alternativeModuleQuery = EitherModule
   ] $ Just findAlternativeModulesErrMsg
 
 monadPlusModuleQuery :: ModuleQuery
-monadPlusModuleQuery = ThisModule monadPlusModuleName Nothing
+monadPlusModuleQuery = EitherModule
+  [ ThisModule monadPlusModuleName   Nothing
+  , ThisModule monadPlusCtModuleName Nothing
+  ] $ Just findMonadPlusModulesErrMsg
 
 -- | Queries the supermonad classes.
 supermonadClassQuery :: ClassQuery
@@ -137,3 +141,11 @@ findAlternativeModulesErrMsg [Left errA, Left errB] =
 findAlternativeModulesErrMsg [Right _mdlA, Right _mdlB] =
   text "Found unconstrained and constrained alternative modules!"
 findAlternativeModulesErrMsg mdls = defaultFindEitherModuleErrMsg mdls
+
+-- | Function to produce proper error messages in the module query.
+findMonadPlusModulesErrMsg :: [Either SDoc Module] -> SDoc
+findMonadPlusModulesErrMsg [Left errA, Left errB] = 
+  hang (text "Could not find monad plus or constrained monad plus modules!") errIndent (errA $$ errB)
+findMonadPlusModulesErrMsg [Right _mdlA, Right _mdlB] =
+  text "Found unconstrained and constrained monad plus modules!"
+findMonadPlusModulesErrMsg mdls = defaultFindEitherModuleErrMsg mdls
