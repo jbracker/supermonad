@@ -3,6 +3,10 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ConstraintKinds #-}
 
+{-# LANGUAGE UndecidableInstances #-} -- For ':.:' instance.
+
+{-# LANGUAGE TypeOperators #-} -- For ':*:' instance and others.
+
 module Control.Super.Monad.Constrained.Alternative
   ( AlternativeEmpty(..)
   , AlternativeAlt(..)
@@ -24,7 +28,7 @@ import qualified Text.ParserCombinators.ReadPrec as ReadPrec
 
 import Control.Super.Monad.Constrained.Prelude 
   ( ($)
-  , Return(..), Applicative(..) )
+  , Return(..), Applicative(..), Functor(..) )
 
 class Return f => AlternativeEmpty f where
   type AlternativeEmptyCts f a :: Constraint
@@ -55,6 +59,12 @@ instance AlternativeEmpty Generics.U1 where
 instance AlternativeEmpty f => AlternativeEmpty (Generics.Rec1 f) where
   type AlternativeEmptyCts (Generics.Rec1 f) a = AlternativeEmptyCts f a
   empty = Generics.Rec1 empty
+instance (AlternativeEmpty f, AlternativeEmpty g) => AlternativeEmpty (f Generics.:*: g) where
+  type AlternativeEmptyCts (f Generics.:*: g) a = (AlternativeEmptyCts f a, AlternativeEmptyCts g a)
+  empty = empty Generics.:*: empty
+instance (AlternativeEmpty f, AlternativeEmpty g) => AlternativeEmpty (f Generics.:.: g) where
+  type AlternativeEmptyCts (f Generics.:.: g) a = (AlternativeEmptyCts f (g a), AlternativeEmptyCts g a)
+  empty = Generics.Comp1 $ empty
   
 
 class Applicative f g h => AlternativeAlt f g h where
@@ -86,6 +96,14 @@ instance AlternativeAlt Generics.U1 Generics.U1 Generics.U1 where
 instance AlternativeAlt f g h => AlternativeAlt (Generics.Rec1 f) (Generics.Rec1 g) (Generics.Rec1 h) where
   type AlternativeAltCts (Generics.Rec1 f) (Generics.Rec1 g) (Generics.Rec1 h) a = AlternativeAltCts f g h a
   (Generics.Rec1 f) <|> (Generics.Rec1 g) = Generics.Rec1 $ f <|> g
+instance (AlternativeAlt f g h, AlternativeAlt f' g' h') => AlternativeAlt (f Generics.:*: f') (g Generics.:*: g') (h Generics.:*: h') where
+  type AlternativeAltCts (f Generics.:*: f') (g Generics.:*: g') (h Generics.:*: h') a = (AlternativeAltCts f g h a, AlternativeAltCts f' g' h' a)
+  (f Generics.:*: g) <|> (f' Generics.:*: g') = (f <|> f') Generics.:*: (g <|> g')
+-- TODO: This does the application of '<|>' on the inner type constructors, whereas the original 
+-- implementation for the standard classes applies '<|>' on the outer type constructors.
+instance (Applicative f g h, AlternativeAlt f' g' h') => AlternativeAlt (f Generics.:.: f') (g Generics.:.: g') (h Generics.:.: h') where
+  type AlternativeAltCts (f Generics.:.: f') (g Generics.:.: g') (h Generics.:.: h') a = (ApplicativeCts f g h (g' a) (h' a), AlternativeAltCts f' g' h' a, FunctorCts f (f' a) (g' a -> h' a))
+  (Generics.Comp1 f) <|> (Generics.Comp1 g) = Generics.Comp1 $ fmap (<|>) f <*> g 
 
 
 

@@ -3,6 +3,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ConstraintKinds #-}
 
+{-# LANGUAGE TypeOperators #-} -- For ':*:' instance and others.
+
 module Control.Super.Monad.MonadPlus
   ( MonadPlusZero(..)
   , MonadPlusAdd(..)
@@ -58,7 +60,10 @@ instance MonadPlusZero Generics.U1 where
 instance MonadPlusZero f => MonadPlusZero (Generics.Rec1 f) where
   type MonadPlusZeroCts (Generics.Rec1 f) = MonadPlusZeroCts f
   mzero = Generics.Rec1 mzero
-  
+instance (MonadPlusZero f, MonadPlusZero g) => MonadPlusZero (f Generics.:*: g) where
+  type MonadPlusZeroCts (f Generics.:*: g) = (MonadPlusZeroCts f, MonadPlusZeroCts g)
+  mzero = mzero Generics.:*: mzero
+
 
 
 class (AlternativeAlt f g h, Bind f g h) => MonadPlusAdd f g h where
@@ -90,6 +95,9 @@ instance MonadPlusAdd Generics.U1 Generics.U1 Generics.U1 where
 instance MonadPlusAdd f g h => MonadPlusAdd (Generics.Rec1 f) (Generics.Rec1 g) (Generics.Rec1 h) where
   type MonadPlusAddCts (Generics.Rec1 f) (Generics.Rec1 g) (Generics.Rec1 h) = MonadPlusAddCts f g h
   mplus (Generics.Rec1 f) (Generics.Rec1 g) = Generics.Rec1 $ mplus f g
+instance (MonadPlusAdd f g h, MonadPlusAdd f' g' h') => MonadPlusAdd (f Generics.:*: f') (g Generics.:*: g') (h Generics.:*: h') where
+  type MonadPlusAddCts (f Generics.:*: f') (g Generics.:*: g') (h Generics.:*: h') = (MonadPlusAddCts f g h, MonadPlusAddCts f' g' h')
+  mplus (f Generics.:*: g) (f' Generics.:*: g') = (mplus f f') Generics.:*: (mplus g g')
 
 
 

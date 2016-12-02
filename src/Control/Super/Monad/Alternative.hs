@@ -3,6 +3,8 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ConstraintKinds #-}
 
+{-# LANGUAGE TypeOperators #-}
+
 module Control.Super.Monad.Alternative
   ( AlternativeEmpty(..)
   , AlternativeAlt(..)
@@ -24,7 +26,7 @@ import qualified Text.ParserCombinators.ReadPrec as ReadPrec
 
 import Control.Super.Monad.Prelude 
   ( ($)
-  , Return(..), Applicative(..) )
+  , Return(..), Applicative(..), Functor(..) )
 
 
 class Return f => AlternativeEmpty f where
@@ -56,6 +58,12 @@ instance AlternativeEmpty Generics.U1 where
 instance AlternativeEmpty f => AlternativeEmpty (Generics.Rec1 f) where
   type AlternativeEmptyCts (Generics.Rec1 f) = AlternativeEmptyCts f
   empty = Generics.Rec1 empty
+instance (AlternativeEmpty f, AlternativeEmpty g) => AlternativeEmpty (f Generics.:*: g) where
+  type AlternativeEmptyCts (f Generics.:*: g) = (AlternativeEmptyCts f, AlternativeEmptyCts g)
+  empty = empty Generics.:*: empty
+instance (AlternativeEmpty f, AlternativeEmpty g) => AlternativeEmpty (f Generics.:.: g) where
+  type AlternativeEmptyCts (f Generics.:.: g) = (AlternativeEmptyCts f, AlternativeEmptyCts g)
+  empty = Generics.Comp1 $ empty
   
 
 
@@ -88,6 +96,14 @@ instance AlternativeAlt Generics.U1 Generics.U1 Generics.U1 where
 instance AlternativeAlt f g h => AlternativeAlt (Generics.Rec1 f) (Generics.Rec1 g) (Generics.Rec1 h) where
   type AlternativeAltCts (Generics.Rec1 f) (Generics.Rec1 g) (Generics.Rec1 h) = AlternativeAltCts f g h
   (Generics.Rec1 f) <|> (Generics.Rec1 g) = Generics.Rec1 $ f <|> g
+instance (AlternativeAlt f g h, AlternativeAlt f' g' h') => AlternativeAlt (f Generics.:*: f') (g Generics.:*: g') (h Generics.:*: h') where
+  type AlternativeAltCts (f Generics.:*: f') (g Generics.:*: g') (h Generics.:*: h') = (AlternativeAltCts f g h, AlternativeAltCts f' g' h')
+  (f Generics.:*: g) <|> (f' Generics.:*: g') = (f <|> f') Generics.:*: (g <|> g')
+-- TODO: This does the application of '<|>' on the inner type constructors, whereas the original 
+-- implementation for the standard classes applies '<|>' on the outer type constructors.
+instance (Applicative f g h, AlternativeAlt f' g' h') => AlternativeAlt (f Generics.:.: f') (g Generics.:.: g') (h Generics.:.: h') where
+  type AlternativeAltCts (f Generics.:.: f') (g Generics.:.: g') (h Generics.:.: h') = (ApplicativeCts f g h, AlternativeAltCts f' g' h')
+  (Generics.Comp1 f) <|> (Generics.Comp1 g) = Generics.Comp1 $ fmap (<|>) f <*> g 
 
 
 
