@@ -60,6 +60,7 @@ import qualified Text.ParserCombinators.ReadP as Read ( ReadP )
 import qualified Text.ParserCombinators.ReadPrec as Read ( ReadPrec )
 
 import qualified GHC.Conc as STM ( STM )
+import qualified GHC.Generics as Generics
 
 -- To defined constrained instances:
 import qualified Data.Set as S
@@ -265,6 +266,18 @@ instance Applicative STM.STM STM.STM STM.STM where
   (<*>) = (P.<*>)
   (<*)  = (P.<*)
   (*>)  = (P.*>)
+
+instance Applicative Generics.U1 Generics.U1 Generics.U1 where
+  (<*>) = (P.<*>)
+  (<*)  = (P.<*)
+  (*>)  = (P.*>)
+instance (Applicative f g h) => Applicative (Generics.Rec1 f) (Generics.Rec1 g) (Generics.Rec1 h) where
+  type ApplicativeCts  (Generics.Rec1 f) (Generics.Rec1 g) (Generics.Rec1 h) a b = ApplicativeCts  f g h a b
+  type ApplicativeCtsR (Generics.Rec1 f) (Generics.Rec1 g) (Generics.Rec1 h) a b = ApplicativeCtsR f g h a b
+  type ApplicativeCtsL (Generics.Rec1 f) (Generics.Rec1 g) (Generics.Rec1 h) a b = ApplicativeCtsL f g h a b
+  (Generics.Rec1 mf) <*> (Generics.Rec1 ma) = Generics.Rec1 $ mf <*> ma
+  (Generics.Rec1 mf)  *> (Generics.Rec1 ma) = Generics.Rec1 $ mf  *> ma
+  (Generics.Rec1 mf) <*  (Generics.Rec1 ma) = Generics.Rec1 $ mf <*  ma
 
 -- Constrained Instances -------------------------------------------------------
 
@@ -513,6 +526,13 @@ instance (Bind m n p) => Bind (App.WrappedMonad m) (App.WrappedMonad n) (App.Wra
 instance Bind STM.STM STM.STM STM.STM where
   (>>=) = (P.>>=)
 
+instance Bind Generics.U1 Generics.U1 Generics.U1 where
+  (>>=) = (P.>>=)
+instance (Bind m n p) => Bind (Generics.Rec1 m) (Generics.Rec1 n) (Generics.Rec1 p) where
+  type BindCts (Generics.Rec1 m) (Generics.Rec1 n) (Generics.Rec1 p) a b = BindCts m n p a b
+  (Generics.Rec1 mf) >>= f = Generics.Rec1 $ mf >>= (Generics.unRec1 . f)
+
+
 -- Constrained Instances -------------------------------------------------------
 
 instance Bind S.Set S.Set S.Set where
@@ -695,6 +715,12 @@ instance (Return m) => Return (App.WrappedMonad m) where
 instance Return STM.STM where
   return = P.return
 
+instance Return Generics.U1 where
+  return = P.return
+instance (Return m) => Return (Generics.Rec1 m) where
+  type ReturnCts (Generics.Rec1 m) a = ReturnCts m a
+  return = Generics.Rec1 . return
+
 -- Constrained Instances -------------------------------------------------------
 
 instance Return S.Set where
@@ -844,6 +870,12 @@ instance (Fail m) => Fail (App.WrappedMonad m) where
 
 instance Fail STM.STM where
   fail = P.fail
+
+instance Fail Generics.U1 where
+  fail = P.fail
+instance (Fail m) => Fail (Generics.Rec1 m) where
+  type FailCts (Generics.Rec1 m) a = FailCts m a
+  fail = Generics.Rec1 . fail
 
 -- Constrained Instances -------------------------------------------------------
 

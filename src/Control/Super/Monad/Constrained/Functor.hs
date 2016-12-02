@@ -42,6 +42,7 @@ import qualified Text.ParserCombinators.ReadP as Read ( ReadP )
 import qualified Text.ParserCombinators.ReadPrec as Read ( ReadPrec )
 
 import qualified GHC.Conc as STM ( STM )
+import qualified GHC.Generics as Generics
 
 -- To defined constrained instances:
 import qualified Data.Set as S
@@ -176,6 +177,14 @@ instance (Functor m) => Functor (App.WrappedMonad m) where
 instance Functor STM.STM where
   fmap = P.fmap
   (<$) = (P.<$)
+
+instance Functor Generics.U1 where
+  fmap = P.fmap
+  (<$) = (P.<$)
+instance (Functor f) => Functor (Generics.Rec1 f) where
+  type FunctorCts (Generics.Rec1 f) a b = FunctorCts f a b
+  fmap f (Generics.Rec1 ma) = Generics.Rec1 $ fmap f ma
+  a <$ (Generics.Rec1 mb) = Generics.Rec1 $ a <$ mb
 
 -- Constrained instances -------------------------------------------------------
 

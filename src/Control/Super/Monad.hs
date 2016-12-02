@@ -624,7 +624,7 @@ instance Return STM.STM where
 instance Return Generics.U1 where
   return = P.return
 instance (Return m) => Return (Generics.Rec1 m) where
-  type ReturnCts (Generics.Rec1 m)= ReturnCts m
+  type ReturnCts (Generics.Rec1 m) = ReturnCts m
   return = Generics.Rec1 . return
   
 -- "transformers" package instances: -------------------------------------------
@@ -776,7 +776,7 @@ instance Fail STM.STM where
 instance Fail Generics.U1 where
   fail = P.fail
 instance (Fail m) => Fail (Generics.Rec1 m) where
-  type FailCts (Generics.Rec1 m)= FailCts m
+  type FailCts (Generics.Rec1 m) = FailCts m
   fail = Generics.Rec1 . fail
 
 -- "transformers" package instances: -------------------------------------------
