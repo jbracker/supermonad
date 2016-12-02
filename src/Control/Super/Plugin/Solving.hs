@@ -107,7 +107,7 @@ solveConstraints relevantClss wantedCts = do
 solveMonoConstraintGroup :: [Class] -> (TyCon, ConstraintGroup) -> SupermonadPluginM s ()
 solveMonoConstraintGroup _relevantClss (_, []) = return ()
 solveMonoConstraintGroup relevantClss (tyCon, ctGroup) = do
-  printMsg "Solve mono group..."
+  --printMsg "Solve mono group..."
   let smCtGroup = filter (isAnyClassConstraint relevantClss) ctGroup
   forM_ smCtGroup $ \ct -> do
     let ctAmbVars = S.filter isAmbiguousTyVar 
@@ -143,7 +143,7 @@ solveMonoConstraintGroup relevantClss (tyCon, ctGroup) = do
 --   associated with.
 solvePolyConstraintGroup :: [Class] -> ConstraintGroup -> SupermonadPluginM s ()
 solvePolyConstraintGroup relevantClss ctGroup = do
-  printMsg "Solve poly group..."
+  --printMsg "Solve poly group..."
   -- Find a valid associations for each of the constraint groups.
   (_, assocs) <- determineValidConstraintGroupAssocs relevantClss ctGroup
   
