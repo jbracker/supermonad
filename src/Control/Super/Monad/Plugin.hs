@@ -36,7 +36,7 @@ import Control.Super.Plugin.Names
 -- | The supermonad type checker plugin for GHC.
 plugin :: Plugin
 plugin = pluginPrototype supermonadModuleQuery
-                         [supermonadClassQuery, alternativeClassQuery]
+                         [supermonadClassQuery, alternativeClassQuery, monadPlusClassQuery]
                          solvingGroups
                          supermonadInstanceImplications
 
@@ -51,6 +51,13 @@ alternativeAltClassName   = "AlternativeAlt"
 alternativeModuleName, alternativeCtModuleName :: PluginModuleName
 alternativeModuleName   = "Control.Super.Monad.Alternative"
 alternativeCtModuleName = "Control.Super.Monad.Constrained.Alternative"
+
+monadPlusZeroClassName, monadPlusAddClassName :: PluginClassName
+monadPlusZeroClassName = "MonadPlusZero"
+monadPlusAddClassName  = "MonadPlusAdd"
+
+monadPlusModuleName :: PluginModuleName
+monadPlusModuleName = "Control.Super.Monad.MonadPlus"
 
 -- | Configure which groups of classes need to be solved together.
 solvingGroups :: [[PluginClassName]]
@@ -80,6 +87,9 @@ alternativeModuleQuery = EitherModule
   , ThisModule alternativeCtModuleName Nothing
   ] $ Just findAlternativeModulesErrMsg
 
+monadPlusModuleQuery :: ModuleQuery
+monadPlusModuleQuery = ThisModule monadPlusModuleName Nothing
+
 -- | Queries the supermonad classes.
 supermonadClassQuery :: ClassQuery
 supermonadClassQuery = ClassQuery False supermonadModuleQuery 
@@ -94,13 +104,20 @@ alternativeClassQuery = ClassQuery True alternativeModuleQuery
   , (alternativeEmptyClassName, 1)
   ]
 
+monadPlusClassQuery :: ClassQuery
+monadPlusClassQuery = ClassQuery True monadPlusModuleQuery
+  [ (monadPlusZeroClassName, 1)
+  , (monadPlusAddClassName , 3)
+  ]
+
 -- | Ensures that all supermonad instance implications with the group of 
 --   one type constructor are obeyed.
 supermonadInstanceImplications :: ClassDict -> [InstanceImplication]
 supermonadInstanceImplications clsDict =
     (applicativeClassName      <=> returnClassName        ) ++
     (bindClassName             ==> returnClassName        ) ++
-    (alternativeEmptyClassName <=> alternativeAltClassName)
+    (alternativeEmptyClassName <=> alternativeAltClassName) ++
+    (monadPlusZeroClassName    <=> monadPlusAddClassName  )
   where
     (==>) = clsDictInstImp clsDict
     (<=>) = clsDictInstEquiv clsDict

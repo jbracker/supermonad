@@ -56,6 +56,7 @@ library
                  , Control.Super.Monad.Prelude
                  , Control.Super.Monad.Functions
                  , Control.Super.Monad.Alternative
+                 , Control.Super.Monad.MonadPlus
                  , Control.Super.Monad.Plugin
                  , Control.Super.Monad.PreludeWithoutMonad
                  , Control.Super.Monad.Constrained
