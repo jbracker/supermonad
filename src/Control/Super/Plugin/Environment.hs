@@ -12,6 +12,7 @@ module Control.Super.Plugin.Environment
   , getInstEnvs
   , getClassDictionary
   , getClass
+  , isOptionalClass
   , getCustomState, putCustomState, modifyCustomState
   , getInstanceFor
   , addTypeEqualities, addTypeEquality
@@ -55,8 +56,10 @@ import Control.Super.Plugin.Constraint
   , mkDerivedTypeEqCt, mkDerivedTypeEqCtOfTypes )
 import Control.Super.Plugin.ClassDict
   ( ClassDict
+  , Optional
   , emptyClsDict
   , lookupClsDictClass )
+import qualified Control.Super.Plugin.ClassDict as ClsD
 import Control.Super.Plugin.InstanceDict
   ( InstanceDict, lookupInstDict )
 
@@ -191,6 +194,10 @@ modifyCustomState sf = modify (\s -> s { smStateCustom = sf (smStateCustom s) })
 --   plugin environment.
 getClass :: PluginClassName -> SupermonadPluginM s (Maybe Class)
 getClass clsName = lookupClsDictClass clsName <$> asks smEnvClassDictionary
+
+-- | Check if the given class name refers that is optional in the solving process.
+isOptionalClass :: PluginClassName -> SupermonadPluginM s Optional
+isOptionalClass clsName = ClsD.isOptionalClass clsName <$> asks smEnvClassDictionary
 
 -- | Returns all of the /given/ and /derived/ constraints of this plugin call.
 getGivenConstraints :: SupermonadPluginM s [GivenCt]

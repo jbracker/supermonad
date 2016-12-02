@@ -9,12 +9,14 @@ module Control.Super.Plugin.Detect
   , defaultFindEitherModuleErrMsg
     -- * Searching for Classes
   , ClassQuery(..)
+  , isOptionalClassQuery
+  , queriedClasses
   , findClassesByQuery
   , findClass
   , isClass
     -- * Searching for Instances
-  , findInstancesInScope
-  , findClassAndInstancesInScope
+  --, findInstancesInScope
+  --, findClassAndInstancesInScope
   , findClassesAndInstancesInScope
   , findMonoTopTyConInstances
     -- * Instance implications
@@ -28,7 +30,7 @@ module Control.Super.Plugin.Detect
 
 import Data.List  ( find )
 import Data.Either ( isLeft, isRight )
-import Data.Maybe ( isJust, isNothing, fromJust, maybeToList )
+import Data.Maybe ( isJust, isNothing, fromJust, maybeToList, catMaybes )
 import Data.Set ( Set )
 import qualified Data.Set as S
 import qualified Data.Map as M
@@ -81,7 +83,7 @@ import Control.Super.Plugin.Utils
   , fromRight, fromLeft
   , getClassName, getTyConName )
 import Control.Super.Plugin.ClassDict
-  ( ClassDict
+  ( ClassDict, Optional
   , allClsDictEntries
   , lookupClsDictClass )
 import Control.Super.Plugin.InstanceDict
@@ -121,9 +123,12 @@ checkInstances clsDict instDict instImplications =
     -- Check if there are any instance that involve different type constructors...
     polyCheckErrMsgs :: [(Either (TyCon, Class) ClsInst, SDoc)]
     polyCheckErrMsgs = do
-      (cls, insts) <- allClsDictEntries clsDict
-      polyInst <- filter (isPolyTyConInstance cls) insts
-      return (Right polyInst, text "Instance involves more then one top-level type constructor: " $$ ppr polyInst)
+      (_opt, mClsInsts) <- allClsDictEntries clsDict
+      case mClsInsts of
+        Just (cls, insts) -> do
+          polyInst <- filter (isPolyTyConInstance cls) insts
+          return (Right polyInst, text "Instance involves more then one top-level type constructor: " $$ ppr polyInst)
+        Nothing -> []
 
 -- -----------------------------------------------------------------------------
 -- Searching for Modules
@@ -229,17 +234,24 @@ defaultFindAnyModuleErrMsg mdlErrs = hang (text "Could not find any of the modul
 -- -----------------------------------------------------------------------------
 
 -- | Find a collection of classes in the given module.
-data ClassQuery = ClassQuery ModuleQuery [(PluginClassName, Arity)]
-
+data ClassQuery = ClassQuery Optional ModuleQuery [(PluginClassName, Arity)]
 instance O.Outputable ClassQuery where
-  ppr (ClassQuery mdlQuery clsNames)
+  ppr (ClassQuery opt mdlQuery clsNames)
     = O.hang (O.text "In module:") errIndent (O.ppr mdlQuery) 
-    O.<> O.hang (O.text "find classes:") errIndent (O.ppr clsNames)
+    O.<> O.hang (O.text $ (if opt then "optionally " else "") ++ "find classes:") errIndent (O.ppr clsNames)
+
+-- | Check if the classes requested by the given query are optional.
+isOptionalClassQuery :: ClassQuery -> Bool
+isOptionalClassQuery (ClassQuery opt _mdlQ _clss) = opt
+
+-- | Get the names of the classes that are queried for by the given query.
+queriedClasses :: ClassQuery -> [PluginClassName]
+queriedClasses (ClassQuery _opt _mdlQ clss) = fmap fst clss
 
 -- | Search for a collection of classes using the given query.
 --   If any one of the classes could not be found an error is returned.
 findClassesByQuery :: ClassQuery -> TcPluginM (Either SDoc [(PluginClassName, Class)])
-findClassesByQuery (ClassQuery mdlQuery toFindCls) = do
+findClassesByQuery (ClassQuery opt mdlQuery toFindCls) = do
   eClss <- forM toFindCls $ \(clsName, clsArity) -> do
     eCls <- findClass (isClass (isModuleInQuery mdlQuery) clsName clsArity)
     return (clsName, eCls, clsArity)
@@ -247,7 +259,11 @@ findClassesByQuery (ClassQuery mdlQuery toFindCls) = do
   let errMsg :: (PluginClassName, Maybe Class, Arity) -> SDoc
       errMsg (n, _, a) = text $ "Could not find class '" ++ n ++ "' with arity " ++ show a ++ "!"
   return $ case notFound of
+    -- We found the classes.
     [] -> Right $ fmap (\(n, Just c, _) -> (n, c)) $ eClss
+    -- If the classes are optional, we return an empty list of classes.
+    _ | opt -> Right []
+    -- The classes aren't optional therefore we return an error.
     _ -> Left $ vcat $ fmap errMsg notFound
   
 -- | Checks if a type class matching the shape of the given 
@@ -292,17 +308,6 @@ findClassesAndInstancesInScope clsQuery = do
       insts <- findInstancesInScope c
       return (n, c, insts)
 
--- | Tries to find a given class and all of its instances in scope 
---   using the class predicate.
-findClassAndInstancesInScope :: (Class -> Bool) -> TcPluginM (Maybe (Class, [ClsInst]))
-findClassAndInstancesInScope clsPred = do
-  mCls <- findClass clsPred
-  case mCls of
-    Nothing -> return $ Nothing
-    Just cls -> do
-      insts <- findInstancesInScope cls
-      return $ Just (cls, insts)
-
 -- | Returns a list of all instances for the given class that are currently in scope.
 findInstancesInScope :: Class -> TcPluginM [ClsInst]
 findInstancesInScope cls = do
@@ -326,7 +331,7 @@ findMonoTopTyConInstances clsDict =
     return $ findMonoClassInstance tc cls insts
   where
     dictEntries :: [(Class, [ClsInst])]
-    dictEntries = allClsDictEntries clsDict
+    dictEntries = catMaybes $ fmap snd $ allClsDictEntries clsDict
     
     -- Collect all type constructors that are used for supermonads
     supermonadTyCons :: [TyCon]

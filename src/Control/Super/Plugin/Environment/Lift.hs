@@ -26,7 +26,7 @@ import Control.Super.Plugin.Environment
   , getGivenConstraints
   , throwPluginErrorSDoc
   )
-import Control.Super.Plugin.ClassDict ( ClassDict, insertClsDict )
+import Control.Super.Plugin.ClassDict ( ClassDict, insertClsDict, insertOptionalClsDict )
 
 import qualified Control.Super.Plugin.Utils as U
 import qualified Control.Super.Plugin.Detect as D
@@ -60,8 +60,11 @@ partiallyApplyTyCons = runTcPlugin . U.partiallyApplyTyCons
 --   class dictionary and returns the updated dictionary.
 findClassesAndInstancesInScope :: D.ClassQuery -> ClassDict -> SupermonadPluginM s ClassDict
 findClassesAndInstancesInScope clsQuery oldClsDict = do
+  let optQuery = D.isOptionalClassQuery clsQuery
   eFoundClsInsts <- runTcPlugin $ D.findClassesAndInstancesInScope clsQuery
-  foundClsInsts <- case eFoundClsInsts of
-    Right clsInsts -> return clsInsts
+  case eFoundClsInsts of
+    Right [] | optQuery ->
+      return $ foldr insertOptionalClsDict oldClsDict $ D.queriedClasses clsQuery
+    Right clsInsts ->
+      return $ foldr (\(clsName, cls, insts) -> insertClsDict clsName optQuery cls insts) oldClsDict clsInsts
     Left errMsg -> throwPluginErrorSDoc errMsg
-  return $ foldr (\(clsName, cls, clsInsts) -> insertClsDict clsName cls clsInsts) oldClsDict foundClsInsts

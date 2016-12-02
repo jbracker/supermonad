@@ -59,7 +59,7 @@ moduleQuery = EitherModule
 
 -- | Queries the superarrow classes.
 classQuery :: ClassQuery
-classQuery = ClassQuery moduleQuery 
+classQuery = ClassQuery False moduleQuery 
   [ (arrowArrClassName     , 1)
   , (arrowSequenceClassName, 3)
   , (arrowSelectClassName  , 2)

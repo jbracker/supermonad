@@ -4,7 +4,7 @@ module Control.Super.Plugin.Prototype
   ) where
 
 
-import Data.Maybe ( isJust, isNothing, fromJust )
+import Data.Maybe ( isJust, isNothing, fromJust, catMaybes )
 import Data.Foldable ( foldrM )
 import Control.Monad ( forM )
 
@@ -27,6 +27,7 @@ import Control.Super.Plugin.Environment
   , runSupermonadPluginAndReturn, runTcPlugin
   , getWantedConstraints
   , getClass, getClassDictionary
+  , isOptionalClass
   , throwPluginErrorSDoc
   , printMsg
   -- , printObj, printConstraints
@@ -49,10 +50,15 @@ import Control.Super.Plugin.Names ( PluginClassName )
 type SupermonadState = ()
 
 -- | The supermonad type checker plugin for GHC.
-pluginPrototype :: ModuleQuery 
+pluginPrototype :: ModuleQuery
+                -- ^ Query the modules that a mandatory for the plugin to work.
                 -> [ClassQuery] 
-                -> [[PluginClassName]] 
+                -- ^ The classes that the plugin will solve.
+                -> [[PluginClassName]]
+                -- ^ The sets of class names that require being solved together.
                 -> (ClassDict -> [InstanceImplication]) 
+                -- ^ The depedencies between different class instances, that 
+                --   cannot be implemented using the Haskell type class definitions.
                 -> Plugin
 pluginPrototype mdlQuery clsQuery solvingGroups instImps = 
   defaultPlugin { tcPlugin = \_clOpts -> Just plugin }
@@ -79,12 +85,22 @@ pluginPrototype mdlQuery clsQuery solvingGroups instImps =
           printMsg "Invoke (super) plugin..."
           
           forM solvingGroups $ \solvingGroup -> do
-            mClss <- forM solvingGroup $ \clsName -> do
+            -- Find the classes in the solving group.
+            mClss <- fmap catMaybes $ forM solvingGroup $ \clsName -> do
               mCls <- getClass clsName
-              return (clsName, mCls)
+              opt  <- isOptionalClass clsName
+              -- Optional classes that are not available, can be ignored while solving
+              return $ if opt && isNothing mCls then
+                         Nothing
+                       else 
+                         Just (clsName, mCls)
+            -- If we found all of the classes in the solving group 
+            -- (except the optional ones), we can try to solve the constraints.
             if all (isJust . snd) mClss then do 
               wantedCts <- getWantedConstraints
               solveConstraints (fmap (fromJust . snd) mClss) wantedCts
+            -- We could not find all of the classes in the solving group: 
+            -- Throw an error listing the missing classes. 
             else do
               throwPluginErrorSDoc $ O.hang (O.text "Missing classes:") errIndent 
                                    $ O.hcat $ O.punctuate (O.text ", ") 

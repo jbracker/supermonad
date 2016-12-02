@@ -36,7 +36,7 @@ import Control.Super.Plugin.Names
 -- | The supermonad type checker plugin for GHC.
 plugin :: Plugin
 plugin = pluginPrototype supermonadModuleQuery
-                         [supermonadClassQuery]
+                         [supermonadClassQuery] --, alternativeClassQuery]
                          solvingGroups
                          supermonadInstanceImplications
 
@@ -44,10 +44,17 @@ plugin = pluginPrototype supermonadModuleQuery
 -- Supermonad specific initialization
 -- -----------------------------------------------------------------------------
 
+alternativeEmptyClassName = "AlternativeEmpty"
+alternativeAltClassName   = "AlternativeAlt"
+
+alternativeModuleName   = "Control.Super.Monad.Alternative"
+alternativeCtModuleName = "Control.Super.Monad.Constrained.Alternative"
+
 -- | Configure which groups of classes need to be solved together.
 solvingGroups :: [[PluginClassName]]
 solvingGroups = 
-  [ [ bindClassName, returnClassName, applicativeClassName ] -- Supermonad group
+  [ [ bindClassName, returnClassName, applicativeClassName
+    ] --, alternativeEmptyClassName, alternativeAltClassName ] -- Supermonad group
   ]
 
 -- | Queries the module providing the supermonad classes.
@@ -65,12 +72,21 @@ supermonadModuleQuery = EitherModule
               ]
   ] $ Just findSupermonadModulesErrMsg
 
+alternativeModuleQuery :: ModuleQuery
+alternativeModuleQuery = undefined
+
 -- | Queries the supermonad classes.
 supermonadClassQuery :: ClassQuery
-supermonadClassQuery = ClassQuery supermonadModuleQuery 
+supermonadClassQuery = ClassQuery False supermonadModuleQuery 
   [ (bindClassName       , 3)
   , (returnClassName     , 1)
   , (applicativeClassName, 3)
+  ]
+
+alternativeClassQuery :: ClassQuery
+alternativeClassQuery = ClassQuery True alternativeModuleQuery
+  [ (alternativeAltClassName, 3)
+  , (alternativeEmptyClassName, 1)
   ]
 
 -- | Ensures that all supermonad instance implications with the group of 
