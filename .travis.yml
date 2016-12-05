@@ -7,7 +7,6 @@ env:
   # - GHCVER=7.10.3
   - GHCVER=8.0.2
 
-# Note: the distinction between `before_install` and `install` is not important.
 before_install:
   - unset CC
 install:
@@ -17,8 +16,17 @@ install:
   - export PATH=$HOME/.cabal/bin:/opt/ghc/$GHCVER/bin:/opt/cabal/1.24/bin:/opt/alex/3.1.4/bin:/opt/happy/1.19.5/bin:$PATH
   - travis_retry cabal update
 
+before_script:
+  - cabal sandbox init
+  # Setup the library dependency of the ebba-example.
+  - git clone https://github.com/glutamate/gnewplot.git ./examples/arrow/ebba/gnewplot
+  - cabal sandbox add-source ./examples/arrow/ebba/gnewplot
+
 script:
+  # Build the supermonad library.
   - travis_retry cabal install -v -j1
+  # Find the example directories that contain a cabal project and builds them in the current context.
+  - find ./examples -type f -iname '*.cabal' -exec dirname {} \; | xargs -n1 cabal install
 
 notifications:
   email: true
