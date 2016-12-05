@@ -68,7 +68,9 @@ instance (AlternativeEmpty f, AlternativeEmpty g) => AlternativeEmpty (f Generic
 instance (AlternativeEmpty f, AlternativeEmpty g) => AlternativeEmpty (f Generics.:.: g) where
   type AlternativeEmptyCts (f Generics.:.: g) = (AlternativeEmptyCts f, AlternativeEmptyCts g)
   empty = Generics.Comp1 $ empty
-  
+instance AlternativeEmpty f => AlternativeEmpty (Generics.M1 i c f) where
+  type AlternativeEmptyCts (Generics.M1 i c f) = AlternativeEmptyCts f
+  empty = Generics.M1 $ empty
 
 
 class Applicative f g h => AlternativeAlt f g h where
@@ -111,6 +113,9 @@ instance (AlternativeAlt f g h, AlternativeAlt f' g' h') => AlternativeAlt (f Ge
 instance (Applicative f g h, AlternativeAlt f' g' h') => AlternativeAlt (f Generics.:.: f') (g Generics.:.: g') (h Generics.:.: h') where
   type AlternativeAltCts (f Generics.:.: f') (g Generics.:.: g') (h Generics.:.: h') = (ApplicativeCts f g h, AlternativeAltCts f' g' h')
   (Generics.Comp1 f) <|> (Generics.Comp1 g) = Generics.Comp1 $ fmap (<|>) f <*> g 
+instance AlternativeAlt f g h => AlternativeAlt (Generics.M1 i c f) (Generics.M1 i c g) (Generics.M1 i c h)  where
+  type AlternativeAltCts (Generics.M1 i c f) (Generics.M1 i c g) (Generics.M1 i c h) = AlternativeAltCts f g h
+  (Generics.M1 f) <|> (Generics.M1 g) = Generics.M1 $ f <|> g
 
 
 

@@ -298,6 +298,13 @@ instance (Applicative f g h, Applicative f' g' h') => Applicative (f Generics.:.
   (Generics.Comp1 mf) <*> (Generics.Comp1 ma) = Generics.Comp1 $ fmap (<*>) mf <*> ma
   (Generics.Comp1 ma)  *> (Generics.Comp1 mb) = Generics.Comp1 $ fmap ( *>) ma <*> mb
   (Generics.Comp1 ma) <*  (Generics.Comp1 mb) = Generics.Comp1 $ fmap (<* ) ma <*> mb
+instance Applicative f g h => Applicative (Generics.M1 i c f) (Generics.M1 i c g) (Generics.M1 i c h) where
+  type ApplicativeCts  (Generics.M1 i c f) (Generics.M1 i c g) (Generics.M1 i c h) a b = ApplicativeCts  f g h a b
+  type ApplicativeCtsL (Generics.M1 i c f) (Generics.M1 i c g) (Generics.M1 i c h) a b = ApplicativeCtsL f g h a b
+  type ApplicativeCtsR (Generics.M1 i c f) (Generics.M1 i c g) (Generics.M1 i c h) a b = ApplicativeCtsR f g h a b
+  (Generics.M1 mf) <*> (Generics.M1 ma) = Generics.M1 $ mf <*> ma
+  (Generics.M1 mf)  *> (Generics.M1 ma) = Generics.M1 $ mf  *> ma
+  (Generics.M1 mf) <*  (Generics.M1 ma) = Generics.M1 $ mf <*  ma
 
 -- Constrained Instances -------------------------------------------------------
 
@@ -554,6 +561,9 @@ instance (Bind m n p) => Bind (Generics.Rec1 m) (Generics.Rec1 n) (Generics.Rec1
 instance (Bind f g h, Bind f' g' h') => Bind (f Generics.:*: f') (g Generics.:*: g') (h Generics.:*: h') where
   type BindCts (f Generics.:*: f') (g Generics.:*: g') (h Generics.:*: h') a b = (BindCts f g h a b, BindCts f' g' h' a b)
   (f Generics.:*: g) >>= m = (f >>= \a -> let (f' Generics.:*: _g') = m a in f') Generics.:*: (g >>= \a -> let (_f' Generics.:*: g') = m a in g')
+instance Bind f g h => Bind (Generics.M1 i c f) (Generics.M1 i c g) (Generics.M1 i c h) where
+  type BindCts  (Generics.M1 i c f) (Generics.M1 i c g) (Generics.M1 i c h) a b = BindCts  f g h a b
+  (Generics.M1 ma) >>= f = Generics.M1 $ ma >>= Generics.unM1 . f
 
 
 -- Constrained Instances -------------------------------------------------------
@@ -749,6 +759,9 @@ instance (Return f, Return g) => Return (f Generics.:*: g) where
 instance (Return f, Return g) => Return (f Generics.:.: g) where
   type ReturnCts (f Generics.:.: g) a = (ReturnCts f (g a), ReturnCts g a)
   return a = Generics.Comp1 $ return (return a)
+instance Return f => Return (Generics.M1 i c f) where
+  type ReturnCts (Generics.M1 i c f) a = ReturnCts f a
+  return = Generics.M1 . return
 
 -- Constrained Instances -------------------------------------------------------
 
@@ -908,6 +921,9 @@ instance (Fail m) => Fail (Generics.Rec1 m) where
 instance (Fail f, Fail g) => Fail (f Generics.:*: g) where
   type FailCts (f Generics.:*: g) a = (FailCts f a, FailCts g a)
   fail a = fail a Generics.:*: fail a
+instance Fail f => Fail (Generics.M1 i c f) where
+  type FailCts (Generics.M1 i c f) a = FailCts f a
+  fail = Generics.M1 . fail
 
 -- Constrained Instances -------------------------------------------------------
 

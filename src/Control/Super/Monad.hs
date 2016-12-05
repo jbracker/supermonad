@@ -259,6 +259,11 @@ instance (Applicative f g h, Applicative f' g' h') => Applicative (f Generics.:*
 instance (Applicative f g h, Applicative f' g' h') => Applicative (f Generics.:.: f') (g Generics.:.: g') (h Generics.:.: h') where
   type ApplicativeCts (f Generics.:.: f') (g Generics.:.: g') (h Generics.:.: h') = (ApplicativeCts f g h, ApplicativeCts f' g' h')
   (Generics.Comp1 mf) <*> (Generics.Comp1 ma) = Generics.Comp1 $ fmap (<*>) mf <*> ma
+instance Applicative f g h => Applicative (Generics.M1 i c f) (Generics.M1 i c g) (Generics.M1 i c h) where
+  type ApplicativeCts  (Generics.M1 i c f) (Generics.M1 i c g) (Generics.M1 i c h) = ApplicativeCts  f g h
+  (Generics.M1 mf) <*> (Generics.M1 ma) = Generics.M1 $ mf <*> ma
+  (Generics.M1 mf)  *> (Generics.M1 ma) = Generics.M1 $ mf  *> ma
+  (Generics.M1 mf) <*  (Generics.M1 ma) = Generics.M1 $ mf <*  ma
 
 -- "transformers" package instances: -------------------------------------------
 
@@ -457,6 +462,9 @@ instance (Bind m n p) => Bind (Generics.Rec1 m) (Generics.Rec1 n) (Generics.Rec1
 instance (Bind f g h, Bind f' g' h') => Bind (f Generics.:*: f') (g Generics.:*: g') (h Generics.:*: h') where
   type BindCts (f Generics.:*: f') (g Generics.:*: g') (h Generics.:*: h') = (BindCts f g h, BindCts f' g' h')
   (f Generics.:*: g) >>= m = (f >>= \a -> let (f' Generics.:*: _g') = m a in f') Generics.:*: (g >>= \a -> let (_f' Generics.:*: g') = m a in g')
+instance Bind f g h => Bind (Generics.M1 i c f) (Generics.M1 i c g) (Generics.M1 i c h) where
+  type BindCts  (Generics.M1 i c f) (Generics.M1 i c g) (Generics.M1 i c h) = BindCts  f g h
+  (Generics.M1 ma) >>= f = Generics.M1 $ ma >>= Generics.unM1 . f
 
 -- "transformers" package instances: -------------------------------------------
 
@@ -644,7 +652,10 @@ instance (Return f, Return g) => Return (f Generics.:*: g) where
   return a = return a Generics.:*: return a
 instance (Return f, Return g) => Return (f Generics.:.: g) where
   type ReturnCts (f Generics.:.: g) = (ReturnCts f, ReturnCts g)
-  return a = Generics.Comp1 $ return (return a)
+  return = Generics.Comp1 . return . return
+instance Return f => Return (Generics.M1 i c f) where
+  type ReturnCts (Generics.M1 i c f) = ReturnCts f
+  return = Generics.M1 . return
   
 -- "transformers" package instances: -------------------------------------------
 
@@ -800,6 +811,9 @@ instance (Fail m) => Fail (Generics.Rec1 m) where
 instance (Fail f, Fail g) => Fail (f Generics.:*: g) where
   type FailCts (f Generics.:*: g) = (FailCts f, FailCts g)
   fail a = fail a Generics.:*: fail a
+instance Fail f => Fail (Generics.M1 i c f) where
+  type FailCts (Generics.M1 i c f) = FailCts f
+  fail = Generics.M1 . fail
 
 -- "transformers" package instances: -------------------------------------------
 

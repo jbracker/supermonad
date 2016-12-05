@@ -67,6 +67,9 @@ instance MonadPlusZero f => MonadPlusZero (Generics.Rec1 f) where
 instance (MonadPlusZero f, MonadPlusZero g) => MonadPlusZero (f Generics.:*: g) where
   type MonadPlusZeroCts (f Generics.:*: g) = (MonadPlusZeroCts f, MonadPlusZeroCts g)
   mzero = mzero Generics.:*: mzero
+instance MonadPlusZero f => MonadPlusZero (Generics.M1 i c f) where
+  type MonadPlusZeroCts (Generics.M1 i c f) = MonadPlusZeroCts f
+  mzero = Generics.M1 $ mzero
 
 
 
@@ -105,6 +108,9 @@ instance MonadPlusAdd f g h => MonadPlusAdd (Generics.Rec1 f) (Generics.Rec1 g) 
 instance (MonadPlusAdd f g h, MonadPlusAdd f' g' h') => MonadPlusAdd (f Generics.:*: f') (g Generics.:*: g') (h Generics.:*: h') where
   type MonadPlusAddCts (f Generics.:*: f') (g Generics.:*: g') (h Generics.:*: h') = (MonadPlusAddCts f g h, MonadPlusAddCts f' g' h')
   mplus (f Generics.:*: g) (f' Generics.:*: g') = (mplus f f') Generics.:*: (mplus g g')
+instance MonadPlusAdd f g h => MonadPlusAdd (Generics.M1 i c f) (Generics.M1 i c g) (Generics.M1 i c h)  where
+  type MonadPlusAddCts (Generics.M1 i c f) (Generics.M1 i c g) (Generics.M1 i c h) = MonadPlusAddCts f g h
+  mplus (Generics.M1 f) (Generics.M1 g) = Generics.M1 $ mplus f g
 
 
 

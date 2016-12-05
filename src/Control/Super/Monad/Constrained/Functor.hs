@@ -194,6 +194,10 @@ instance (Functor f, Functor g) => Functor (f Generics.:*: g) where
 instance (Functor f, Functor g) => Functor (f Generics.:.: g) where
   type FunctorCts (f Generics.:.: g) a b = (FunctorCts f (g a) (g b), FunctorCts g a b)
   fmap f (Generics.Comp1 ma) = Generics.Comp1 $ fmap (fmap f) ma
+instance Functor f => Functor (Generics.M1 i c f) where
+  type FunctorCts (Generics.M1 i c f) a b = FunctorCts f a b
+  fmap f (Generics.M1 ma) = Generics.M1 $ fmap f ma
+
 
 -- Constrained instances -------------------------------------------------------
 
