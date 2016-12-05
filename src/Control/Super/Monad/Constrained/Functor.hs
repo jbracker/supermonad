@@ -30,6 +30,7 @@ import qualified Data.Monoid as Mon ( First, Last, Sum, Product, Dual, Alt(..) )
 import qualified Data.Proxy as Proxy ( Proxy )
 import qualified Data.Complex as Complex ( Complex )
 import qualified Data.Functor.Product as Product ( Product(..) )
+import qualified Data.Functor.Compose as Compose ( Compose(..) )
 #if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 import qualified Data.Semigroup as Semigroup ( Min, Max, Option, First, Last )
 import qualified Data.List.NonEmpty as NonEmpty ( NonEmpty )
@@ -151,9 +152,14 @@ instance Functor NonEmpty.NonEmpty where
   fmap = P.fmap
   (<$) = (P.<$)
 #endif
+
 instance (Functor f, Functor g) => Functor (Product.Product f g) where
   type FunctorCts (Product.Product f g) a b = (FunctorCts f a b, FunctorCts g a b)
   fmap f (Product.Pair fa fb) = Product.Pair (fmap f fa) (fmap f fb)
+  
+instance (Functor f, Functor g) => Functor (Compose.Compose f g) where
+  type FunctorCts (Compose.Compose f g) a b = (FunctorCts f (g a) (g b), FunctorCts g a b)
+  fmap f (Compose.Compose x) = Compose.Compose (fmap (fmap f) x)
 
 instance Functor Read.ReadP where
   fmap = P.fmap

@@ -48,6 +48,7 @@ import qualified Data.Monoid as Mon ( First, Last, Sum, Product, Dual, Alt(..) )
 import qualified Data.Proxy as Proxy ( Proxy )
 import qualified Data.Complex as Complex ( Complex )
 import qualified Data.Functor.Product as Product ( Product(..) )
+import qualified Data.Functor.Compose as Compose ( Compose(..) )
 #if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 import qualified Data.Semigroup as Semigroup ( Min, Max, Option, First, Last )
 import qualified Data.List.NonEmpty as NonEmpty ( NonEmpty )
@@ -225,13 +226,25 @@ instance Applicative NonEmpty.NonEmpty NonEmpty.NonEmpty NonEmpty.NonEmpty where
   (<*)  = (P.<*)
   (*>)  = (P.*>)
 #endif
+
 instance (Applicative m1 n1 p1, Applicative m2 n2 p2) => Applicative (Product.Product m1 m2) (Product.Product n1 n2) (Product.Product p1 p2) where
   type ApplicativeCts (Product.Product m1 m2) (Product.Product n1 n2) (Product.Product p1 p2) a b = (ApplicativeCts m1 n1 p1 a b, ApplicativeCts m2 n2 p2 a b)
   type ApplicativeCtsR (Product.Product m1 m2) (Product.Product n1 n2) (Product.Product p1 p2) a b = (ApplicativeCtsR m1 n1 p1 a b, ApplicativeCtsR m2 n2 p2 a b)
   type ApplicativeCtsL (Product.Product m1 m2) (Product.Product n1 n2) (Product.Product p1 p2) a b = (ApplicativeCtsL m1 n1 p1 a b, ApplicativeCtsL m2 n2 p2 a b)
   Product.Pair m1 m2 <*> Product.Pair n1 n2 = Product.Pair (m1 <*> n1) (m2 <*> n2)
-  Product.Pair m1 m2 *> Product.Pair n1 n2 = Product.Pair (m1 *> n1) (m2 *> n2)
-  Product.Pair m1 m2 <* Product.Pair n1 n2 = Product.Pair (m1 <* n1) (m2 <* n2)
+  Product.Pair m1 m2  *> Product.Pair n1 n2 = Product.Pair (m1  *> n1) (m2  *> n2)
+  Product.Pair m1 m2 <*  Product.Pair n1 n2 = Product.Pair (m1 <*  n1) (m2 <*  n2)
+
+instance (Applicative f g h, Applicative f' g' h') => Applicative (Compose.Compose f f') (Compose.Compose g g') (Compose.Compose h h') where
+  type ApplicativeCts  (Compose.Compose f f') (Compose.Compose g g') (Compose.Compose h h') a b = ( ApplicativeCts f g h (g' a) (h' b), ApplicativeCts  f' g' h' a b
+                                                                                                  , FunctorCts f (f' (a -> b)) (g' a -> h' b) )
+  type ApplicativeCtsL (Compose.Compose f f') (Compose.Compose g g') (Compose.Compose h h') a b = ( ApplicativeCts f g h (g' b) (h' a), ApplicativeCtsL f' g' h' a b
+                                                                                                  , FunctorCts f (f' a) (g' b -> h' a) )
+  type ApplicativeCtsR (Compose.Compose f f') (Compose.Compose g g') (Compose.Compose h h') a b = ( ApplicativeCts f g h (g' b) (h' b), ApplicativeCtsR f' g' h' a b
+                                                                                                  , FunctorCts f (f' a) (g' b -> h' b) )
+  Compose.Compose f <*> Compose.Compose x = Compose.Compose $ fmap (<*>) f <*> x
+  Compose.Compose f  *> Compose.Compose x = Compose.Compose $ fmap ( *>) f <*> x
+  Compose.Compose f <*  Compose.Compose x = Compose.Compose $ fmap (<* ) f <*> x
 
 instance Applicative Read.ReadP Read.ReadP Read.ReadP where
   (<*>) = (P.<*>)
@@ -290,7 +303,7 @@ instance (Applicative f g h, Applicative f' g' h') => Applicative (f Generics.:*
 -- TODO: Is there a nicer way to implement this for ':.:'?
 instance (Applicative f g h, Applicative f' g' h') => Applicative (f Generics.:.: f') (g Generics.:.: g') (h Generics.:.: h') where
   type ApplicativeCts  (f Generics.:.: f') (g Generics.:.: g') (h Generics.:.: h') a b = ( ApplicativeCts f g h (g' a) (h' b), ApplicativeCts  f' g' h' a b
-                                                                                         , FunctorCts f (f' (a -> b)) (g' a -> h' b))
+                                                                                         , FunctorCts f (f' (a -> b)) (g' a -> h' b) )
   type ApplicativeCtsL (f Generics.:.: f') (g Generics.:.: g') (h Generics.:.: h') a b = ( ApplicativeCts f g h (g' b) (h' a), ApplicativeCtsL f' g' h' a b
                                                                                          , FunctorCts f (f' a) (g' b -> h' a) )
   type ApplicativeCtsR (f Generics.:.: f') (g Generics.:.: g') (h Generics.:.: h') a b = ( ApplicativeCts f g h (g' b) (h' b), ApplicativeCtsR f' g' h' a b
@@ -726,9 +739,14 @@ instance Return Complex.Complex where
 instance Return NonEmpty.NonEmpty where
   return = P.return
 #endif
+
 instance (Return m1, Return m2) => Return (Product.Product m1 m2) where
   type ReturnCts (Product.Product m1 m2) a = (ReturnCts m1 a, ReturnCts m2 a)
   return a = Product.Pair (return a) (return a)
+
+instance (Return f, Return f') => Return (Compose.Compose f f') where
+  type ReturnCts (Compose.Compose f f') a = (ReturnCts f (f' a), ReturnCts f' a)
+  return = Compose.Compose . return . return
 
 instance Return Read.ReadP where
   return = P.return

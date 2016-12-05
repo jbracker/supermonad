@@ -48,6 +48,7 @@ import qualified Data.Monoid as Mon ( First, Last, Sum, Product, Dual, Alt(..) )
 import qualified Data.Proxy as Proxy ( Proxy )
 import qualified Data.Complex as Complex ( Complex )
 import qualified Data.Functor.Product as Product ( Product(..) )
+import qualified Data.Functor.Compose as Compose ( Compose(..) )
 #if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 import qualified Data.Semigroup as Semigroup ( Min, Max, Option, First, Last )
 import qualified Data.List.NonEmpty as NonEmpty ( NonEmpty )
@@ -195,8 +196,14 @@ instance Applicative NonEmpty.NonEmpty NonEmpty.NonEmpty NonEmpty.NonEmpty where
 instance (Applicative m1 n1 p1, Applicative m2 n2 p2) => Applicative (Product.Product m1 m2) (Product.Product n1 n2) (Product.Product p1 p2) where
   type ApplicativeCts (Product.Product m1 m2) (Product.Product n1 n2) (Product.Product p1 p2) = (ApplicativeCts m1 n1 p1, ApplicativeCts m2 n2 p2)
   Product.Pair m1 m2 <*> Product.Pair n1 n2 = Product.Pair (m1 <*> n1) (m2 <*> n2)
-  Product.Pair m1 m2 *> Product.Pair n1 n2 = Product.Pair (m1 *> n1) (m2 *> n2)
-  Product.Pair m1 m2 <* Product.Pair n1 n2 = Product.Pair (m1 <* n1) (m2 <* n2)
+  Product.Pair m1 m2  *> Product.Pair n1 n2 = Product.Pair (m1  *> n1) (m2  *> n2)
+  Product.Pair m1 m2 <*  Product.Pair n1 n2 = Product.Pair (m1 <*  n1) (m2 <*  n2)
+
+instance (Applicative f g h, Applicative f' g' h') => Applicative (Compose.Compose f f') (Compose.Compose g g') (Compose.Compose h h') where
+  type ApplicativeCts (Compose.Compose f f') (Compose.Compose g g') (Compose.Compose h h') = (ApplicativeCts f g h, ApplicativeCts f' g' h')
+  Compose.Compose f <*> Compose.Compose x = Compose.Compose $ fmap (<*>) f <*> x
+  Compose.Compose f  *> Compose.Compose x = Compose.Compose $ fmap ( *>) f <*> x
+  Compose.Compose f <*  Compose.Compose x = Compose.Compose $ fmap (<* ) f <*> x
 
 instance Applicative Read.ReadP Read.ReadP Read.ReadP where
   (<*>) = (P.<*>)
@@ -619,9 +626,14 @@ instance Return Complex.Complex where
 instance Return NonEmpty.NonEmpty where
   return = P.return
 #endif
+
 instance (Return m1, Return m2) => Return (Product.Product m1 m2) where
   type ReturnCts (Product.Product m1 m2) = (ReturnCts m1, ReturnCts m2)
   return a = Product.Pair (return a) (return a)
+
+instance (Return f, Return f') => Return (Compose.Compose f f') where
+  type ReturnCts (Compose.Compose f f') = (ReturnCts f, ReturnCts f')
+  return = Compose.Compose . return . return
 
 instance Return Read.ReadP where
   return = P.return

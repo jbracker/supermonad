@@ -23,6 +23,7 @@ import qualified Data.Semigroup as Semigroup
 import qualified Data.Proxy as Proxy
 import qualified Data.Monoid as Mon
 import qualified Data.Functor.Product as Product ( Product(..) )
+import qualified Data.Functor.Compose as Compose ( Compose(..) )
 import qualified Text.ParserCombinators.ReadP as ReadP
 import qualified Text.ParserCombinators.ReadPrec as ReadPrec
 
