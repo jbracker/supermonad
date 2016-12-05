@@ -22,6 +22,7 @@ import qualified Control.Applicative as Applic
 import qualified Data.Semigroup as Semigroup
 import qualified Data.Proxy as Proxy
 import qualified Data.Monoid as Mon
+import qualified Data.Functor.Product as Product ( Product(..) )
 import qualified Text.ParserCombinators.ReadP as ReadP
 import qualified Text.ParserCombinators.ReadPrec as ReadPrec
 
@@ -56,6 +57,10 @@ instance MonadPlusZero Proxy.Proxy where
 instance (MonadPlusZero f) => MonadPlusZero (Mon.Alt f) where
   type MonadPlusZeroCts (Mon.Alt f) = MonadPlusZeroCts f
   mzero = Mon.Alt $ mzero
+
+instance (MonadPlusZero f, MonadPlusZero f') => MonadPlusZero (Product.Product f f') where
+  type MonadPlusZeroCts (Product.Product f f') = (MonadPlusZeroCts f, MonadPlusZeroCts f')
+  mzero = Product.Pair mzero mzero
 
 -- TODO: ArrowMonad and WrappedMonad instances. These lead to cyclic dependencies.
 
@@ -97,6 +102,10 @@ instance MonadPlusAdd Proxy.Proxy Proxy.Proxy Proxy.Proxy where
 instance (MonadPlusAdd f g h) => MonadPlusAdd (Mon.Alt f) (Mon.Alt g) (Mon.Alt h) where
   type MonadPlusAddCts (Mon.Alt f) (Mon.Alt g) (Mon.Alt h) = MonadPlusAddCts f g h
   mplus (Mon.Alt ma) (Mon.Alt na) = Mon.Alt $ mplus ma na
+
+instance (MonadPlusAdd f g h, MonadPlusAdd f' g' h') => MonadPlusAdd (Product.Product f f') (Product.Product g g') (Product.Product h h') where
+  type MonadPlusAddCts (Product.Product f f') (Product.Product g g') (Product.Product h h') = (MonadPlusAddCts f g h, MonadPlusAddCts f' g' h')
+  mplus (Product.Pair m1 m2) (Product.Pair n1 n2) = Product.Pair (mplus m1 n1) (mplus m2 n2)
 
 -- TODO: ArrowMonad and WrappedMonad instances. These lead to cyclic dependencies.
 

@@ -24,6 +24,7 @@ import qualified Control.Applicative as Applic
 import qualified Data.Semigroup as Semigroup
 import qualified Data.Proxy as Proxy
 import qualified Data.Monoid as Mon
+import qualified Data.Functor.Product as Product ( Product(..) )
 import qualified Text.ParserCombinators.ReadP as ReadP
 import qualified Text.ParserCombinators.ReadPrec as ReadPrec
 
@@ -55,6 +56,10 @@ instance AlternativeEmpty Proxy.Proxy where
 instance (AlternativeEmpty f) => AlternativeEmpty (Mon.Alt f) where
   type AlternativeEmptyCts (Mon.Alt f) a = AlternativeEmptyCts f a
   empty = Mon.Alt $ empty
+
+instance (AlternativeEmpty f, AlternativeEmpty f') => AlternativeEmpty (Product.Product f f') where
+  type AlternativeEmptyCts (Product.Product f f') a = (AlternativeEmptyCts f a, AlternativeEmptyCts f' a)
+  empty = Product.Pair empty empty
 
 -- TODO: ArrowMonad and WrappedMonad instances. These lead to cyclic dependencies.
 
@@ -98,6 +103,10 @@ instance AlternativeAlt Proxy.Proxy Proxy.Proxy Proxy.Proxy where
 instance (AlternativeAlt f g h) => AlternativeAlt (Mon.Alt f) (Mon.Alt g) (Mon.Alt h) where
   type AlternativeAltCts (Mon.Alt f) (Mon.Alt g) (Mon.Alt h) a = AlternativeAltCts f g h a
   (Mon.Alt ma) <|> (Mon.Alt na) = Mon.Alt $ ma <|> na
+
+instance (AlternativeAlt f g h, AlternativeAlt f' g' h') => AlternativeAlt (Product.Product f f') (Product.Product g g') (Product.Product h h') where
+  type AlternativeAltCts (Product.Product f f') (Product.Product g g') (Product.Product h h') a = (AlternativeAltCts f g h a, AlternativeAltCts f' g' h' a)
+  Product.Pair m1 m2 <|> Product.Pair n1 n2 = Product.Pair (m1 <|> n1) (m2 <|> n2)
 
 -- TODO: ArrowMonad and WrappedMonad instances. These lead to cyclic dependencies.
 
