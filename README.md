@@ -19,12 +19,12 @@ These parallel structures will not be maintained indefinitely and
 at some point we will probably only offer supermonads with support
 for constrained monads.
 
-* master: ![travis build status: master](https://travis-ci.org/jbracker/supermonad.svg?branch=master)
-* dev: ![travis build status: dev](https://travis-ci.org/jbracker/supermonad.svg?branch=dev)
+* master: [![build status master][TravisBuildMaster]](https://travis-ci.org/jbracker/supermonad)
+* dev: [![build status dev][TravisBuildDev]](https://travis-ci.org/jbracker/supermonad)
 
 ## GHC Version
 
-The implementation has been tested with GHC in version 7.10.3 and GHC 8.0.1.
+The implementation has been tested with GHC in version 7.10.3 and GHC 8.0.2.
 
 Versions of GHC prior to version 7.10.1 will most certainly not work,
 because the plugin mechanism was still in development.
@@ -64,3 +64,7 @@ cabal file and offer a version of the code with and without the use of supermona
 ## Known Problems
 
 None at the moment.
+
+
+[TravisBuildMaster]: https://travis-ci.org/jbracker/supermonad.svg?branch=master
+[TravisBuildDev]: https://travis-ci.org/jbracker/supermonad.svg?branch=dev
