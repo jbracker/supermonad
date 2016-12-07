@@ -21,13 +21,15 @@ import qualified GHC.Generics as Generics
 import qualified GHC.Conc as STM
 import qualified Control.Arrow as Arrow
 import qualified Control.Applicative as Applic
-import qualified Data.Semigroup as Semigroup
 import qualified Data.Proxy as Proxy
 import qualified Data.Monoid as Mon
 import qualified Data.Functor.Product as Product ( Product(..) )
 import qualified Data.Functor.Compose as Compose ( Compose(..) )
 import qualified Text.ParserCombinators.ReadP as ReadP
 import qualified Text.ParserCombinators.ReadPrec as ReadPrec
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
+import qualified Data.Semigroup as Semigroup
+#endif
 
 import Control.Super.Monad.Constrained.Prelude 
   ( ($)
@@ -50,8 +52,10 @@ instance AlternativeEmpty ReadPrec.ReadPrec where
   empty = A.empty
 instance AlternativeEmpty STM.STM where
   empty = A.empty
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 instance AlternativeEmpty Semigroup.Option where
   empty = A.empty
+#endif
 instance AlternativeEmpty Proxy.Proxy where
   empty = A.empty
 instance (AlternativeEmpty f) => AlternativeEmpty (Mon.Alt f) where
@@ -101,8 +105,10 @@ instance AlternativeAlt ReadPrec.ReadPrec ReadPrec.ReadPrec ReadPrec.ReadPrec wh
   (<|>) = (A.<|>)
 instance AlternativeAlt STM.STM STM.STM STM.STM where
   (<|>) = (A.<|>)
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 instance AlternativeAlt Semigroup.Option Semigroup.Option Semigroup.Option where
   (<|>) = (A.<|>)
+#endif
 instance AlternativeAlt Proxy.Proxy Proxy.Proxy Proxy.Proxy where
   (<|>) = (A.<|>)
 instance (AlternativeAlt f g h) => AlternativeAlt (Mon.Alt f) (Mon.Alt g) (Mon.Alt h) where

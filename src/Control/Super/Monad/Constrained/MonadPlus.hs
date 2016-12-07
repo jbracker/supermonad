@@ -19,13 +19,15 @@ import qualified GHC.Generics as Generics
 import qualified GHC.Conc as STM
 import qualified Control.Arrow as Arrow
 import qualified Control.Applicative as Applic
-import qualified Data.Semigroup as Semigroup
 import qualified Data.Proxy as Proxy
 import qualified Data.Monoid as Mon
 import qualified Data.Functor.Product as Product ( Product(..) )
 import qualified Data.Functor.Compose as Compose ( Compose(..) )
 import qualified Text.ParserCombinators.ReadP as ReadP
 import qualified Text.ParserCombinators.ReadPrec as ReadPrec
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
+import qualified Data.Semigroup as Semigroup
+#endif
 
 import Control.Super.Monad.Constrained.Prelude 
   ( ($)
@@ -51,8 +53,10 @@ instance MonadPlusZero ReadPrec.ReadPrec where
   mzero = M.mzero
 instance MonadPlusZero STM.STM where
   mzero = M.mzero
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 instance MonadPlusZero Semigroup.Option where
   mzero = M.mzero
+#endif
 instance MonadPlusZero Proxy.Proxy where
   mzero = M.mzero
 instance (MonadPlusZero f) => MonadPlusZero (Mon.Alt f) where
@@ -95,8 +99,10 @@ instance MonadPlusAdd ReadPrec.ReadPrec ReadPrec.ReadPrec ReadPrec.ReadPrec wher
   mplus = M.mplus
 instance MonadPlusAdd STM.STM STM.STM STM.STM where
   mplus = M.mplus
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 instance MonadPlusAdd Semigroup.Option Semigroup.Option Semigroup.Option where
   mplus = M.mplus
+#endif
 instance MonadPlusAdd Proxy.Proxy Proxy.Proxy Proxy.Proxy where
   mplus = M.mplus
 instance (MonadPlusAdd f g h) => MonadPlusAdd (Mon.Alt f) (Mon.Alt g) (Mon.Alt h) where
