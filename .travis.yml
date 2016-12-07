@@ -1,19 +1,23 @@
  
-# The following enables several GHC versions to be tested; often it's enough to
-# test only against the last release in a major GHC version. Feel free to omit
-# lines listings versions you don't need/want testing for.
-language: c
+# Don't use a specific environment we install everything ourselves.
+language: generic
+
+# What environments we want to build for.
 env:
   # - GHCVER=7.10.3
-  - GHCVER=8.0.2
+  #- env: BUILD=cabal GHCVER=7.10.3 CABALVER=1.22
+  #  addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3], sources: [hvr-ghc]}}
+  - env: BUILD=cabal GHCVER=8.0.2 CABALVER=1.24
+    addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2], sources: [hvr-ghc]}}
 
 before_install:
-  - unset CC
+  #- unset CC
 install:
-  - travis_retry sudo add-apt-repository -y ppa:hvr/ghc
-  - travis_retry sudo apt-get update
-  - travis_retry sudo apt-get install cabal-install-1.24 ghc-$GHCVER-dyn alex-3.1.4 happy-1.19.5
-  - export PATH=$HOME/.cabal/bin:/opt/ghc/$GHCVER/bin:/opt/cabal/1.24/bin:/opt/alex/3.1.4/bin:/opt/happy/1.19.5/bin:$PATH
+  #- travis_retry sudo add-apt-repository -y ppa:hvr/ghc
+  #- travis_retry sudo apt-get update
+  #- travis_retry sudo apt-get install cabal-install-1.24 ghc-$GHCVER-dyn alex-3.1.4 happy-1.19.5
+  #/opt/alex/3.1.4/bin:/opt/happy/1.19.5/bin:
+  - export PATH=$HOME/.cabal/bin:/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:$PATH
   - travis_retry cabal update
 
 before_script:
