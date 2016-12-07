@@ -12,7 +12,7 @@ cabal-version:       >=1.10
 
 executable effect-example
   build-depends:  base            >= 4.8,
-                  effect-monad    == 0.6.1,
+                  effect-monad    == 0.7,
                   type-level-sets == 0.5
   main-is:             Main.hs
   hs-source-dirs:      .
@@ -23,7 +23,7 @@ executable effect-example
 
 executable effect-example-pm
   build-depends:  base              >= 4.8,
-                  effect-monad      == 0.6.1,
+                  effect-monad      == 0.7,
                   type-level-sets   == 0.5,
                   supermonad        == 0.1
   main-is:             MainSupermonad.hs
@@ -33,7 +33,7 @@ executable effect-example-pm
 
 executable effect-example2
   build-depends:  base            >= 4.8,
-                  effect-monad    == 0.6.1,
+                  effect-monad    == 0.7,
                   type-level-sets == 0.5
   main-is:             Main2.hs
   hs-source-dirs:      .
@@ -44,7 +44,7 @@ executable effect-example2
 
 executable effect-example2-pm 
   build-depends:  base              >= 4.8,
-                  effect-monad      == 0.6.1,
+                  effect-monad      == 0.7,
                   type-level-sets   == 0.5,
                   supermonad        == 0.1
   main-is:             MainSupermonad2.hs
@@ -55,7 +55,7 @@ executable effect-example2-pm
 
 executable effect-example3
   build-depends:  base            >= 4.8,
-                  effect-monad    == 0.6.1,
+                  effect-monad    == 0.7,
                   type-level-sets == 0.5
   main-is:             Main3.hs
   hs-source-dirs:      .
@@ -66,7 +66,7 @@ executable effect-example3
 
 executable effect-example3-pm
   build-depends:  base              >= 4.8,
-                  effect-monad      == 0.6.1,
+                  effect-monad      == 0.7,
                   type-level-sets   == 0.5,
                   supermonad        == 0.1
   main-is:             MainSupermonad3.hs
