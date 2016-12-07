@@ -27,8 +27,7 @@ import qualified Text.ParserCombinators.ReadPrec as ReadPrec
 import qualified GHC.Generics as Generics
 import qualified Data.Semigroup as Semigroup
 import qualified Data.Proxy as Proxy
-import qualified Data.Functor.Product as Product ( Product(..) )
-import qualified Data.Functor.Compose as Compose ( Compose(..) )
+import qualified Data.Functor.Product as Product
 #endif
 
 import Control.Super.Monad.Prelude 

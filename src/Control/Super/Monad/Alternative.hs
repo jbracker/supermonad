@@ -33,7 +33,8 @@ import qualified Data.Functor.Compose as Compose ( Compose(..) )
 
 import Control.Super.Monad.Prelude 
   ( ($)
-  , Return(..), Applicative(..) )
+  , Return(..), Applicative(..), Functor(..) )
+-- Import of 'Functor' required for GHC 8+ instances.
 
 
 class Return f => AlternativeEmpty f where

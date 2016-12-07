@@ -35,7 +35,8 @@ import qualified Data.Functor.Compose as Compose ( Compose(..) )
 
 import Control.Super.Monad.Constrained.Prelude 
   ( ($)
-  , Return(..), Applicative(..) )
+  , Return(..), Applicative(..), Functor(..) )
+-- Import of 'Functor' required for GHC 8+ instances.
 
 class Return f => AlternativeEmpty f where
   type AlternativeEmptyCts f a :: Constraint
