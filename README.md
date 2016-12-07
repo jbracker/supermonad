@@ -19,6 +19,9 @@ These parallel structures will not be maintained indefinitely and
 at some point we will probably only offer supermonads with support
 for constrained monads.
 
+* master: ![travis build status: master](https://travis-ci.org/jbracker/supermonad.svg?branch=master)
+* dev: ![travis build status: dev](https://travis-ci.org/jbracker/supermonad.svg?branch=dev)
+
 ## GHC Version
 
 The implementation has been tested with GHC in version 7.10.3 and GHC 8.0.1.
