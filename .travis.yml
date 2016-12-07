@@ -3,12 +3,13 @@
 language: generic
 
 # What environments we want to build for.
-env:
-  # - GHCVER=7.10.3
-  #- env: BUILD=cabal GHCVER=7.10.3 CABALVER=1.22
-  #  addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3], sources: [hvr-ghc]}}
-  - env: BUILD=cabal GHCVER=8.0.2 CABALVER=1.24
-    addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2], sources: [hvr-ghc]}}
+matrix:
+  include:
+    # - GHCVER=7.10.3
+    #- env: GHCVER=7.10.3 CABALVER=1.22
+    #  addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3], sources: [hvr-ghc]}}
+    - env: GHCVER=8.0.2 CABALVER=1.24
+      addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2], sources: [hvr-ghc]}}
 
 before_install:
   #- unset CC
