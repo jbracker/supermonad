@@ -2,8 +2,8 @@
 # Don't use a specific environment we install everything ourselves.
 language: generic
 
-# Needed to install custom packages.
-sudo: required
+# We are using addons, maybe we can get around requiring sudo.
+sudo: false
 
 # What environments we want to build for.
 matrix:
