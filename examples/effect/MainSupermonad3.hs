@@ -10,7 +10,7 @@
 -- Ignore our orphan instance in this file.
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
--- Use the polymonad plugin.
+-- Use the supermonad plugin.
 {-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
 
 import Control.Supermonad.Prelude
@@ -36,7 +36,7 @@ instance Fail (Counter (h :: Nat)) where
 
 main :: IO ()
 main = do
-  print $ forget (limitedOp 1 2 3 4)
+  print $ forget (limitedOp 1 2 3 4) -- 10
 
 specialOp :: Int -> Int -> Counter 1 Int
 specialOp n m = tick (n + m)

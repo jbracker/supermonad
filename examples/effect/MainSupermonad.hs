@@ -17,7 +17,7 @@
 -- Ignore our orphan instance in this file.
 {-# OPTIONS_GHC -fno-warn-orphans #-}
 
--- Use the polymonad plugin.
+-- Use the supermonad plugin.
 {-# OPTIONS_GHC -fplugin Control.Supermonad.Plugin #-}
 
 import Control.Supermonad.Prelude
@@ -27,7 +27,7 @@ import qualified Control.Effect as E
 import Control.Effect.State
 
 instance Functor (State (s :: [*])) where
-  fmap f ma = State $ \s -> let (a, s') = runState ma s in (f a, s') 
+  fmap f ma = State $ \s -> let (a, s') = runState ma s in (f a, s')
 
 instance ( h ~ Plus State f g ) => Bind (State (f :: [*])) (State (g :: [*])) (State (h :: [*])) where
   type BindCts (State (f :: [*])) (State (g :: [*])) (State (h :: [*])) = Inv State f g
