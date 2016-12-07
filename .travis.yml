@@ -2,7 +2,9 @@
 # Don't use a specific environment we install everything ourselves.
 language: generic
 
-# We are using addons, maybe we can get around requiring sudo.
+# Don't use sudo so the environment boots faster on travis.
+# We can get around sudo, because we are using apt addons to install 
+# custom packages.
 sudo: false
 
 # What environments we want to build for.
@@ -16,18 +18,16 @@ matrix:
       addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2,alex-3.1.4,happy-1.19.5], sources: [hvr-ghc]}}
 
 before_install:
-  - unset CC
 install:
-  # Don't need to do manual installation, because "addons" does that for us.
-  #- travis_retry sudo add-apt-repository -y ppa:hvr/ghc
-  #- travis_retry sudo apt-get update
-  #- travis_retry sudo apt-get install cabal-install-$CABALVER ghc-$GHCVER-dyn alex-$ALEXVER happy-$HAPPYVER
+  # Setup the path to find the custom installed executables.
   - export PATH=$HOME/.cabal/bin:/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:/opt/alex/$ALEXVER/bin:/opt/happy/$HAPPYVER/bin:$PATH
+  # Update cabal so it can find all of the packages that are required.
   - travis_retry cabal update
 
 before_script:
+  # Work in a sandbox
   - cabal sandbox init
-  # Setup the library dependency of the ebba-example.
+  # Setup the library dependency of the ebba-example
   - git clone https://github.com/glutamate/gnewplot.git ./examples/arrow/ebba/gnewplot
   - cabal sandbox add-source ./examples/arrow/ebba/gnewplot
 
@@ -38,9 +38,8 @@ script:
   - alex  --version
   - happy --version
   # Build the supermonad library.
-  # According to:
+  # According to travis documentation we can use 2 core:
   # https://docs.travis-ci.com/user/ci-environment/#Overview
-  # We can use 2 cores.
   - travis_retry cabal install -j2
   # Find the example directories that contain a cabal project and builds them in the current context.
   - find ./examples -type f -iname '*.cabal' -exec dirname {} \; | xargs -n1 cabal install -j2
