@@ -55,7 +55,7 @@ non-super-examples: install session-chat-orig-example hmtc-orig-example hmtc-mon
 
 supermonad-examples: install minimal-example session-example session-chat-supermonad-example effect-example constrained-example hmtc-supermonad-example
 
-superarrow-examples: install ebba-example reversible-indexed-example
+superarrow-examples: install ebba-example reversible-indexed-example counter-indexed-example
 
 superapplicative-examples: install ll1-parser-example
 
@@ -101,5 +101,8 @@ ebba-example: install
 
 reversible-indexed-example: init
 	cabal install ./examples/arrow/reversible-indexed
+
+counter-indexed-example: init
+	cabal install ./examples/arrow/counter-indexed
 
 
