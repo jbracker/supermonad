@@ -44,40 +44,42 @@ import Data.Functor.Identity ( Identity )
 import GHC.Exts ( Constraint )
 
 -- To define standard instances:
-import qualified Data.Monoid as Mon ( First, Last, Sum, Product, Dual, Alt(..) )
-import qualified Data.Proxy as Proxy ( Proxy )
-import qualified Data.Complex as Complex ( Complex )
-import qualified Data.Functor.Product as Product ( Product(..) )
-import qualified Data.Functor.Compose as Compose ( Compose(..) )
+import qualified Data.Monoid as Mon
+import qualified Data.Proxy as Proxy
+import qualified Data.Functor.Product as Product
+import qualified Data.Functor.Compose as Compose
 #if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
-import qualified Data.Semigroup as Semigroup ( Min, Max, Option, First, Last )
-import qualified Data.List.NonEmpty as NonEmpty ( NonEmpty )
+import qualified Data.Complex as Complex
+import qualified Data.Semigroup as Semigroup
+import qualified Data.List.NonEmpty as NonEmpty
 #endif
 
-import qualified Control.Arrow as Arrow ( ArrowMonad, ArrowApply, Arrow )
-import qualified Control.Applicative as App ( WrappedMonad(..) )
-import qualified Control.Monad.ST as ST ( ST )
-import qualified Control.Monad.ST.Lazy as STL ( ST )
+import qualified Control.Arrow as Arrow
+import qualified Control.Applicative as App
+import qualified Control.Monad.ST as ST
+import qualified Control.Monad.ST.Lazy as STL
 
-import qualified Text.ParserCombinators.ReadP as Read ( ReadP )
-import qualified Text.ParserCombinators.ReadPrec as Read ( ReadPrec )
+import qualified Text.ParserCombinators.ReadP as Read
+import qualified Text.ParserCombinators.ReadPrec as Read
 
-import qualified GHC.Conc as STM ( STM )
+import qualified GHC.Conc as STM
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 import qualified GHC.Generics as Generics
+#endif
 
 -- To define "transformers" instances:
-import qualified Control.Monad.Trans.Cont     as Cont     ( ContT(..) )
-import qualified Control.Monad.Trans.Except   as Except   ( ExceptT(..), runExceptT )
-import qualified Control.Monad.Trans.Identity as Identity ( IdentityT(..) )
-import qualified Control.Monad.Trans.List     as List     ( ListT(..) )
-import qualified Control.Monad.Trans.Maybe    as Maybe    ( MaybeT(..) )
-import qualified Control.Monad.Trans.RWS.Lazy      as RWSL    ( RWST(..) )
-import qualified Control.Monad.Trans.RWS.Strict    as RWSS    ( RWST(..) )
-import qualified Control.Monad.Trans.Reader        as Reader  ( ReaderT(..) )
-import qualified Control.Monad.Trans.State.Lazy    as StateL  ( StateT(..) )
-import qualified Control.Monad.Trans.State.Strict  as StateS  ( StateT(..) )
-import qualified Control.Monad.Trans.Writer.Lazy   as WriterL ( WriterT(..) )
-import qualified Control.Monad.Trans.Writer.Strict as WriterS ( WriterT(..) )
+import qualified Control.Monad.Trans.Cont     as Cont
+import qualified Control.Monad.Trans.Except   as Except
+import qualified Control.Monad.Trans.Identity as Identity
+import qualified Control.Monad.Trans.List     as List
+import qualified Control.Monad.Trans.Maybe    as Maybe
+import qualified Control.Monad.Trans.RWS.Lazy      as RWSL
+import qualified Control.Monad.Trans.RWS.Strict    as RWSS
+import qualified Control.Monad.Trans.Reader        as Reader
+import qualified Control.Monad.Trans.State.Lazy    as StateL
+import qualified Control.Monad.Trans.State.Strict  as StateS
+import qualified Control.Monad.Trans.Writer.Lazy   as WriterL
+import qualified Control.Monad.Trans.Writer.Strict as WriterS
 
 -- -----------------------------------------------------------------------------
 -- Super-Applicative Type Class
@@ -249,6 +251,7 @@ instance Applicative STM.STM STM.STM STM.STM where
   (<*)  = (P.<*)
   (*>)  = (P.*>)
 
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 instance Applicative Generics.U1 Generics.U1 Generics.U1 where
   (<*>) = (P.<*>)
   (<*)  = (P.<*)
@@ -271,6 +274,7 @@ instance Applicative f g h => Applicative (Generics.M1 i c f) (Generics.M1 i c g
   (Generics.M1 mf) <*> (Generics.M1 ma) = Generics.M1 $ mf <*> ma
   (Generics.M1 mf)  *> (Generics.M1 ma) = Generics.M1 $ mf  *> ma
   (Generics.M1 mf) <*  (Generics.M1 ma) = Generics.M1 $ mf <*  ma
+#endif
 
 -- "transformers" package instances: -------------------------------------------
 
@@ -461,6 +465,7 @@ instance (Bind m m m, P.Monad m) => Bind (App.WrappedMonad m) (App.WrappedMonad 
 instance Bind STM.STM STM.STM STM.STM where
   (>>=) = (P.>>=)
 
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 instance Bind Generics.U1 Generics.U1 Generics.U1 where
   (>>=) = (P.>>=)
 instance (Bind m n p) => Bind (Generics.Rec1 m) (Generics.Rec1 n) (Generics.Rec1 p) where
@@ -472,6 +477,7 @@ instance (Bind f g h, Bind f' g' h') => Bind (f Generics.:*: f') (g Generics.:*:
 instance Bind f g h => Bind (Generics.M1 i c f) (Generics.M1 i c g) (Generics.M1 i c h) where
   type BindCts  (Generics.M1 i c f) (Generics.M1 i c g) (Generics.M1 i c h) = BindCts  f g h
   (Generics.M1 ma) >>= f = Generics.M1 $ ma >>= Generics.unM1 . f
+#endif
 
 -- "transformers" package instances: -------------------------------------------
 
@@ -654,6 +660,7 @@ instance (Return m, P.Monad m) => Return (App.WrappedMonad m) where
 instance Return STM.STM where
   return = P.return
 
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 instance Return Generics.U1 where
   return = P.return
 instance (Return m) => Return (Generics.Rec1 m) where
@@ -668,7 +675,8 @@ instance (Return f, Return g) => Return (f Generics.:.: g) where
 instance Return f => Return (Generics.M1 i c f) where
   type ReturnCts (Generics.M1 i c f) = ReturnCts f
   return = Generics.M1 . return
-  
+#endif
+
 -- "transformers" package instances: -------------------------------------------
 
 -- Continuations are so weird...
@@ -815,6 +823,7 @@ instance (Fail m, P.Monad m) => Fail (App.WrappedMonad m) where
 instance Fail STM.STM where
   fail = P.fail
 
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 instance Fail Generics.U1 where
   fail = P.fail
 instance (Fail m) => Fail (Generics.Rec1 m) where
@@ -826,6 +835,7 @@ instance (Fail f, Fail g) => Fail (f Generics.:*: g) where
 instance Fail f => Fail (Generics.M1 i c f) where
   type FailCts (Generics.M1 i c f) = FailCts f
   fail = Generics.M1 . fail
+#endif
 
 -- "transformers" package instances: -------------------------------------------
 

@@ -51,7 +51,6 @@ module Control.Super.Monad.Functions
 import qualified Prelude as P
 import Prelude
   ( Bool(..), Int
-  , Functor(..)
   , (.), ($)
   , id, flip, const
   , not

@@ -26,43 +26,45 @@ import qualified Prelude as P
 -- To define instances:
 import Data.Functor.Identity ( Identity )
 
-import qualified Data.Monoid as Mon ( First, Last, Sum, Product, Dual, Alt(..) )
-import qualified Data.Proxy as Proxy ( Proxy )
-import qualified Data.Complex as Complex ( Complex )
-import qualified Data.Functor.Product as Product ( Product(..) )
-import qualified Data.Functor.Compose as Compose ( Compose(..) )
+import qualified Data.Monoid as Mon
+import qualified Data.Proxy as Proxy
+import qualified Data.Functor.Product as Product
+import qualified Data.Functor.Compose as Compose
 #if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
-import qualified Data.Semigroup as Semigroup ( Min, Max, Option, First, Last )
-import qualified Data.List.NonEmpty as NonEmpty ( NonEmpty )
+import qualified Data.Semigroup as Semigroup
+import qualified Data.Complex as Complex
+import qualified Data.List.NonEmpty as NonEmpty
 #endif
 
-import qualified Control.Arrow as Arrow ( ArrowMonad, ArrowApply )
-import qualified Control.Applicative as App ( WrappedMonad(..) )
-import qualified Control.Monad.ST as ST ( ST )
-import qualified Control.Monad.ST.Lazy as STL ( ST )
+import qualified Control.Arrow as Arrow
+import qualified Control.Applicative as App
+import qualified Control.Monad.ST as ST
+import qualified Control.Monad.ST.Lazy as STL
 
-import qualified Text.ParserCombinators.ReadP as Read ( ReadP )
-import qualified Text.ParserCombinators.ReadPrec as Read ( ReadPrec )
+import qualified Text.ParserCombinators.ReadP as Read
+import qualified Text.ParserCombinators.ReadPrec as Read
 
-import qualified GHC.Conc as STM ( STM )
+import qualified GHC.Conc as STM
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 import qualified GHC.Generics as Generics
+#endif
 
 -- To defined constrained instances:
 import qualified Data.Set as S
 
 -- To define "transformers" instances:
-import qualified Control.Monad.Trans.Cont     as Cont     ( ContT(..) )
-import qualified Control.Monad.Trans.Except   as Except   ( ExceptT(..), runExceptT )
-import qualified Control.Monad.Trans.Identity as Identity ( IdentityT(..), mapIdentityT )
-import qualified Control.Monad.Trans.List     as List     ( ListT(..), mapListT )
-import qualified Control.Monad.Trans.Maybe    as Maybe    ( MaybeT(..), mapMaybeT )
-import qualified Control.Monad.Trans.RWS.Lazy      as RWSL    ( RWST(..) )
-import qualified Control.Monad.Trans.RWS.Strict    as RWSS    ( RWST(..) )
-import qualified Control.Monad.Trans.Reader        as Reader  ( ReaderT(..), mapReaderT )
-import qualified Control.Monad.Trans.State.Lazy    as StateL  ( StateT(..) )
-import qualified Control.Monad.Trans.State.Strict  as StateS  ( StateT(..) )
-import qualified Control.Monad.Trans.Writer.Lazy   as WriterL ( WriterT(..), mapWriterT )
-import qualified Control.Monad.Trans.Writer.Strict as WriterS ( WriterT(..), mapWriterT )
+import qualified Control.Monad.Trans.Cont     as Cont
+import qualified Control.Monad.Trans.Except   as Except
+import qualified Control.Monad.Trans.Identity as Identity
+import qualified Control.Monad.Trans.List     as List
+import qualified Control.Monad.Trans.Maybe    as Maybe
+import qualified Control.Monad.Trans.RWS.Lazy      as RWSL
+import qualified Control.Monad.Trans.RWS.Strict    as RWSS
+import qualified Control.Monad.Trans.Reader        as Reader
+import qualified Control.Monad.Trans.State.Lazy    as StateL
+import qualified Control.Monad.Trans.State.Strict  as StateS
+import qualified Control.Monad.Trans.Writer.Lazy   as WriterL
+import qualified Control.Monad.Trans.Writer.Strict as WriterS
 
 infixl 4  <$
 
@@ -186,6 +188,7 @@ instance Functor STM.STM where
   fmap = P.fmap
   (<$) = (P.<$)
 
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 instance Functor Generics.U1 where
   fmap = P.fmap
   (<$) = (P.<$)
@@ -203,7 +206,7 @@ instance (Functor f, Functor g) => Functor (f Generics.:.: g) where
 instance Functor f => Functor (Generics.M1 i c f) where
   type FunctorCts (Generics.M1 i c f) a b = FunctorCts f a b
   fmap f (Generics.M1 ma) = Generics.M1 $ fmap f ma
-
+#endif
 
 -- Constrained instances -------------------------------------------------------
 

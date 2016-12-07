@@ -19,7 +19,7 @@ import Control.Super.Plugin.Detect
   ( ModuleQuery(..)
   , ClassQuery(..)
   , InstanceImplication
-  , clsDictInstImp, clsDictInstEquiv
+  , clsDictInstEquiv -- , clsDictInstImp
   , defaultFindEitherModuleErrMsg )
 import Control.Super.Plugin.Names
   ( PluginClassName
@@ -76,7 +76,7 @@ instanceImplications clsDict =
     (arrowArrClassName <=> arrowParallelClassName) ++
     (arrowArrClassName <=> arrowFanOutClassName  )
   where
-    (==>) = clsDictInstImp clsDict
+    -- (==>) = clsDictInstImp clsDict
     (<=>) = clsDictInstEquiv clsDict
 
 -- | Function to produce proper error messages in the module query.
