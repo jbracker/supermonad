@@ -11,9 +11,7 @@ env:
     - EXAMPLE=examples/monad/session
     - EXAMPLE=examples/monad/hmtc/supermonad
   matrix:
-    include:
-      - env: GHCVER=8.0.2 CABALVER=1.24 ALEXVER=3.1.4 HAPPYVER=1.19.5
-        addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2,alex-3.1.4,happy-1.19.5], sources: [hvr-ghc]}}
+    - GHCVER=8.0.2 CABALVER=1.24 ALEXVER=3.1.4 HAPPYVER=1.19.5
 
 # What environments we want to build for.
 #matrix:
@@ -26,12 +24,11 @@ env:
     #  addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2,alex-3.1.4,happy-1.19.5], sources: [hvr-ghc]}}
 
 before_install:
-  #- unset CC
+  - unset CC
 install:
-  #- travis_retry sudo add-apt-repository -y ppa:hvr/ghc
-  #- travis_retry sudo apt-get update
-  #- travis_retry sudo apt-get install cabal-install-1.24 ghc-$GHCVER-dyn alex-3.1.4 happy-1.19.5
-  #
+  - travis_retry sudo add-apt-repository -y ppa:hvr/ghc
+  - travis_retry sudo apt-get update
+  - travis_retry sudo apt-get install cabal-install-$CABALVER ghc-$GHCVER-dyn alex-$ALEXVER happy-$HAPPYVER
   - export PATH=$HOME/.cabal/bin:/opt/ghc/$GHCVER/bin:/opt/cabal/$CABALVER/bin:/opt/alex/$ALEXVER/bin:/opt/happy/$HAPPYVER/bin:$PATH
   - travis_retry cabal update
 
@@ -44,7 +41,7 @@ before_script:
 script:
   # Build the supermonad library.
   - travis_retry cabal install -j1
-  - travis_retry cabal install $EXAMPLE
+  - travis_retry cabal install -j1 $EXAMPLE
   # Find the example directories that contain a cabal project and builds them in the current context.
   #- find ./examples -type f -iname '*.cabal' -exec dirname {} \; | xargs -n1 cabal install -j1
 
