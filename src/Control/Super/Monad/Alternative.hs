@@ -1,4 +1,6 @@
 
+{-# LANGUAGE CPP #-}
+
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE ConstraintKinds #-}
