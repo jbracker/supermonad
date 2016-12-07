@@ -2,14 +2,28 @@
 # Don't use a specific environment we install everything ourselves.
 language: generic
 
+#env:
+# - GHCVER=7.10.3
+
+env:
+  global:
+    - EXAMPLE=examples/monad/constrained
+    - EXAMPLE=examples/monad/session
+    - EXAMPLE=examples/monad/hmtc/supermonad
+  matrix:
+    include:
+      - env: GHCVER=8.0.2 CABALVER=1.24 ALEXVER=3.1.4 HAPPYVER=1.19.5
+        addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2,alex-3.1.4,happy-1.19.5], sources: [hvr-ghc]}}
+
 # What environments we want to build for.
-matrix:
-  include:
-    # - GHCVER=7.10.3
+#matrix:
+#  include:
+    #- env: GHCVER=7.10.2 CABALVER=1.22 ALEXVER=3.1.4 HAPPYVER=1.19.5
+    #  addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.2,alex-3.1.4,happy-1.19.5], sources: [hvr-ghc]}}
     #- env: GHCVER=7.10.3 CABALVER=1.22 ALEXVER=3.1.4 HAPPYVER=1.19.5
     #  addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3,alex-3.1.4,happy-1.19.5], sources: [hvr-ghc]}}
-    - env: GHCVER=8.0.2 CABALVER=1.24 ALEXVER=3.1.4 HAPPYVER=1.19.5
-      addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2,alex-3.1.4,happy-1.19.5], sources: [hvr-ghc]}}
+    #- env: GHCVER=8.0.2 CABALVER=1.24 ALEXVER=3.1.4 HAPPYVER=1.19.5
+    #  addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2,alex-3.1.4,happy-1.19.5], sources: [hvr-ghc]}}
 
 before_install:
   #- unset CC
@@ -30,8 +44,9 @@ before_script:
 script:
   # Build the supermonad library.
   - travis_retry cabal install -j1
+  - travis_retry cabal install $EXAMPLE
   # Find the example directories that contain a cabal project and builds them in the current context.
-  - find ./examples -type f -iname '*.cabal' -exec dirname {} \; | xargs -n1 cabal install -j1
+  #- find ./examples -type f -iname '*.cabal' -exec dirname {} \; | xargs -n1 cabal install -j1
 
 notifications:
   email: true
