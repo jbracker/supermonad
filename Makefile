@@ -49,6 +49,9 @@ init:
 missing-function-test:
 	cabal install ./examples/test/missing-functions
 
+examples: non-super-examples supermonad-examples superarrow-examples superapplicative-examples
+
+non-super-examples: install session-chat-orig-example hmtc-orig-example hmtc-monad-param-example
 
 supermonad-examples: install minimal-example session-example session-chat-supermonad-example effect-example constrained-example hmtc-supermonad-example
 
