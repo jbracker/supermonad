@@ -19,7 +19,7 @@ ifThenElse False t e = e
 
 main :: IO ()
 main = do
-  print $ forget (limitedOp 1 2 3 4)
+  print $ forget (limitedOp 1 2 3 4) -- 10
   where return :: (Monad m) => a -> m a
         return = P.return
 
