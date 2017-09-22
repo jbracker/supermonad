@@ -332,12 +332,12 @@ instance (Bind m n p) => Applicative (StateS.StateT s m) (StateS.StateT s n) (St
   {-# INLINE (<*>) #-}
 
 instance (P.Monoid w, Applicative m n p) => Applicative (WriterL.WriterT w m) (WriterL.WriterT w n) (WriterL.WriterT w p) where
-  type ApplicativeCts (WriterL.WriterT s m) (WriterL.WriterT s n) (WriterL.WriterT s p) = (ApplicativeCts m n p)
+  type ApplicativeCts (WriterL.WriterT w m) (WriterL.WriterT w n) (WriterL.WriterT w p) = (ApplicativeCts m n p)
   WriterL.WriterT mf <*> WriterL.WriterT ma = WriterL.WriterT $ fmap (\ ~(f, w) ~(a, w') -> (f a, P.mappend w w')) mf <*> ma
   {-# INLINE (<*>) #-}
 
 instance (P.Monoid w, Applicative m n p) => Applicative (WriterS.WriterT w m) (WriterS.WriterT w n) (WriterS.WriterT w p) where
-  type ApplicativeCts (WriterS.WriterT s m) (WriterS.WriterT s n) (WriterS.WriterT s p) = (ApplicativeCts m n p)
+  type ApplicativeCts (WriterS.WriterT w m) (WriterS.WriterT w n) (WriterS.WriterT w p) = (ApplicativeCts m n p)
   WriterS.WriterT mf <*> WriterS.WriterT ma = WriterS.WriterT $ fmap (\ (f, w) (a, w') -> (f a, P.mappend w w')) mf <*> ma
   {-# INLINE (<*>) #-}
 
@@ -559,14 +559,14 @@ instance (Bind m n p) => Bind (StateS.StateT s m) (StateS.StateT s n) (StateS.St
   {-# INLINE (>>=) #-}
 
 instance (P.Monoid w, Bind m n p) => Bind (WriterL.WriterT w m) (WriterL.WriterT w n) (WriterL.WriterT w p) where
-  type BindCts (WriterL.WriterT s m) (WriterL.WriterT s n) (WriterL.WriterT s p) = (BindCts m n p)
+  type BindCts (WriterL.WriterT w m) (WriterL.WriterT w n) (WriterL.WriterT w p) = (BindCts m n p)
   m >>= k  = WriterL.WriterT $
       WriterL.runWriterT m >>=
       \ ~(a, w) -> fmap (\ ~(b, w') -> (b, w `P.mappend` w')) $ WriterL.runWriterT (k a)
   {-# INLINE (>>=) #-}
 
 instance (P.Monoid w, Bind m n p) => Bind (WriterS.WriterT w m) (WriterS.WriterT w n) (WriterS.WriterT w p) where
-  type BindCts (WriterS.WriterT s m) (WriterS.WriterT s n) (WriterS.WriterT s p) = (BindCts m n p)
+  type BindCts (WriterS.WriterT w m) (WriterS.WriterT w n) (WriterS.WriterT w p) = (BindCts m n p)
   m >>= k  = WriterS.WriterT $
       WriterS.runWriterT m >>=
       \ (a, w) -> fmap (\ (b, w') -> (b, w `P.mappend` w')) $ WriterS.runWriterT (k a)
@@ -716,7 +716,7 @@ instance (P.Monoid w, Return m) => Return (RWSS.RWST r w s m) where
   {-# INLINE return #-}
 
 instance (Return m) => Return (Reader.ReaderT r m) where
-  type ReturnCts (Reader.ReaderT s m) = ReturnCts m
+  type ReturnCts (Reader.ReaderT r m) = ReturnCts m
   return = Reader.ReaderT . const . return
   {-# INLINE return #-}
 

@@ -832,7 +832,7 @@ instance (P.Monoid w, Return m) => Return (RWSS.RWST r w s m) where
   {-# INLINE return #-}
 
 instance (Return m) => Return (Reader.ReaderT r m) where
-  type ReturnCts (Reader.ReaderT s m) a = ReturnCts m a
+  type ReturnCts (Reader.ReaderT r m) a = ReturnCts m a
   return = Reader.ReaderT . const . return
   {-# INLINE return #-}
 

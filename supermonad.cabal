@@ -11,7 +11,7 @@ stability:           experimental
 copyright:           Copyright (c) 2016, Jan Bracker
 build-type:          Simple
 cabal-version:       >=1.10
-tested-with:         GHC == 7.10.3, GHC == 8.0.1
+tested-with:         GHC == 7.10.3, GHC == 8.0.2, GHC == 8.2.1
 extra-source-files: README.md
                   , Makefile
                   , compile-all.sh
@@ -94,7 +94,7 @@ library
                , Control.Super.Plugin.Prototype
   other-extensions:
   build-depends: base         >=4.8  && <5
-               , ghc          >=7.10.1 && <8.1
+               , ghc          >=7.10.1 && <8.3
                -- ^ We require version 7.10.1+, because we use the cpp macro:
                --   MIN_VERSION_GLASGOW_HASKELL(x,y,z,z')
                --   http://downloads.haskell.org/~ghc/8.0.1/docs/html/users_guide/phases.html#standard-cpp-macros
