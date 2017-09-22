@@ -13,7 +13,7 @@ module Control.Super.Plugin.Evidence
 
 import Data.Either ( isLeft )
 import Data.List ( find )
-import qualified Data.Set as S
+import qualified Data.Set as Set
 
 import Control.Monad ( forM )
 
@@ -50,6 +50,7 @@ import FamInstEnv ( normaliseType )
 import Outputable ( ($$), SDoc )
 import qualified Outputable as O
 
+-- import qualified Control.Super.Plugin.Collection.Set as S
 import Control.Super.Plugin.Wrapper
   ( mkTypeVarSubst
   , mkTcCoercion
@@ -90,7 +91,7 @@ evaluateType r t = do
 --   the given list type arguments would be bound by the instance.
 matchInstanceTyVars :: ClsInst -> [Type] -> Maybe ([Type], [(TyVar, Type)])
 matchInstanceTyVars inst instArgs = do
-  let ambVars = S.toList $ S.filter isAmbiguousTyVar $ S.unions $ fmap collectTyVars instArgs
+  let ambVars = Set.toList $ Set.filter isAmbiguousTyVar $ Set.unions $ fmap collectTyVars instArgs
   matchInstanceTyVars' ambVars inst instArgs
 
 -- | Trys to see if the given arguments match the class instance
@@ -108,7 +109,7 @@ matchInstanceTyVars inst instArgs = do
 matchInstanceTyVars' :: [TyVar] -> ClsInst -> [Type] -> Maybe ([Type], [(TyVar, Type)])
 matchInstanceTyVars' varsToBind inst instArgs = do
   let (instVars, _cts, _cls, tyArgs) = instanceSig inst
-  let constVars = S.toList $ (S.unions $ fmap collectTyVars instArgs) S.\\ (S.fromList varsToBind)
+  let constVars = Set.toList $ (Set.unions $ fmap collectTyVars instArgs) Set.\\ (Set.fromList varsToBind)
   subst <- tcUnifyTys (skolemVarsBindFun constVars) tyArgs instArgs
   return $ (substTy subst . mkTyVarTy <$> instVars, fmap (\v -> (v, substTy subst $ mkTyVarTy v)) varsToBind)
 
@@ -370,7 +371,7 @@ isPotentiallyInstantiatedCtType  givenCts (ctCls, ctArgs) assocs = do
   -- Substitute variables in the constraint arguments with the type constructors.
   let ctSubstArgs = substTys ctSubst ctArgs
   -- Calculate set of generated type variables in constraints
-  let ctGenVars = S.unions $ fmap (\(_tv, _tcTy, vars) -> S.fromList vars) appliedAssocs
+  let ctGenVars = Set.unions $ fmap (\(_tv, _tcTy, vars) -> Set.fromList vars) appliedAssocs
   
   -- If there are no ambiguous or generated type variables in the substituted arguments of our constraint
   -- we can simply check if there is evidence.
@@ -413,8 +414,8 @@ isPotentiallyInstantiatedCtType  givenCts (ctCls, ctArgs) assocs = do
   where
     -- Checks if the given type constains any ambiguous variables or if 
     -- it contains any of the given type variables.
-    containsGivenOrAmbiguousTyVar :: S.Set TyVar -> Type -> Bool
+    containsGivenOrAmbiguousTyVar :: Set.Set TyVar -> Type -> Bool
     containsGivenOrAmbiguousTyVar givenTvs ty = 
       let tyVars = collectTyVars ty
-      in any isAmbiguousTyVar tyVars || not (S.null (S.intersection givenTvs tyVars))
+      in any isAmbiguousTyVar tyVars || not (Set.null (Set.intersection givenTvs tyVars))
   

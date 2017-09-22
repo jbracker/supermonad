@@ -19,8 +19,10 @@ module Control.Super.Plugin.Utils (
   , atIndex
   , t1st, t2nd, t3rd
   , associations
-  , subsets
+  --, subsets
   , removeDup, removeDupByIndex
+  , removeDupByIndexEq
+  , removeDupUnique, removeDupByIndexUnique
   , lookupBy
   , allM, anyM
   , fromLeft, fromRight
@@ -29,13 +31,13 @@ module Control.Super.Plugin.Utils (
 
 import Data.Maybe ( listToMaybe, catMaybes )
 import Data.List ( find )
-import Data.Set ( Set )
-import qualified Data.Set as S
-import qualified Data.Map as M
+import qualified Data.Set as Set
+import qualified Data.Map.Strict as Map
 
 import Control.Monad ( forM )
 import Control.Arrow ( second )
 
+import Unique ( Uniquable )
 import BasicTypes ( Arity )
 import Name ( nameOccName )
 import OccName ( occNameString )
@@ -60,6 +62,11 @@ import InstEnv ( instanceBindFun )
 import TcPluginM ( TcPluginM, newFlexiTyVar )
 import Outputable ( ($$) )
 import qualified Outputable as O
+
+
+import Control.Super.Plugin.Collection.Set ( Set )
+import qualified Control.Super.Plugin.Collection.Set as S
+import qualified Control.Super.Plugin.Collection.Map as M
 
 import Control.Super.Plugin.Wrapper 
   ( TypeVarSubst
@@ -99,8 +106,8 @@ collectTopTyCons tys = S.fromList $ catMaybes $ fmap tyConAppTyCon_maybe tys
 --
 -- >>> collectTopTcVars [m a b, Identity c, n]
 -- { m, n }
-collectTopTcVars :: [Type] -> Set TyVar
-collectTopTcVars = S.map fst . collectTopTcVarsWithArity
+collectTopTcVars :: [Type] -> Set.Set TyVar
+collectTopTcVars = Set.map fst . collectTopTcVarsWithArity
 
 -- | Retrieve the type constructor variables at the top level involved in the
 --   given types. If there are nested type variables they are ignored.
@@ -112,8 +119,8 @@ collectTopTcVars = S.map fst . collectTopTcVarsWithArity
 --
 -- >>> collectTopTcVars [m a b, Identity c, n]
 -- { (m, 2), (n, 0) }
-collectTopTcVarsWithArity :: [Type] -> Set (TyVar, Arity)
-collectTopTcVarsWithArity tys = S.fromList $ catMaybes $ fmap getTyVarAndArity tys
+collectTopTcVarsWithArity :: [Type] -> Set.Set (TyVar, Arity)
+collectTopTcVarsWithArity tys = Set.fromList $ catMaybes $ fmap getTyVarAndArity tys
   where
     getTyVarAndArity :: Type -> Maybe (TyVar, Arity)
     getTyVarAndArity t = do
@@ -124,19 +131,19 @@ collectTopTcVarsWithArity tys = S.fromList $ catMaybes $ fmap getTyVarAndArity t
 -- | Try to collect all type variables in a given expression.
 --   Does not work for Pi or ForAll types.
 --   If the given type is not supported an empty set is returned.
-collectTyVars :: Type -> Set TyVar
+collectTyVars :: Type -> Set.Set TyVar
 collectTyVars t =
   case getTyVar_maybe t of
-    Just tv -> S.singleton tv
+    Just tv -> Set.singleton tv
     Nothing -> case splitTyConApp_maybe t of
-      Just (_tc, args) -> S.unions $ fmap collectTyVars args
+      Just (_tc, args) -> Set.unions $ fmap collectTyVars args
       Nothing -> case splitFunTy_maybe t of
-        Just (ta, tb) -> collectTyVars ta `S.union` collectTyVars tb
+        Just (ta, tb) -> collectTyVars ta `Set.union` collectTyVars tb
         Nothing -> case splitAppTy_maybe t of
-          Just (ta, tb) -> collectTyVars ta `S.union` collectTyVars tb
+          Just (ta, tb) -> collectTyVars ta `Set.union` collectTyVars tb
           Nothing -> case getEqPredTys_maybe t of
-            Just (_r, ta, tb) -> collectTyVars ta `S.union` collectTyVars tb
-            Nothing -> S.empty
+            Just (_r, ta, tb) -> collectTyVars ta `Set.union` collectTyVars tb
+            Nothing -> Set.empty
 
 -- | Create a substitution that replaces the given type variables with their
 --   associated type constructors.
@@ -273,7 +280,7 @@ associations :: [(key , [value])] -> [[(key, value)]]
 associations [] = [[]]
 associations ((_x, []) : _xys) = []
 associations ((x, y : ys) : xys) = fmap ((x, y) :) (associations xys) ++ associations ((x, ys) : xys)
-
+{-
 -- | Generates the set of all subsets of a given set.
 subsets :: (Ord a) => Set a -> Set (Set a)
 subsets s = case S.size s of
@@ -281,16 +288,26 @@ subsets s = case S.size s of
   _ -> let (x, s') = S.deleteFindMin s
            subs = subsets s'
        in S.map (S.insert x) subs `S.union` subs
-
+         -}
 -- | Efficient removal of duplicate elements in O(n * log(n)).
 --   The result list is ordered in ascending order.
 removeDup :: (Ord a) => [a] -> [a]
-removeDup = S.toAscList . S.fromList
+removeDup = (Set.toAscList) . (Set.fromList)
+
+removeDupUnique :: (Uniquable a) => [a] -> [a]
+removeDupUnique = (S.toList) . (S.fromList)
 
 -- | Efficient removal of duplicate elements in O(n * log(n)).
 --   The result list is ordered.
 removeDupByIndex :: (Ord a) => [(a,b)] -> [(a,b)]
-removeDupByIndex = M.toList . M.fromList
+removeDupByIndex = Map.toList . Map.fromList
+
+removeDupByIndexEq :: (Eq a) => [(a,b)] -> [(a,b)]
+removeDupByIndexEq [] = []
+removeDupByIndexEq ((a,b) : l) = (a,b) : (removeDupByIndexEq $ filter (\(a',_) -> not $ a' == a) l)
+
+removeDupByIndexUnique :: (Uniquable a) => [(a,b)] -> [(a,b)]
+removeDupByIndexUnique = M.toList . M.fromList
 
 -- | Exactly like 'lookup'. Searches the list for the entry with the right key
 --   and returns the associated value if an entry is found. Uses a custom

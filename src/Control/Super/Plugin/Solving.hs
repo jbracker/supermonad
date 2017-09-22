@@ -9,7 +9,7 @@ import Data.Maybe
   , isJust, isNothing
   , fromJust )
 import Data.List ( partition, nubBy )
-import qualified Data.Set as S
+import qualified Data.Set as Set
 
 import Control.Monad ( forM, forM_, filterM )
 
@@ -26,6 +26,7 @@ import Unify ( tcUnifyTy )
 import qualified Outputable as O
 
 
+import qualified Control.Super.Plugin.Collection.Set as S
 import Control.Super.Plugin.Debug ( sDocToStr )
 import Control.Super.Plugin.InstanceDict ( InstanceDict )
 import Control.Super.Plugin.Wrapper 
@@ -110,7 +111,7 @@ solveMonoConstraintGroup relevantClss (tyCon, ctGroup) = do
   --printMsg "Solve mono group..."
   let smCtGroup = filter (isAnyClassConstraint relevantClss) ctGroup
   forM_ smCtGroup $ \ct -> do
-    let ctAmbVars = S.filter isAmbiguousTyVar 
+    let ctAmbVars = Set.filter isAmbiguousTyVar 
                   $ collectTopTcVars 
                   $ maybe [] id
                   $ constraintClassTyArgs ct
@@ -198,10 +199,24 @@ solvePolyConstraintGroup relevantClss ctGroup = do
     collectRelevantTopTcVars ct = do
       let isRelevantCt = isAnyClassConstraint relevantClss ct
       case (isRelevantCt, constraintClassType ct) of
-        (True, Just (_cls, tyArgs)) -> S.toList $ collectTopTcVars tyArgs
+        (True, Just (_cls, tyArgs)) -> Set.toList $ collectTopTcVars tyArgs
         _ -> []
 
 
+-- = Set (Either TyCon TyVar)
+type TcTvSet = (S.Set TyCon, Set.Set TyVar)
+
+tctvIntersection :: TcTvSet -> TcTvSet -> TcTvSet
+tctvIntersection (tca, tva) (tcb, tvb) = (S.intersection tca tcb, Set.intersection tva tvb)
+
+tctvNull :: TcTvSet -> Bool
+tctvNull (tcs, tvs) = S.null tcs && Set.null tvs
+
+tctvUnion :: TcTvSet -> TcTvSet -> TcTvSet
+tctvUnion (tca, tva) (tcb, tvb) = (S.union tca tcb, Set.union tva tvb)
+
+tctvToList :: TcTvSet -> [Either TyCon TyVar]
+tctvToList (tcs, tvs) = (fmap Left $ S.toList tcs) ++ (fmap Right $ Set.toList tvs)
 
 -- | Given a constraint group this calculates the set of type constructors
 --   involved with that constraint group and then generates all potentially
@@ -220,7 +235,7 @@ determineValidConstraintGroupAssocs relevantClss ctGroup = do
   -- Collect the ambiguous variables that require solving withing this 
   -- group of constraints.
   -- :: [TyVar]
-  tyConVars <- S.toList <$> getAmbTyConVarsFrom smCtGroup
+  tyConVars <- Set.toList <$> getAmbTyConVarsFrom smCtGroup
   
   -- Calculate the type constructor base used for solving. That means
   -- calculate the set of supermonad type constructors that are involved 
@@ -231,7 +246,7 @@ determineValidConstraintGroupAssocs relevantClss ctGroup = do
   let givenTyConBase = getTyConBaseFrom $ filterRelevantCtsWith givenCts wantedTyConBase
   
   let tyConBase :: [Either TyCon TyVar]
-      tyConBase = S.toList $ S.union wantedTyConBase givenTyConBase
+      tyConBase = tctvToList $ tctvUnion wantedTyConBase givenTyConBase
   
   -- All possible associations of ambiguous variables with their possible 
   -- type constructors from the base.
@@ -272,7 +287,7 @@ determineValidConstraintGroupAssocs relevantClss ctGroup = do
   where
     -- | Filters all relevant constraints that contain at least 
     --   one of the given variables/type constructors in their arguments.
-    filterRelevantCtsWith :: [Ct] -> S.Set (Either TyCon TyVar) -> [Ct]
+    filterRelevantCtsWith :: [Ct] -> TcTvSet -> [Ct]
     filterRelevantCtsWith allCts baseTyCons =
       let cts = filter (isAnyClassConstraint relevantClss) allCts
       in filter predicate cts
@@ -280,24 +295,24 @@ determineValidConstraintGroupAssocs relevantClss ctGroup = do
         predicate :: Ct -> Bool
         predicate ct =
           let ctBase = getTyConBaseFrom [ct]
-          in not $ S.null $ S.intersection ctBase baseTyCons
+          in not $ tctvNull $ tctvIntersection ctBase baseTyCons
     
     -- | Calculate the type constructor base for the given constraint.
-    getTyConBaseFrom :: [Ct] -> S.Set (Either TyCon TyVar)
+    getTyConBaseFrom :: [Ct] -> TcTvSet
     getTyConBaseFrom cts =
       let checkedCts = filter (isAnyClassConstraint relevantClss)  cts
-          baseTvs :: S.Set (Either TyCon TyVar)
-          baseTvs = S.map Right $ S.filter (not . isAmbiguousTyVar) $ componentTopTcVars checkedCts
-          baseTcs :: S.Set (Either TyCon TyVar)
-          baseTcs = S.map Left $ componentTopTyCons checkedCts
-      in S.union baseTvs baseTcs
+          baseTvs :: Set.Set TyVar
+          baseTvs = Set.filter (not . isAmbiguousTyVar) $ componentTopTcVars checkedCts
+          baseTcs :: S.Set TyCon
+          baseTcs = componentTopTyCons checkedCts
+      in (baseTcs, baseTvs)
     
     -- | Collect all ambiguous top-level type constructor variables
     --   from the given constraints.
-    getAmbTyConVarsFrom :: [Ct] -> SupermonadPluginM s (S.Set TyVar)
+    getAmbTyConVarsFrom :: [Ct] -> SupermonadPluginM s (Set.Set TyVar)
     getAmbTyConVarsFrom cts = do
       let checkedCts = filter (isAnyClassConstraint relevantClss) cts
-      return $ S.filter isAmbiguousTyVar $ componentTopTcVars checkedCts
+      return $ Set.filter isAmbiguousTyVar $ componentTopTcVars checkedCts
 
 
 
@@ -356,14 +371,14 @@ solveSolvedTyConIndices relevantClss = do
       predFilteredCts <- filterM (\(ct, _tc, _args) -> p ct) cts
       -- Also remove constraints that don't constain any ambiguous type variables.
       -- There is nothing to solve in them.
-      let filterNoVarCts = filter (\(_ct, _tc, args) -> not $ S.null 
-                                                            $ S.filter isAmbiguousTyVar 
-                                                            $ S.unions 
+      let filterNoVarCts = filter (\(_ct, _tc, args) -> not $ Set.null 
+                                                            $ Set.filter isAmbiguousTyVar 
+                                                            $ Set.unions 
                                                             $ fmap collectTyVars args) 
                                   predFilteredCts
       -- Get all constraints that already have been assigned their top-level
       -- type constructors and process them to solve the type constructor arguments...
-      return $ filter (S.null . collectTopTcVars . (\(_ct, _tc, args) -> args)) filterNoVarCts
+      return $ filter (Set.null . collectTopTcVars . (\(_ct, _tc, args) -> args)) filterNoVarCts
     
     withTopTyCon :: (Ct, TyCon, [Type]) 
                  -> (TyCon -> SupermonadPluginM s (Maybe ClsInst)) 
@@ -394,7 +409,7 @@ solveSolvedTyConIndices relevantClss = do
     deriveUnificationConstraints (ct, _ctClsTyCon, ctArgs) inst = do
       let (instVars, _instCls, instArgs) = instanceHead inst
       -- let Just ctArgs = constraintClassTyArgs ct
-      let ctVars = S.toList $ S.unions $ fmap collectTyVars ctArgs
+      let ctVars = Set.toList $ Set.unions $ fmap collectTyVars ctArgs
       let mSubsts = zipWith tcUnifyTy instArgs ctArgs
       if any isNothing mSubsts then do
         Left $ O.hang (O.text "Unification constraint solving not possible, because instance and constraint are not unifiable!") 2 

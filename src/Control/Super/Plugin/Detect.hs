@@ -31,9 +31,6 @@ module Control.Super.Plugin.Detect
 import Data.List  ( find )
 import Data.Either ( isLeft, isRight )
 import Data.Maybe ( isJust, isNothing, fromJust, maybeToList, catMaybes )
-import Data.Set ( Set )
-import qualified Data.Set as S
-import qualified Data.Map as M
 
 import Control.Monad ( forM )
 
@@ -70,6 +67,9 @@ import PrelNames ( mAIN_NAME )
 import Outputable ( SDoc, ($$), text, vcat, ppr, hang )
 import qualified Outputable as O
 
+import Control.Super.Plugin.Collection.Set ( Set )
+import qualified Control.Super.Plugin.Collection.Set as S
+import qualified Control.Super.Plugin.Collection.Map as M
 --import Control.Super.Plugin.Log ( printObj, printObjTrace, printMsg )
 import Control.Super.Plugin.Wrapper
   ( UnitId, moduleUnitId )
@@ -79,7 +79,7 @@ import Control.Super.Plugin.Instance
   , isPolyTyConInstance )
 import Control.Super.Plugin.Utils
   ( errIndent
-  , removeDupByIndex
+  , removeDupByIndexEq
   , fromRight, fromLeft
   , getClassName, getTyConName )
 import Control.Super.Plugin.ClassDict
@@ -116,7 +116,7 @@ checkInstances clsDict instDict instImplications =
     -- Check if all instances for each supermonad type constructor exist.
     monoCheckErrMsgs :: [(Either (TyCon, Class) ClsInst, SDoc)]
     monoCheckErrMsgs = fmap (\(tc, msg) -> (Left tc, msg)) 
-                     $ removeDupByIndex
+                     $ removeDupByIndexEq
                      $ checkInstanceImplications instDict 
                      $ instImplications
    

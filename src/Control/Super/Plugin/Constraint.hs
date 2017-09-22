@@ -26,8 +26,7 @@ module Control.Super.Plugin.Constraint
   ) where
 
 import Data.List ( sortBy )
-import Data.Set ( Set )
-import qualified Data.Set as S
+import qualified Data.Set as Set
 
 import TcRnTypes
   ( Ct(..), CtLoc(..), CtEvidence(..)
@@ -40,6 +39,8 @@ import Type
   )
 import TyCon ( TyCon )
 
+import Control.Super.Plugin.Collection.Set ( Set )
+import qualified Control.Super.Plugin.Collection.Set as S
 import Control.Super.Plugin.Wrapper
   ( mkEqualityCtType, constraintSourceLocation )
 import Control.Super.Plugin.Utils
@@ -127,8 +128,8 @@ constraintTopTyCons ct = maybe S.empty collectTopTyCons $ constraintClassTyArgs 
 -- | Collects the type variables in the arguments of the constraint.
 --   Only works if the given constraint is a type class constraint.
 --   Only collects those on the top level (See 'collectTopTcVars').
-constraintTopTcVars :: Ct -> Set TyVar
-constraintTopTcVars ct = maybe S.empty collectTopTcVars $ constraintClassTyArgs ct
+constraintTopTcVars :: Ct -> Set.Set TyVar
+constraintTopTcVars ct = maybe Set.empty collectTopTcVars $ constraintClassTyArgs ct
 
 -- | Retrieve the source location the given constraint originated from.
 constraintLocation :: Ct -> CtLoc
@@ -139,7 +140,7 @@ constraintPredicateType :: Ct -> Type
 constraintPredicateType ct = ctev_pred $ cc_ev ct
 
 -- | Collect all type variables in the given constraint.
-constraintTyVars :: Ct -> Set TyVar
+constraintTyVars :: Ct -> Set.Set TyVar
 constraintTyVars = collectTyVars . ctev_pred . cc_ev
 
 -- | Sorts constraints by the line of their occurence.

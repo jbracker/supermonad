@@ -10,7 +10,7 @@ module Control.Super.Plugin.Separation
   ) where
 
 import Data.Maybe ( fromJust )
-import qualified Data.Set as S
+import qualified Data.Set as Set
 
 import Data.Graph.Inductive.Graph 
   ( LNode, Edge
@@ -23,7 +23,9 @@ import TyCon ( TyCon )
 import Type ( Type, TyVar )
 import TcType ( isAmbiguousTyVar )
 import Class ( Class )
+import Unique ( Uniquable )
 
+import qualified Control.Super.Plugin.Collection.Set as S
 import Control.Super.Plugin.Constraint
   ( WantedCt
   , constraintClassTyArgs
@@ -44,28 +46,36 @@ componentMonoTyCon releventClss cts =
   let -- Find all of the return and bind constraints
       smCts = filter (isAnyClassConstraint releventClss) cts
       -- Get the polymorphic type constructors
-      tyVars = S.filter (not . isAmbiguousTyVar) $ componentTopTcVars smCts
+      tyVars = Set.filter (not . isAmbiguousTyVar) $ componentTopTcVars smCts
       -- Get the concrete type constructors
       tyCons = componentTopTyCons smCts
-  in case (S.toList tyCons, S.size tyVars) of
+  in case (S.toList tyCons, Set.size tyVars) of
     ([tc], 0) -> Just tc
     _ -> Nothing
 
 -- | Collect all top-level type constructors for the given list of 
 --   wanted constraints. See 'collectTopTyCons'.
 componentTopTyCons :: [WantedCt] -> S.Set TyCon
-componentTopTyCons = collect collectTopTyCons
+componentTopTyCons = collectInternalSet collectTopTyCons
 
 -- | Collect all top-level type constructors variables for the given list of 
 --   wanted constraints. See 'collectTopTyCons'.
-componentTopTcVars :: [WantedCt] -> S.Set TyVar
+componentTopTcVars :: [WantedCt] -> Set.Set TyVar
 componentTopTcVars = collect collectTopTcVars
 
 -- | Utility function that applies the given collection functions to all
 --   type arguments of the given constraints and returns a list of the
 --   collected results. Duplicates are removed from the result list.
-collect :: (Ord a) => ([Type] -> S.Set a) -> [Ct] -> S.Set a
-collect f cts = S.unions $ fmap collectLocal cts
+collect :: (Ord a) => ([Type] -> Set.Set a) -> [Ct] -> Set.Set a
+collect f cts = Set.unions $ fmap collectLocal cts
+  where 
+    -- collectLocal :: WantedCt -> S.Set a
+    collectLocal ct = maybe Set.empty id 
+                    $ fmap f
+                    $ constraintClassTyArgs ct
+
+collectInternalSet :: (Uniquable a) => ([Type] -> S.Set a) -> [Ct] -> S.Set a
+collectInternalSet f cts = S.unions $ fmap collectLocal cts
   where 
     -- collectLocal :: WantedCt -> S.Set a
     collectLocal ct = maybe S.empty id 
@@ -105,10 +115,10 @@ separateContraints wantedCts = comps
       cbArgs <- lookup nb nodes >>= constraintClassTyArgs
       -- Collect all top level type constructors and type constructor variables
       -- in the type arguments.
-      let ta = S.filter isAmbiguousTyVar $ collectTopTcVars caArgs
-      let tb = S.filter isAmbiguousTyVar $ collectTopTcVars cbArgs
+      let ta = Set.filter isAmbiguousTyVar $ collectTopTcVars caArgs
+      let tb = Set.filter isAmbiguousTyVar $ collectTopTcVars cbArgs
       -- If there is an element in the intersection of these sets 
-      return $ not $ S.null $ S.intersection ta tb
+      return $ not $ Set.null $ Set.intersection ta tb
     
     -- | Returns the edges for a complete undirected graph of the given nodes.
     allEdgesFor :: [SCNode] -> [Edge]

@@ -118,9 +118,9 @@ formatConstraint ct
       CHoleCan      {} -> "CHoleCan"
     formatCtFlavour :: Ct -> String
     formatCtFlavour c = case ctFlavour c of
-      Given   -> "G"
-      Wanted  -> "W"
-      Derived -> "D"
+      Given      -> "G"
+      (Wanted _) -> "W"
+      Derived    -> "D"
     formatCtType :: Ct -> String
     formatCtType c = pprToStr $ ctPred c
 

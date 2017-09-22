@@ -11,8 +11,6 @@ module Control.Super.Plugin.Instance
   , isPolyTyConInstance
   ) where
 
-import qualified Data.Set as S
-
 import InstEnv
   ( ClsInst(..)
   , instanceHead )
@@ -20,6 +18,7 @@ import Type ( Type )
 import Class ( Class, classTyCon )
 import TyCon ( TyCon )
 
+import qualified Control.Super.Plugin.Collection.Set as S
 import Control.Super.Plugin.Utils ( collectTopTyCons )
 
 -- | Checks if the given instance is of the given type class.
