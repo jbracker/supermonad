@@ -35,14 +35,14 @@ import Control.Super.Plugin.Names
 
 -- | The supermonad type checker plugin for GHC.
 plugin :: Plugin
-plugin = pluginPrototype [supermonadClassQuery, alternativeClassQuery, monadPlusClassQuery]
+plugin = pluginPrototype [supermonadClassQuery ] --, alternativeClassQuery, monadPlusClassQuery]
                          solvingGroups
                          supermonadInstanceImplications
 
 -- -----------------------------------------------------------------------------
 -- Supermonad specific initialization
 -- -----------------------------------------------------------------------------
-
+{-
 alternativeEmptyClassName, alternativeAltClassName :: PluginClassName
 alternativeEmptyClassName = "AlternativeEmpty"
 alternativeAltClassName   = "AlternativeAlt"
@@ -58,12 +58,12 @@ monadPlusAddClassName  = "MonadPlusAdd"
 monadPlusModuleName, monadPlusCtModuleName :: PluginModuleName
 monadPlusModuleName   = "Control.Super.Monad.MonadPlus"
 monadPlusCtModuleName = "Control.Super.Monad.Constrained.MonadPlus"
-
+-}
 -- | Configure which groups of classes need to be solved together.
 solvingGroups :: [[PluginClassName]]
 solvingGroups = 
-  [ [ bindClassName, returnClassName, applicativeClassName
-    , alternativeEmptyClassName, alternativeAltClassName ] -- Supermonad group
+  [ [ bindClassName, returnClassName, applicativeClassName ]
+    -- , alternativeEmptyClassName, alternativeAltClassName ] -- Supermonad group
   ]
 
 -- | Queries the module providing the supermonad classes.
@@ -80,7 +80,7 @@ supermonadModuleQuery = EitherModule
               , ThisModule legacySupermonadCtPreludeModuleName Nothing
               ]
   ] $ Just findSupermonadModulesErrMsg
-
+{-
 alternativeModuleQuery :: ModuleQuery
 alternativeModuleQuery = EitherModule
   [ ThisModule alternativeModuleName   Nothing
@@ -92,7 +92,7 @@ monadPlusModuleQuery = EitherModule
   [ ThisModule monadPlusModuleName   Nothing
   , ThisModule monadPlusCtModuleName Nothing
   ] $ Just findMonadPlusModulesErrMsg
-
+-}
 -- | Queries the supermonad classes.
 supermonadClassQuery :: ClassQuery
 supermonadClassQuery = ClassQuery False supermonadModuleQuery 
@@ -100,7 +100,7 @@ supermonadClassQuery = ClassQuery False supermonadModuleQuery
   , (returnClassName     , 1)
   , (applicativeClassName, 3)
   ]
-
+{-
 alternativeClassQuery :: ClassQuery
 alternativeClassQuery = ClassQuery True alternativeModuleQuery
   [ (alternativeAltClassName  , 3)
@@ -112,15 +112,15 @@ monadPlusClassQuery = ClassQuery True monadPlusModuleQuery
   [ (monadPlusZeroClassName, 1)
   , (monadPlusAddClassName , 3)
   ]
-
+-}
 -- | Ensures that all supermonad instance implications with the group of 
 --   one type constructor are obeyed.
 supermonadInstanceImplications :: ClassDict -> [InstanceImplication]
 supermonadInstanceImplications clsDict =
-    (applicativeClassName      <=> returnClassName        ) ++
-    (bindClassName             ==> returnClassName        ) ++
-    (alternativeEmptyClassName <=> alternativeAltClassName) ++
-    (monadPlusZeroClassName    <=> monadPlusAddClassName  )
+    (applicativeClassName      ==> returnClassName        ) ++
+    (bindClassName             ==> returnClassName        ) -- ++
+    --(alternativeEmptyClassName <=> alternativeAltClassName) ++
+    --(monadPlusZeroClassName    <=> monadPlusAddClassName  )
   where
     (==>) = clsDictInstImp clsDict
     (<=>) = clsDictInstEquiv clsDict
