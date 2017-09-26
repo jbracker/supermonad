@@ -36,6 +36,10 @@ clean-sandbox:
 	rm -fR ./.cabal-sandbox
 	rm -f ./cabal.sandbox.config
 
+test: init
+	cabal install --only-dependencies --enable-tests
+	cabal test
+
 doc: init
 	cabal configure && cabal haddock --internal --executables
 
