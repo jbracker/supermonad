@@ -10,11 +10,10 @@ module TestTAM
   ( testTAM
   ) where
 
-import Control.Supermonad.Prelude hiding ( take, drop, (!!) )
-import qualified Control.Supermonad.Prelude as P ( take, drop, (!!) )
+import qualified Prelude as P
+import Prelude hiding ( (!!), drop, take )
 
 -- Standard library imports
-import Control.Supermonad.Functions (when)
 import Data.Char (isDigit)
 import Data.Array
 
@@ -66,7 +65,7 @@ instance Applicative TestM where
 instance Monad TestM where
   return = pure
   ma >>= f = TestM $ \e -> let (e', a) = unTestM ma e
-                           in case a where 
+                           in case a of 
                                 Just a -> unTestM (f a) e'
                                 Nothing -> (e', Nothing)
   fail msg = TestM $ \e -> (e, fail msg)
@@ -418,7 +417,7 @@ execute s@(TAMState {tsLB = lb, tsST = st, tsStk = stk}) i =
 
 
         continue :: TAMState -> m (Maybe TAMState)
-        continue s | tsST s <= stkSz = return (Just s)
+        continue s | tsST s <= stkSz = P.return (Just s)
                    | otherwise       = abort stkOFlw
 
         abort :: String -> m (Maybe TAMState)

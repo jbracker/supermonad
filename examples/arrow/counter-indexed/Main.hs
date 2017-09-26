@@ -55,7 +55,7 @@ carr :: (ArrowArr arr, ArrowArrCts arr) => Proxy n -> (a -> b) -> Count arr n a 
 carr _ f = Count $ arr f 
 
 instance ArrowArr arr => ArrowArr (Count arr 0) where
-  type ArrowArrCts (Count f 0) = ArrowArrCts f
+  type ArrowArrCts (Count arr 0) = ArrowArrCts arr
   arr = Count . arr
 
 instance (ArrowSequence f g h, k ~ (i + j)) => ArrowSequence (Count f i) (Count g j) (Count h k)  where

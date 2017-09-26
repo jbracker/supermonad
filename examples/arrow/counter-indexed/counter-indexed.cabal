@@ -10,7 +10,7 @@ copyright:           Copyright (c) 2016, Jan Bracker
 build-type:          Simple
 cabal-version:       >=1.10
 
-executable reversible-indexed
+executable counter-indexed
   build-depends: base       >=4.8
                , supermonad == 0.2
   main-is:             Main.hs
