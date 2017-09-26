@@ -22,10 +22,11 @@ import Unique ( Uniquable )
 import UniqSet ( UniqSet )
 import qualified UniqSet as U
 import qualified Outputable as O 
+import Control.Super.Plugin.Wrapper ( uniqSetToList )
 
 newtype Set a = Set { unSet :: UniqSet a } deriving Data
 
-instance Eq (Set a) where
+instance (Eq a) => Eq (Set a) where
   sa == sb = unSet sa == unSet sb
   sa /= sb = unSet sa /= unSet sb
 
@@ -89,7 +90,7 @@ difference sa sb = Set $ U.minusUniqSet (unSet sa) (unSet sb)
 (\\) = difference
 
 toList :: Set a -> [a]
-toList s = U.nonDetEltsUniqSet $ unSet s
+toList s = uniqSetToList $ unSet s
 
 fromList :: Uniquable a => [a] -> Set a
 fromList l = Set $ U.mkUniqSet l

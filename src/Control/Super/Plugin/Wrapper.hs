@@ -24,6 +24,8 @@ module Control.Super.Plugin.Wrapper
   , produceTupleEvidence, isTupleTyCon
     -- * Instance Environment
   , lookupInstEnv
+    -- * UniqSet compatibility
+  , uniqSetToList
   ) where
 
 import Data.Either ( isLeft )
@@ -44,6 +46,7 @@ import qualified TcRnTypes as TcRnT
 import qualified TcEvidence as TcEv
 import qualified TcPluginM
 import qualified SrcLoc
+import qualified UniqSet
 
 -- | Return the 'Left' value. If no 'Left' value is given, an error is raised.
 fromLeft :: Either a b -> a
@@ -194,7 +197,13 @@ lookupInstEnv instEnv cls tys = IE.lookupInstEnv instEnv cls tys
 #endif
 
 
-
+-- | Turns a unique set into a list
+uniqSetToList :: UniqSet.UniqSet a -> [a]
+#if MIN_VERSION_GLASGOW_HASKELL(8,2,0,0)
+uniqSetToList = UniqSet.nonDetEltsUniqSet
+#elif MIN_VERSION_GLASGOW_HASKELL(7,10,0,0)
+uniqSetToList = UniqSet.uniqSetToList
+#endif
 
 
 

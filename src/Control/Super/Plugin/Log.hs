@@ -119,7 +119,10 @@ formatConstraint ct
     formatCtFlavour :: Ct -> String
     formatCtFlavour c = case ctFlavour c of
       Given      -> "G"
-      (Wanted _) -> "W"
+      -- Pattern matching this way is important, because up to GHC 8.0
+      -- "Wanted" does not have arguments. Howeverm from GHC 8.2 onwards
+      -- it does have arguments.
+      Wanted {}  -> "W"
       Derived    -> "D"
     formatCtType :: Ct -> String
     formatCtType c = pprToStr $ ctPred c
