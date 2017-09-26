@@ -16,6 +16,8 @@ matrix:
       addons: {apt: {packages: [cabal-install-1.22,ghc-7.10.3,alex-3.1.4,happy-1.19.5], sources: [hvr-ghc]}}
     - env: GHCVER=8.0.2 CABALVER=1.24 ALEXVER=3.1.4 HAPPYVER=1.19.5
       addons: {apt: {packages: [cabal-install-1.24,ghc-8.0.2,alex-3.1.4,happy-1.19.5], sources: [hvr-ghc]}}
+    - env: GHCVER=8.2.1 CABALVER=2.0 ALEXVER=3.1.4 HAPPYVER=1.19.5
+      addons: {apt: {packages: [cabal-install-2.0,ghc-8.2.1,alex-3.1.4,happy-1.19.5], sources: [hvr-ghc]}}
 
 before_install:
 install:
@@ -38,7 +40,7 @@ script:
   - alex  --version
   - happy --version
   # Build the supermonad library.
-  # According to travis documentation we can use 2 core:
+  # According to travis documentation we can use 2 cores:
   # https://docs.travis-ci.com/user/ci-environment/#Overview
   - cabal install -j2
   # Find the example directories that contain a cabal project and builds them in the current context.
