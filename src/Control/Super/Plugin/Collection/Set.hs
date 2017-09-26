@@ -69,7 +69,9 @@ delete :: Uniquable a => a -> Set a -> Set a
 delete a s = Set $ U.delOneFromUniqSet (unSet s) a
 
 map :: Uniquable b => (a -> b) -> Set a -> Set b
-map f s = Set $ U.mapUniqSet f $ unSet s
+-- We need to use a custom implementation of "U.mapUniqSet",
+-- because back in GHC 7.10 it was implemented wrong.
+map f s = Set $ (U.mkUniqSet . fmap f . uniqSetToList) $ unSet s
 
 filter :: (a -> Bool) -> Set a -> Set a
 filter p s = Set $ U.filterUniqSet p $ unSet s
