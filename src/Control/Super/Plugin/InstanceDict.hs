@@ -4,9 +4,10 @@ module Control.Super.Plugin.InstanceDict
   ( InstanceDict
   , emptyInstDict, insertInstDict
   , lookupInstDict, lookupInstDictByTyCon
-  , allInstDictTyCons ) where
+  , allInstDictTyCons
+  , instDictToList ) where
 
-import Data.Maybe ( maybe )
+import Data.Maybe ( maybeToList )
 
 import Class ( Class )
 import InstEnv ( ClsInst )
@@ -23,7 +24,14 @@ import qualified Control.Super.Plugin.Collection.Map as M
 newtype InstanceDict = InstanceDict (M.Map TyCon (M.Map Class ClsInst))
 
 instance Monoid InstanceDict where
-  mappend (InstanceDict a) (InstanceDict b) = InstanceDict $ mappend a b
+  mappend (InstanceDict dictA) (InstanceDict dictB) = InstanceDict $ foldr (\tc dictAB -> M.insert tc (combineClsMaps tc) dictAB) M.empty keysAB  -- mappend dictA dictB
+    where
+      keysAB :: [TyCon]
+      keysAB = S.toList $ M.keysSet dictA `S.union` M.keysSet dictB
+      
+      combineClsMaps :: TyCon -> M.Map Class ClsInst
+      combineClsMaps tc = (maybe M.empty id (M.lookup tc dictA)) `M.union` (maybe M.empty id (M.lookup tc dictB))
+      
   mempty = emptyInstDict
 
 instance O.Outputable InstanceDict where
@@ -55,4 +63,10 @@ allInstDictTyCons (InstanceDict instDict) = M.keysSet instDict
 lookupInstDictByTyCon :: TyCon -> InstanceDict -> M.Map Class ClsInst
 lookupInstDictByTyCon tc (InstanceDict instDict) = maybe M.empty id $ M.lookup tc instDict
 
-
+-- | Convert the instance dictionary into a list of key value pairs for inspection.
+instDictToList :: InstanceDict -> [((TyCon, Class), ClsInst)]
+instDictToList dict@(InstanceDict instDict) = do
+  tc <- M.keys instDict
+  cls <- M.keys $ maybe M.empty id $ M.lookup tc instDict
+  clsInst <- maybeToList $ lookupInstDict tc cls dict
+  return ( (tc , cls) , clsInst )
