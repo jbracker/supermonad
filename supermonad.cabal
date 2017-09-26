@@ -116,6 +116,12 @@ test-suite tests
   hs-source-dirs:       tests, src
   ghc-options:          -Wall
   main-is:              Main.hs
+  other-modules: Control.Super.Plugin.Collection.Map
+               , Control.Super.Plugin.Collection.Set
+               , Control.Super.Plugin.Wrapper
+               , Test.Control.Super.Plugin.Collection.Map
+               , Test.Control.Super.Plugin.Collection.Set
+               , Test.Utils
   build-depends: base         >=4.8  && <5
                , ghc          >=7.10.1 && <8.3
                , containers   >=0.5  && <0.6
