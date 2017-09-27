@@ -289,23 +289,29 @@ subsets s = case S.size s of
            subs = subsets s'
        in S.map (S.insert x) subs `S.union` subs
          -}
+
 -- | Efficient removal of duplicate elements in O(n * log(n)).
 --   The result list is ordered in ascending order.
 removeDup :: (Ord a) => [a] -> [a]
 removeDup = (Set.toAscList) . (Set.fromList)
 
+-- | Removal of duplicate elements in a list,
+--   based on their unique representation.
 removeDupUnique :: (Uniquable a) => [a] -> [a]
 removeDupUnique = (S.toList) . (S.fromList)
 
--- | Efficient removal of duplicate elements in O(n * log(n)).
+-- | Efficient removal of duplicate entries by key in O(n * log(n)).
 --   The result list is ordered.
 removeDupByIndex :: (Ord a) => [(a,b)] -> [(a,b)]
 removeDupByIndex = Map.toList . Map.fromList
 
+-- | Efficient removal of duplicate entries by key, based on equality of keys.
 removeDupByIndexEq :: (Eq a) => [(a,b)] -> [(a,b)]
 removeDupByIndexEq [] = []
 removeDupByIndexEq ((a,b) : l) = (a,b) : (removeDupByIndexEq $ filter (\(a',_) -> not $ a' == a) l)
 
+-- | Efficient removal of duplicate entries by key, 
+--   based on the unique representation of the keys.
 removeDupByIndexUnique :: (Uniquable a) => [(a,b)] -> [(a,b)]
 removeDupByIndexUnique = M.toList . M.fromList
 

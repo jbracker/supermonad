@@ -1,8 +1,10 @@
- 
+
+-- | Provides the configurable prototype implementation of the supermonad
+--   plugin. This can essentially be used with any type classes when configured 
+--   correctly.
 module Control.Super.Plugin.Prototype
   ( pluginPrototype
   ) where
-
 
 import Data.Maybe ( isJust, isNothing, fromJust, catMaybes )
 import Data.Foldable ( foldrM )
@@ -48,6 +50,7 @@ import Control.Super.Plugin.Names ( PluginClassName )
 -- The Plugin
 -- -----------------------------------------------------------------------------
 
+-- | Type of the state used in the supermonad plugin.
 type SupermonadState = ()
 
 -- | The supermonad type checker plugin for GHC.
