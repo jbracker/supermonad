@@ -22,11 +22,6 @@ clean: init
 	
 	rm -fR ./examples/applicative/ll1-parser/dist
 	
-	rm -fR ./examples/arrow/ebba/dist
-	cabal sandbox delete-source $(DIR)/examples/arrow/ebba/gnewplot
-	rm -fR ./examples/arrow/ebba/gnewplot
-	rm -f  ./examples/arrow/ebba/*.eps
-	
 	rm -fR ./examples/arrow/reversible-indexed/dist
 	
 	rm -fR ./dist
@@ -53,13 +48,11 @@ init:
 missing-function-test:
 	cabal install ./examples/test/missing-functions
 
-examples: non-super-examples supermonad-examples superarrow-examples superapplicative-examples
+examples: non-super-examples supermonad-examples superapplicative-examples
 
 non-super-examples: install session-chat-orig-example hmtc-orig-example hmtc-monad-param-example
 
 supermonad-examples: install minimal-example session-example session-chat-supermonad-example effect-example constrained-example hmtc-supermonad-example
-
-superarrow-examples: install ebba-example reversible-indexed-example counter-indexed-example
 
 superapplicative-examples: install ll1-parser-example
 
@@ -94,19 +87,4 @@ hmtc-monad-param-example: init
 # Compilation of (super)applicative examples.
 ll1-parser-example: install
 	cabal install ./examples/applicative/ll1-parser
-	
-
-# Compilation of (super)arrow examples.
-ebba-example: install
-	[ -d ./examples/arrow/ebba/gnewplot ] || ( \
-		git clone https://github.com/glutamate/gnewplot.git ./examples/arrow/ebba/gnewplot && \
-		cabal sandbox add-source ./examples/arrow/ebba/gnewplot )
-	cabal install ./examples/arrow/ebba
-
-reversible-indexed-example: init
-	cabal install ./examples/arrow/reversible-indexed
-
-counter-indexed-example: init
-	cabal install ./examples/arrow/counter-indexed
-
 

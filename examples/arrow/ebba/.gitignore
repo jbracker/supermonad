@@ -1,6 +1,0 @@
- 
-*.o
-*.hi
-*.eps
-.cabal-sandbox
-gnewplot
