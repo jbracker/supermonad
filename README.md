@@ -1,8 +1,10 @@
-# Supermonads for GHC
+# Supermonads and superapplicatives for GHC
 
 Implementation of supermonads for GHC. See the 
 "Supermonads: One Notion to Bind Them All" paper for detailed explanation
 of version 0.1.
+
+## Supermonads
 
 The library offers two definitions for supermonads. The version 
 in `Control.Super.Monad` does not have support for constrained
@@ -19,18 +21,24 @@ These parallel structures will not be maintained indefinitely and
 at some point we will probably only offer supermonads with support
 for constrained monads.
 
+## Superapplicatives
+
+Support for generalized applicatives was added in version 0.2.
+For users this does not change anything. 
+
+## Build Status
 * master: [![build status master][TravisBuildMaster]](https://travis-ci.org/jbracker/supermonad)
 * dev: [![build status dev][TravisBuildDev]](https://travis-ci.org/jbracker/supermonad)
 
 ## GHC Version
 
-The implementation has been tested with GHC in version 7.10.3 and GHC 8.0.2.
+The implementation has been tested with GHC in version 7.10.3, 8.0.2 and 8.2.1.
 
 Versions of GHC prior to version 7.10.1 will most certainly not work,
 because the plugin mechanism was still in development.
 
 Newer version of GHC may work. If you encounter problems with a newer version
-of GHC, please file a bug report so they can be fixed.
+of GHC, please file a bug report so it can be fixed.
 
 ## Usage
 
@@ -60,6 +68,10 @@ you are working with and a minimal example that shows the problem.
 Examples for the use of the plugin with different kinds of monad generalizations 
 are provided in the `examples` directory. All examples have their own separate 
 cabal file and offer a version of the code with and without the use of supermonads.
+
+A minimal example of how to use supermonads can be found under `examples/monad/minimal`.
+It is a good entry point to play around with supermonads.
+
 
 [TravisBuildMaster]: https://travis-ci.org/jbracker/supermonad.svg?branch=master
 [TravisBuildDev]: https://travis-ci.org/jbracker/supermonad.svg?branch=dev
