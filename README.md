@@ -27,8 +27,10 @@ Support for generalized applicatives was added in version 0.2.
 For users this does not change anything. 
 
 ## Build Status
-* master: [![build status master][TravisBuildMaster]](https://travis-ci.org/jbracker/supermonad)
-* dev: [![build status dev][TravisBuildDev]](https://travis-ci.org/jbracker/supermonad)
+
+`master` | `dev`
+---------|---------
+[![build status master][TravisBuildMaster]](https://travis-ci.org/jbracker/supermonad) | [![build status dev][TravisBuildDev]](https://travis-ci.org/jbracker/supermonad)
 
 ## GHC Version
 
