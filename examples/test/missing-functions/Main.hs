@@ -37,6 +37,7 @@ import Control.Super.Monad.Constrained
   )
 
 -- Base superarrow modules -----------------------------------------------------
+{-
 import Control.Super.Arrow
   ( ArrowArr( arr, ArrowArrCts )
   , ArrowSequence( (>>>), (<<<), ArrowSequenceCts )
@@ -51,7 +52,7 @@ import Control.Super.Arrow.Constrained
   , ArrowParallel( (***), ArrowParallelCts )
   , ArrowFanOut( (&&&), ArrowFanOutCts )
   )
-
+-}
 -- Base functor modules --------------------------------------------------------
 import Data.Functor
   ( Functor( fmap, (<$) )
