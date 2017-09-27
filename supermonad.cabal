@@ -15,29 +15,33 @@ tested-with:         GHC == 7.10.3, GHC == 8.0.2, GHC == 8.2.1
 extra-source-files: README.md
                   , Makefile
                   , compile-all.sh
-                  , examples/constrained/constrained-example.cabal
-                  , examples/constrained/*.hs
-                  , examples/effect/effect-example.cabal
-                  , examples/effect/*.hs
-                  , examples/session/session-example.cabal
-                  , examples/session/*.hs
-                  , examples/session-chat/original/session-chat-orig-example.cabal
-                  , examples/session-chat/original/*.hs
-                  , examples/session-chat/supermonad/session-chat-supermonad-example.cabal
-                  , examples/session-chat/supermonad/*.hs
-                  , examples/hmtc/monad-param/hmtc-monad-param.cabal
-                  , examples/hmtc/monad-param/Makefile
-                  , examples/hmtc/monad-param/*.y
-                  , examples/hmtc/monad-param/*.hs
-                  , examples/hmtc/original/hmtc-orig.cabal
-                  , examples/hmtc/original/Makefile
-                  , examples/hmtc/original/*.y
-                  , examples/hmtc/original/*.hs
-                  , examples/hmtc/supermonad/hmtc-supermonad.cabal
-                  , examples/hmtc/supermonad/Makefile
-                  , examples/hmtc/supermonad/*.y
-                  , examples/hmtc/supermonad/*.hs
-                  , examples/hmtc/test-files/*.mt
+                  , examples/applicative/ll1-parser/ll1-parser-example.cabal
+                  , examples/applicative/ll1-parser/*.hs
+                  , examples/monad/constrained/constrained-example.cabal
+                  , examples/monad/constrained/*.hs
+                  , examples/monad/effect/effect-example.cabal
+                  , examples/monad/effect/*.hs
+                  , examples/monad/minimal/minimal.cabal
+                  , examples/monad/minimal/*.hs
+                  , examples/monad/session/session-example.cabal
+                  , examples/monad/session/*.hs
+                  , examples/monad/session-chat/original/session-chat-orig-example.cabal
+                  , examples/monad/session-chat/original/*.hs
+                  , examples/monad/session-chat/supermonad/session-chat-supermonad-example.cabal
+                  , examples/monad/session-chat/supermonad/*.hs
+                  , examples/monad/hmtc/monad-param/hmtc-monad-param.cabal
+                  , examples/monad/hmtc/monad-param/Makefile
+                  , examples/monad/hmtc/monad-param/*.y
+                  , examples/monad/hmtc/monad-param/*.hs
+                  , examples/monad/hmtc/original/hmtc-orig.cabal
+                  , examples/monad/hmtc/original/Makefile
+                  , examples/monad/hmtc/original/*.y
+                  , examples/monad/hmtc/original/*.hs
+                  , examples/monad/hmtc/supermonad/hmtc-supermonad.cabal
+                  , examples/monad/hmtc/supermonad/Makefile
+                  , examples/monad/hmtc/supermonad/*.y
+                  , examples/monad/hmtc/supermonad/*.hs
+                  , examples/monad/hmtc/test-files/*.mt
 description:
 
     The @supermonad@ library adds support for supermonads to GHC
@@ -65,10 +69,6 @@ library
                  , Control.Super.Monad.Constrained.Functions
                  , Control.Super.Monad.Constrained.Alternative
                  , Control.Super.Monad.Constrained.MonadPlus
-                 , Control.Super.Arrow
-                 , Control.Super.Arrow.Plugin
-                 , Control.Super.Arrow.Prelude
-                 , Control.Super.Arrow.Constrained
                  -- Legacy Modules
                  , Control.Supermonad
                  , Control.Supermonad.Prelude
