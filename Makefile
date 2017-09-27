@@ -39,7 +39,7 @@ doc: init
 	cabal configure && cabal haddock --internal --executables
 
 opendoc:
-	xdg-open ./dist/doc/html/supermonad-plugin/index.html 
+	xdg-open ./dist/doc/html/supermonad/index.html 
 
 init:
 	[ -f ./cabal.sandbox.config ] || [ -d ./.cabal-sandbox ] || cabal sandbox init
