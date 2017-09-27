@@ -61,10 +61,5 @@ Examples for the use of the plugin with different kinds of monad generalizations
 are provided in the `examples` directory. All examples have their own separate 
 cabal file and offer a version of the code with and without the use of supermonads.
 
-## Known Problems
-
-None at the moment.
-
-
 [TravisBuildMaster]: https://travis-ci.org/jbracker/supermonad.svg?branch=master
 [TravisBuildDev]: https://travis-ci.org/jbracker/supermonad.svg?branch=dev
