@@ -7,6 +7,10 @@
 
 {-# LANGUAGE TypeOperators #-}
 
+-- | __WARNING:__ This module is an experiment to see how 'Alternative' may be encoded.
+--   The authors are not aware of any generalized applicatives that make use of 'Alternative'. 
+--   Hence, we do not know if this encoding of it is sufficient. 
+--   Therefore, the encoding is not in its final form and may change in the future.
 module Control.Super.Monad.Alternative
   ( AlternativeEmpty(..)
   , AlternativeAlt(..)
@@ -36,7 +40,7 @@ import Control.Super.Monad.Prelude
   , Return(..), Applicative(..), Functor(..) )
 -- Import of 'Functor' required for GHC 8+ instances.
 
-
+-- | The encoding of the 'empty' operation.
 class Return f => AlternativeEmpty f where
   type AlternativeEmptyCts f :: Constraint
   type AlternativeEmptyCts f = ()
@@ -95,6 +99,7 @@ instance AlternativeEmpty f => AlternativeEmpty (Generics.M1 i c f) where
   empty = Generics.M1 $ empty
 #endif
 
+-- | The encoding of the '<|>' operation.
 class Applicative f g h => AlternativeAlt f g h where
   type AlternativeAltCts f g h :: Constraint
   type AlternativeAltCts f g h = ()
