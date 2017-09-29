@@ -37,8 +37,6 @@ import qualified Data.Functor.Product as Product
 import Control.Super.Monad.Prelude 
   ( ($)
   , Return(..), Bind(..) )
-import Control.Super.Monad.Alternative 
-  ( AlternativeEmpty(..), AlternativeAlt(..) )
 
 -- | The encoding of the 'mzero' operation.
 class (Return m) => MonadPlusZero m where
