@@ -1,4 +1,5 @@
 
+-- | See "Control.Super.Monad.Constrained.Prelude".
 module Control.Supermonad.Constrained.Prelude
   ( module Control.Super.Monad.Constrained.Prelude
   ) where

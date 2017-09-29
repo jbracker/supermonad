@@ -23,7 +23,7 @@ import TyCon ( TyCon )
 import Type ( Type, TyVar )
 import TcType ( isAmbiguousTyVar )
 import Class ( Class )
-import Unique ( Uniquable )
+--import Unique ( Uniquable )
 
 import qualified Control.Super.Plugin.Collection.Set as S
 import Control.Super.Plugin.Constraint
@@ -74,7 +74,7 @@ collect f cts = Set.unions $ fmap collectLocal cts
                     $ fmap f
                     $ constraintClassTyArgs ct
 
-collectInternalSet :: (Uniquable a) => ([Type] -> S.Set a) -> [Ct] -> S.Set a
+collectInternalSet :: ([Type] -> S.Set a) -> [Ct] -> S.Set a
 collectInternalSet f cts = S.unions $ fmap collectLocal cts
   where 
     -- collectLocal :: WantedCt -> S.Set a

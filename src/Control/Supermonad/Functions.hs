@@ -1,4 +1,5 @@
- 
+
+-- | See "Control.Super.Monad.Functions".
 module Control.Supermonad.Functions
   ( module Control.Super.Monad.Functions
   ) where
