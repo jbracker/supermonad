@@ -62,8 +62,9 @@ monadPlusCtModuleName = "Control.Super.Monad.Constrained.MonadPlus"
 -- | Configure which groups of classes need to be solved together.
 solvingGroups :: [[PluginClassName]]
 solvingGroups = 
-  [ [ bindClassName, returnClassName, applicativeClassName ]
-    -- , alternativeEmptyClassName, alternativeAltClassName ] -- Supermonad group
+  [ [ bindClassName, returnClassName, applicativeClassName 
+    , monadPlusZeroClassName, monadPlusAddClassName
+    , alternativeEmptyClassName, alternativeAltClassName ] -- Supermonad group
   ]
 
 -- | Queries the module providing the supermonad classes.
