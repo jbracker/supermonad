@@ -9,7 +9,7 @@ module Control.Super.Plugin.Separation
   , componentMonoTyCon
   ) where
 
-import Data.Maybe ( fromJust )
+import Data.Maybe ( fromJust, fromMaybe )
 import qualified Data.Set as Set
 
 import Data.Graph.Inductive.Graph 
@@ -70,17 +70,13 @@ collect :: (Ord a) => ([Type] -> Set.Set a) -> [Ct] -> Set.Set a
 collect f cts = Set.unions $ fmap collectLocal cts
   where 
     -- collectLocal :: WantedCt -> S.Set a
-    collectLocal ct = maybe Set.empty id 
-                    $ fmap f
-                    $ constraintClassTyArgs ct
+    collectLocal ct = maybe Set.empty f $ constraintClassTyArgs ct
 
 collectInternalSet :: ([Type] -> S.Set a) -> [Ct] -> S.Set a
 collectInternalSet f cts = S.unions $ fmap collectLocal cts
   where 
     -- collectLocal :: WantedCt -> S.Set a
-    collectLocal ct = maybe S.empty id 
-                    $ fmap f
-                    $ constraintClassTyArgs ct
+    collectLocal ct = maybe S.empty f $ constraintClassTyArgs ct
 
 -- | Creates a graph of the constraints and how they are 
 --   conntected by their top-level ambiguous type constructor variables. 
@@ -108,7 +104,7 @@ separateContraints wantedCts = comps
     
     -- | Returns 'True' if the given edge is an edge of the graph.
     isEdge :: Edge -> Bool
-    isEdge (na, nb) = maybe False id $ do
+    isEdge (na, nb) = fromMaybe False $ do
       -- Lookup the constraints associated with the nodes in the given
       -- edge and keep their type arguments.
       caArgs <- lookup na nodes >>= constraintClassTyArgs
@@ -123,6 +119,6 @@ separateContraints wantedCts = comps
     -- | Returns the edges for a complete undirected graph of the given nodes.
     allEdgesFor :: [SCNode] -> [Edge]
     allEdgesFor [] = []
-    allEdgesFor (n : ns) = concat [ fmap (\m -> (m, fst n)) (fmap fst ns)
-                                  , fmap (\m -> (fst n, m)) (fmap fst ns)
+    allEdgesFor (n : ns) = concat [ fmap (\m -> (m, fst n) . fst) ns
+                                  , fmap (\m -> (fst n, m) . fst) ns
                                   , allEdgesFor ns ]

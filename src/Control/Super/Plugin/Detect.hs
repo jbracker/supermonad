@@ -30,7 +30,7 @@ module Control.Super.Plugin.Detect
 
 import Data.List  ( find )
 import Data.Either ( isLeft, isRight )
-import Data.Maybe ( isJust, isNothing, fromJust, maybeToList, catMaybes )
+import Data.Maybe ( isJust, isNothing, fromJust, maybeToList, catMaybes, fromMaybe )
 
 import Control.Monad ( forM )
 
@@ -151,7 +151,7 @@ data ModuleQuery
   --   will be returned.
 
 instance O.Outputable ModuleQuery where
-  ppr (ThisModule mdlName mUnitId) = O.text mdlName O.<> (if isJust mUnitId then O.ppr (fromJust mUnitId) else O.text "")
+  ppr (ThisModule mdlName mUnitId) = O.text mdlName O.<> (maybe (O.text "") O.ppr $ mUnitId)
   ppr (EitherModule mdlQueries _errF) = O.text "XOR " O.<> (O.brackets $ O.hcat $ O.punctuate (O.text ", ") $ fmap O.ppr mdlQueries)
   ppr (AnyModule mdlQueries) = O.text "OR " O.<> (O.brackets $ O.hcat $ O.punctuate (O.text ", ") $ fmap O.ppr mdlQueries)
 
@@ -200,9 +200,9 @@ findModule pkgKeyToFind mdlNameToFind = do
 findEitherModule :: Maybe ([Either SDoc Module] -> SDoc) -> [Either SDoc Module] -> (Either SDoc Module)
 findEitherModule mErrFun eMdls = 
   case fmap fromRight $ filter isRight eMdls of
-    [] -> Left $ maybe defaultFindEitherModuleErrMsg id mErrFun $ eMdls
+    [] -> Left $ fromMaybe defaultFindEitherModuleErrMsg mErrFun $ eMdls
     [mdl] -> Right mdl
-    _ -> Left $ maybe defaultFindEitherModuleErrMsg id mErrFun $ eMdls
+    _ -> Left $ fromMaybe defaultFindEitherModuleErrMsg mErrFun $ eMdls
 
 -- | Makes sure that at least one of the given modules was found and, if so, returns 
 --   the first one found (in order of the list). If none of the modules 
@@ -212,7 +212,7 @@ findEitherModule mErrFun eMdls =
 findAnyModule :: Maybe ([SDoc] -> SDoc) -> [Either SDoc Module] -> (Either SDoc Module)
 findAnyModule mErrFun eMdls = 
   case fmap fromRight $ filter isRight eMdls of
-    [] -> Left $ maybe defaultFindAnyModuleErrMsg id mErrFun $ fmap fromLeft eMdls
+    [] -> Left $ fromMaybe defaultFindAnyModuleErrMsg mErrFun $ fmap fromLeft eMdls
     (mdl : _) -> Right mdl
 
 -- | Default error message function in case 'EitherModule' fails.

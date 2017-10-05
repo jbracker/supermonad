@@ -248,9 +248,7 @@ whenNoResults :: SupermonadPluginM s () -> SupermonadPluginM s ()
 whenNoResults m = do
   tyVarEqs <- getTyVarEqualities
   tyEqs <- getTypeEqualities
-  if null tyVarEqs && null tyEqs 
-    then m 
-    else return ()
+  when (null tyVarEqs && null tyEqs) m
 
 -- | Displays the queued warning messages if no progress has been made.
 displayWarnings :: SupermonadPluginM s ()

@@ -7,7 +7,7 @@ module Control.Super.Plugin.Solving
 import Data.Maybe 
   ( catMaybes
   , isJust, isNothing
-  , fromJust )
+  , fromJust, fromMaybe )
 import Data.List ( partition, nubBy )
 import qualified Data.Set as Set
 
@@ -113,7 +113,7 @@ solveMonoConstraintGroup relevantClss (tyCon, ctGroup) = do
   forM_ smCtGroup $ \ct -> do
     let ctAmbVars = Set.filter isAmbiguousTyVar 
                   $ collectTopTcVars 
-                  $ maybe [] id
+                  $ fromMaybe []
                   $ constraintClassTyArgs ct
     forM_ ctAmbVars $ \tyVar -> do
       appliedTyCon <- either throwPluginErrorSDoc return =<< partiallyApplyTyCons [(tyVar, Left tyCon)]
@@ -435,7 +435,7 @@ solveSolvedTyConIndices relevantClss = do
     mkEqStarGroup baseCt eqGroups = concatMap (\(tv, tys) -> fmap (\ty -> (baseCt, tv, ty)) tys) eqGroups
     
     collectEqualityGroup :: [TypeVarSubst] -> [TyVar] -> [(TyVar, [Type])]
-    collectEqualityGroup substs tvs = [ (tv, nubBy eqType $ filter (all (tv /=) . collectTyVars) 
+    collectEqualityGroup substs tvs = [ (tv, nubBy eqType $ filter (notElem tv . collectTyVars)
                                                           $ [ substTyVar subst tv | subst <- substs]
                                         ) | tv <- tvs]
                                         

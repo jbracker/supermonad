@@ -308,7 +308,7 @@ removeDupByIndex = Map.toList . Map.fromList
 -- | Efficient removal of duplicate entries by key, based on equality of keys.
 removeDupByIndexEq :: (Eq a) => [(a,b)] -> [(a,b)]
 removeDupByIndexEq [] = []
-removeDupByIndexEq ((a,b) : l) = (a,b) : (removeDupByIndexEq $ filter (\(a',_) -> not $ a' == a) l)
+removeDupByIndexEq ((a,b) : l) = (a,b) : (removeDupByIndexEq $ filter (\(a',_) -> a' /= a) l)
 
 -- | Efficient removal of duplicate entries by key, 
 --   based on the unique representation of the keys.

@@ -7,7 +7,7 @@ module Control.Super.Plugin.InstanceDict
   , allInstDictTyCons
   , instDictToList ) where
 
-import Data.Maybe ( maybeToList )
+import Data.Maybe ( maybeToList, fromMaybe )
 
 import Class ( Class )
 import InstEnv ( ClsInst )
@@ -30,7 +30,7 @@ instance Monoid InstanceDict where
       keysAB = S.toList $ M.keysSet dictA `S.union` M.keysSet dictB
       
       combineClsMaps :: TyCon -> M.Map Class ClsInst
-      combineClsMaps tc = (maybe M.empty id (M.lookup tc dictA)) `M.union` (maybe M.empty id (M.lookup tc dictB))
+      combineClsMaps tc = (fromMaybe M.empty $ M.lookup tc dictA) `M.union` (fromMaybe M.empty $ M.lookup tc dictB)
       
   mempty = emptyInstDict
 
@@ -44,7 +44,7 @@ emptyInstDict = InstanceDict $ M.empty
 -- | Insert an entry into a instance dictionary.
 insertInstDict :: TyCon -> Class -> ClsInst -> InstanceDict -> InstanceDict
 insertInstDict tc cls inst (InstanceDict instDict) 
-  = InstanceDict $ M.insert tc (M.insert cls inst (maybe M.empty id $ M.lookup tc instDict)) instDict
+  = InstanceDict $ M.insert tc (M.insert cls inst (fromMaybe M.empty $ M.lookup tc instDict)) instDict
 
 -- | Try to lookup an entry in a instance dictionary.
 lookupInstDict :: TyCon -> Class -> InstanceDict -> Maybe ClsInst
@@ -61,12 +61,12 @@ allInstDictTyCons (InstanceDict instDict) = M.keysSet instDict
 --   Returns a mapping between the classes and their instances for that
 --   type constructor.
 lookupInstDictByTyCon :: TyCon -> InstanceDict -> M.Map Class ClsInst
-lookupInstDictByTyCon tc (InstanceDict instDict) = maybe M.empty id $ M.lookup tc instDict
+lookupInstDictByTyCon tc (InstanceDict instDict) = fromMaybe M.empty $ M.lookup tc instDict
 
 -- | Convert the instance dictionary into a list of key value pairs for inspection.
 instDictToList :: InstanceDict -> [((TyCon, Class), ClsInst)]
 instDictToList dict@(InstanceDict instDict) = do
   tc <- M.keys instDict
-  cls <- M.keys $ maybe M.empty id $ M.lookup tc instDict
+  cls <- M.keys $ fromMaybe M.empty $ M.lookup tc instDict
   clsInst <- maybeToList $ lookupInstDict tc cls dict
   return ( (tc , cls) , clsInst )

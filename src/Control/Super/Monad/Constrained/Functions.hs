@@ -236,6 +236,7 @@ replicateM_ n = void . replicateM n
 liftM :: (Functor m, FunctorCts m a b) => (a -> b) -> m a -> m b
 liftM f ma = fmap f ma
 
+{-# ANN liftM' "HLint: ignore" #-} 
 -- | Make arguments and result of a pure function monadic with allowed morphing
 liftM' :: ( Return n, ReturnCts n b
           , Bind m n n, BindCts m n n a b

@@ -228,10 +228,10 @@ produceEvidenceForCtType givenCts ct =
           case res of
             Right _ -> return res
             Left _ -> do
-              newRes <- return $ (\ev -> mkEvCast ev (mkTcCoercion coer)) <$> produceGivenCtEv evalCt
-              case newRes of
-                Right _ -> return newRes
-                Left _ -> return res
+              let newRes = (\ev -> mkEvCast ev (mkTcCoercion coer)) <$> produceGivenCtEv evalCt
+              return $ case newRes of
+                Right _ -> newRes
+                Left _ -> res
         -- It is a normal class constraint...
         Just (ctCls, ctArgs) -> do
           res <- produceClassCtEv ctCls ctArgs
@@ -239,10 +239,10 @@ produceEvidenceForCtType givenCts ct =
           case res of
             Right _ -> return res
             Left _ -> do
-              newRes <- return $ produceGivenCtEv ct
-              case newRes of
-                Right _ -> return newRes
-                Left _ -> return res
+              let newRes = produceGivenCtEv ct
+              return $ case newRes of
+                Right _ -> newRes
+                Left _ -> res
         -- In any other case, lets try if one of the given constraints can help...
         _ | containsTyFunApp ct -> do
           -- Evaluate it...
