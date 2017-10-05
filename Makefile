@@ -44,6 +44,9 @@ opendoc:
 init:
 	[ -f ./cabal.sandbox.config ] || [ -d ./.cabal-sandbox ] || cabal sandbox init
 
+hlint:
+	find src/ -iname '*.hs' -exec hlint --hint=.hlint.hs {} \;
+
 
 missing-function-test:
 	cabal install ./examples/test/missing-functions
