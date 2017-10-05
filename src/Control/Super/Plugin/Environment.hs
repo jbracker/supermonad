@@ -29,7 +29,7 @@ module Control.Super.Plugin.Environment
 
 import Data.List ( groupBy )
 
-import Control.Monad ( unless, forM_ )
+import Control.Monad ( when, unless, forM_ )
 import Control.Monad.Reader ( ReaderT, runReaderT, asks )
 import Control.Monad.State  ( StateT , runStateT , gets, modify )
 import Control.Monad.Except ( ExceptT, runExceptT, throwError, catchError )

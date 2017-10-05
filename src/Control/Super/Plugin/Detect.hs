@@ -30,7 +30,7 @@ module Control.Super.Plugin.Detect
 
 import Data.List  ( find )
 import Data.Either ( isLeft, isRight )
-import Data.Maybe ( isJust, isNothing, fromJust, maybeToList, catMaybes, fromMaybe )
+import Data.Maybe ( isNothing, maybeToList, catMaybes, fromMaybe )
 
 import Control.Monad ( forM )
 

@@ -119,6 +119,6 @@ separateContraints wantedCts = comps
     -- | Returns the edges for a complete undirected graph of the given nodes.
     allEdgesFor :: [SCNode] -> [Edge]
     allEdgesFor [] = []
-    allEdgesFor (n : ns) = concat [ fmap (\m -> (m, fst n) . fst) ns
-                                  , fmap (\m -> (fst n, m) . fst) ns
+    allEdgesFor (n : ns) = concat [ fmap (\m -> (fst m, fst n)) ns
+                                  , fmap (\m -> (fst n, fst m)) ns
                                   , allEdgesFor ns ]
