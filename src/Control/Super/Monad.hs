@@ -576,7 +576,7 @@ instance (P.Monoid w, Bind m n p) => Bind (WriterS.WriterT w m) (WriterS.WriterT
 -- Return Type Class
 -- -----------------------------------------------------------------------------
 
--- | See 'Bind' for details on laws and requirements.
+-- | See 'Bind' or 'Ap' for details on laws and requirements.
 class (Functor m) => Return m where
   type ReturnCts m :: Constraint
   type ReturnCts m = ()
