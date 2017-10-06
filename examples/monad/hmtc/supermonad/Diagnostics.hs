@@ -195,26 +195,26 @@ class MonadTransformer t where
 class (Applicative d d d, Bind d d d, Return d) => Diagnostic d where
 
     -- | Emits a diagnostic message
-    emitD :: (BindCts d d d, ReturnCts d) => DMsg -> d ()
+    emitD :: (ApplicativeCts d d d, BindCts d d d, ReturnCts d) => DMsg -> d ()
 
     -- | Emits an information message.
-    emitInfoD :: (BindCts d d d, ReturnCts d) => SrcPos -> String -> d ()
+    emitInfoD :: (ApplicativeCts d d d, BindCts d d d, ReturnCts d) => SrcPos -> String -> d ()
     emitInfoD sp msg = emitD (mkInfoMsg sp msg)
 
     -- | Emits a warning message.
-    emitWngD :: (BindCts d d d, ReturnCts d) => SrcPos -> String -> d ()
+    emitWngD :: (ApplicativeCts d d d, BindCts d d d, ReturnCts d) => SrcPos -> String -> d ()
     emitWngD sp msg = emitD (mkWngMsg sp msg)
 
     -- | Emits an error message.
-    emitErrD :: (BindCts d d d, ReturnCts d) => SrcPos -> String -> d ()
+    emitErrD :: (ApplicativeCts d d d, BindCts d d d, ReturnCts d) => SrcPos -> String -> d ()
     emitErrD sp msg = emitD (mkErrMsg sp msg)
 
     -- | Diagnostic messages emitted thus far
-    getDMsgsD :: (BindCts d d d, ReturnCts d) => d [DMsg]
+    getDMsgsD :: (ApplicativeCts d d d, BindCts d d d, ReturnCts d) => d [DMsg]
 
     -- | Tries the first diagnostic computation. If that results in errors,
     -- discards those and runs the second computation.
-    (|||) :: (BindCts d d d, ReturnCts d) => d a -> d a -> d a
+    (|||) :: (ApplicativeCts d d d, BindCts d d d, ReturnCts d) => d a -> d a -> d a
 
 
 -- | Class for diagnostic computations with failure.
@@ -223,16 +223,16 @@ class (Applicative d d d, Bind d d d, Return d) => Diagnostic d where
 class Diagnostic df => DiagnosticFail df where
 
     -- | Emits an error message and fails.
-    failD :: (BindCts df df df, ReturnCts df) => SrcPos -> String -> df a
+    failD :: (ApplicativeCts df df df, BindCts df df df, ReturnCts df) => SrcPos -> String -> df a
     
     -- | Fails without giving any specific reason.
-    failNoReasonD :: (BindCts df df df, ReturnCts df) => df a
+    failNoReasonD :: (ApplicativeCts df df df, BindCts df df df, ReturnCts df) => df a
     
     -- | Fails if there has been errors thus far
-    failIfErrorsD :: (BindCts df df df, ReturnCts df) => df ()
+    failIfErrorsD :: (ApplicativeCts df df df, BindCts df df df, ReturnCts df) => df ()
     
     -- | Forces a stop, e.g. after some user-specified pass.
-    stopD :: (BindCts df df df, ReturnCts df) => df a
+    stopD :: (ApplicativeCts df df df, BindCts df df df, ReturnCts df) => df a
 
 
 ------------------------------------------------------------------------------
