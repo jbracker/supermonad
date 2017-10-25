@@ -1,0 +1,46 @@
+% Supermonads-JS.tex
+\begin{hcarentry}{Supermonads}
+\report{Jan Bracker}%05/17
+\status{Experimental fully working version}
+\participants{Jan Bracker and Henrik Nilsson}
+\makeheader
+
+The supermonad package provides a unified way to represent different monadic
+and applicative notions. In other words, it provides a way to use standard and generalized
+monads and applicative functors (with additional indices or constraints)
+without having to manually disambiguate which notion is referred to in every context.
+This allows the reuse of code, such as standard library functions, across all of 
+the notions.
+
+To achieve this, the library splits the monad and applicative type classes
+such that they are general enough to allow instances for all of the generalized notions and
+then aids constraint checking through a GHC plugin to ensure that everything
+type checks properly. Due to the plugin the library can only be used with GHC.
+
+If you are interested in using the library, we have a few examples of
+different size in the repository to show how it can be utilized. The generated
+Haddock documentation also has full coverage and can be seen on the libraries
+Hackage page.
+
+The project had its first release shortly before ICFP and the Haskell
+Symposium 2016. Since then we have added support for applicative 
+functors in addition to monads. The support for applicative 
+functors has not been released on Hackage at the time of writing, 
+but is available on GitHub.
+We are working on a comprehensive paper that covers all aspects of the project.
+It should be available within the next year.
+
+If you are interested in contributing, found a bug or have a suggestion to
+improve the project we are happy to hear from you in person, by email or over
+the projects bug tracker on GitHub.
+
+\FurtherReading
+\begin{compactitem}
+  \item Hackage:\\ \url{http://hackage.haskell.org/package/supermonad}
+  \item Repository:\\ \url{https://github.com/jbracker/supermonad}
+  \item Paper:\\
+    \url{http://www.cs.nott.ac.uk/~psxjb5/publications/2016-BrackerNilsson-Supermonads.pdf}
+  \item Bug-Tracker:\\ \url{https://github.com/jbracker/supermonad/issues}
+  \item Haskell Symposium presentation:\\ \url{https://youtu.be/HRofw58sySw}
+\end{compactitem}
+\end{hcarentry}

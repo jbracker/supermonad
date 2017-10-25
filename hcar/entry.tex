@@ -7,50 +7,6 @@
 
 \begin{document}
 
-\begin{hcarentry}{Supermonads}
-\report{Jan Bracker}
-\status{Experimental fully working version}
-\participants{Jan Bracker and Henrik Nilsson}% optional
-\makeheader
-
-The supermonad package provides a unified way to represent different 
-monadic notions. In other words, it provides a way to use standard and 
-generalized monads (with additional indices or constraints)
-with each other without having to manually disambiguate which notion 
-is referred to in every computation. To achieve this, the library represents 
-monads as a set of two type classes that are general enough to 
-allow instances for all of the different notions and then aids 
-constraint checking through a GHC plugin to ensure that everything type checks properly.
-Due to the plugin the library can only be used with GHC.
-
-If you are interested in using the library, we have a few examples of different
-size in the repository to show how it can be utilized. The generated Haddock 
-documentation also has full coverage and can be seen on the libraries 
-Hackage page.
-
-The project had its first release shortly before ICFP and the Haskell Symposium 2016.
-We are currently working on providing the same kind of support for applicative
-functors and arrows, so that generalizations of these notions can be 
-used as freely as the different notions of monads.
-
-If you are interested in contributing, found a bug or have a suggestion 
-to improve the project we are happy to hear from 
-you in person, by email or over the projects bug tracker on GitHub.
-
-\FurtherReading
-\begin{itemize}
-  \item Hackage:\\ 
-        \url{http://hackage.haskell.org/package/supermonad}
-  \item Repository:\\ 
-        \url{https://github.com/jbracker/supermonad}
-  \item Paper:\\ 
-        \url{http://www.cs.nott.ac.uk/~psxjb5/publications/2016-BrackerNilsson-Supermonads.pdf}
-  \item Bug-Tracker:\\ 
-        \url{https://github.com/jbracker/supermonad/issues}
-  \item Haskell Symposium presentation:\\
-        \url{https://youtu.be/HRofw58sySw}
-\end{itemize}
-
-\end{hcarentry}
+\input{supermonads.tex}
 
 \end{document}
