@@ -7,6 +7,8 @@
 
 {-# LANGUAGE TypeOperators #-}
 
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+
 -- | __WARNING:__ This module is an experiment to see how 'Alternative' may be encoded.
 --   The authors are not aware of any generalized applicatives that make use of 'Alternative'. 
 --   Hence, we do not know if this encoding of it is sufficient. 
@@ -36,8 +38,7 @@ import qualified Data.Functor.Compose as Compose ( Compose(..) )
 #endif
 
 import Control.Super.Monad.Prelude 
-  ( ($)
-  , Return(..), Applicative(..), Functor(..) )
+  ( ($), Applicative(..), Functor(..) )
 -- Import of 'Functor' required for GHC 8+ instances.
 
 -- | The encoding of the 'empty' operation.

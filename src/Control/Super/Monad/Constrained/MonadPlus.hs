@@ -7,6 +7,8 @@
 
 {-# LANGUAGE TypeOperators #-} -- For ':*:' instance and others.
 
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+
 -- | __WARNING:__ This module is an experiment to see how 'MonadPlus' may be encoded.
 --   The authors are not aware of any generalized monads that make use of 'MonadPlus'. 
 --   Hence, we do not know if this encoding of it is sufficient. 
@@ -52,7 +54,7 @@ import Control.Super.Monad.Constrained.Alternative
 --   Therefore, the encoding is not in its final form and may change in the future.
 class (AlternativeEmpty m) => MonadPlusZero m where
   type MonadPlusZeroCts m a :: Constraint
-  type MonadPlusZeroCts m a = (AlternativeEmptyCts m a)
+  type MonadPlusZeroCts m a = ()
   mzero :: MonadPlusZeroCts m a => m a
 
 instance MonadPlusZero [] where
@@ -113,7 +115,7 @@ instance MonadPlusZero f => MonadPlusZero (Generics.M1 i c f) where
 --   Therefore, the encoding is not in its final form and may change in the future.
 class (AlternativeAlt f g h) => MonadPlusAdd f g h where
   type MonadPlusAddCts f g h a :: Constraint
-  type MonadPlusAddCts f g h a = (AlternativeAltCts f g h a)
+  type MonadPlusAddCts f g h a = ()
   mplus :: MonadPlusAddCts f g h a => f a -> g a -> h a
 
 instance MonadPlusAdd [] [] [] where

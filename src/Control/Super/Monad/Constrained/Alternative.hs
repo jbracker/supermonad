@@ -9,6 +9,8 @@
 
 {-# LANGUAGE TypeOperators #-} -- For ':*:' instance and others.
 
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+
 -- | __WARNING:__ This module is an experiment to see how 'Alternative' may be encoded.
 --   The authors are not aware of any generalized applicatives that make use of 'Alternative'. 
 --   Hence, we do not know if this encoding of it is sufficient. 
