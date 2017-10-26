@@ -9,7 +9,12 @@
 
 {-# LANGUAGE TypeOperators #-} -- For ':*:' instance and others.
 
+-- These warnings can be inaccurate, because of conditional compilation.
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
 {-# OPTIONS_GHC -Wno-unused-imports #-}
+#else
+{-# OPTIONS_GHC -fno-warn-unused-imports #-}
+#endif
 
 -- | __WARNING:__ This module is an experiment to see how 'Alternative' may be encoded.
 --   The authors are not aware of any generalized applicatives that make use of 'Alternative'. 
