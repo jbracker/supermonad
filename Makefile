@@ -12,6 +12,7 @@ clean: init
 	rm -fR ./examples/monad/session/dist
 	rm -fR ./examples/monad/effect/dist
 	rm -fR ./examples/monad/constrained/dist
+	rm -fR ./examples/monad/minimal/dist
 	
 	rm -fR ./examples/monad/session-chat/original/dist
 	rm -fR ./examples/monad/session-chat/supermonad/dist
@@ -21,8 +22,6 @@ clean: init
 	rm -fR ./examples/monad/hmtc/monad-param/dist
 	
 	rm -fR ./examples/applicative/ll1-parser/dist
-	
-	rm -fR ./examples/arrow/reversible-indexed/dist
 	
 	rm -fR ./dist
 	rm -f  ./*.eps

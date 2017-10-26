@@ -7,6 +7,8 @@
 
 {-# LANGUAGE TypeOperators #-} -- For ':*:' instance and others.
 
+{-# OPTIONS_GHC -Wno-unused-imports #-}
+
 -- | __WARNING:__ This module is an experiment to see how 'MonadPlus' may be encoded.
 --   The authors are not aware of any generalized monads that make use of 'MonadPlus'. 
 --   Hence, we do not know if this encoding of it is sufficient. 
@@ -37,9 +39,20 @@ import qualified Data.Functor.Product as Product
 import Control.Super.Monad.Prelude 
   ( ($)
   , Return(..), Bind(..) )
+import Control.Super.Monad.Alternative 
+  ( AlternativeEmpty(..), AlternativeAlt(..) )
 
 -- | The encoding of the 'mzero' operation.
-class (Return m) => MonadPlusZero m where
+--  
+--   'Return' is not a superclass, because the indices or constraints involved 
+--   in an 'MonadPlusZero' instance may differ from those involved with the 'Return'
+--   instance.
+--   
+--   __WARNING:__ This module is an experiment to see how 'MonadPlus' may be encoded.
+--   The authors are not aware of any generalized applicatives that make use of 'MonadPlus'. 
+--   Hence, we do not know if this encoding of it is sufficient. 
+--   Therefore, the encoding is not in its final form and may change in the future.
+class (AlternativeEmpty m) => MonadPlusZero m where
   type MonadPlusZeroCts m :: Constraint
   type MonadPlusZeroCts m = ()
   mzero :: MonadPlusZeroCts m => m a
@@ -90,8 +103,17 @@ instance MonadPlusZero f => MonadPlusZero (Generics.M1 i c f) where
   mzero = Generics.M1 $ mzero
 #endif
 
--- | The encoding of the 'mplus' operation
-class (Bind f g h) => MonadPlusAdd f g h where
+-- | The encoding of the 'mplus' operation.
+--  
+--   'Bind' is not a superclass, because the indices or constraints involved 
+--   in an 'MonadPlusAdd' instance may differ from those involved with the 'Bind'
+--   instance.
+--   
+--   __WARNING:__ This module is an experiment to see how 'MonadPlus' may be encoded.
+--   The authors are not aware of any generalized applicatives that make use of 'MonadPlus'. 
+--   Hence, we do not know if this encoding of it is sufficient. 
+--   Therefore, the encoding is not in its final form and may change in the future.
+class (AlternativeAlt f g h) => MonadPlusAdd f g h where
   type MonadPlusAddCts f g h :: Constraint
   type MonadPlusAddCts f g h = ()
   mplus :: MonadPlusAddCts f g h => f a -> g a -> h a

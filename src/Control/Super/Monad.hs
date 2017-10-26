@@ -373,7 +373,7 @@ infixl 1 >>, >>=
 --   * @m '>>=' (\\x -> k x '>>=' h)  =  (m '>>=' k) '>>=' h@
 --   * @'fmap' f xs  =  xs '>>=' 'return' . f@
 --   
-class (Applicative m n p) => Bind m n p where
+class (Functor m, Functor n, Functor p) => Bind m n p where
   type BindCts m n p :: Constraint
   type BindCts m n p = ()
   (>>=) :: (BindCts m n p) => m a -> (a -> n b) -> p b
