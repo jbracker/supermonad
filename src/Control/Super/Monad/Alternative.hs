@@ -41,7 +41,16 @@ import Control.Super.Monad.Prelude
 -- Import of 'Functor' required for GHC 8+ instances.
 
 -- | The encoding of the 'empty' operation.
-class Return f => AlternativeEmpty f where
+--  
+--   'Return' is not a superclass, because the indices or constraints involved 
+--   in an 'AlternativeEmpty' instance may differ from those involved with the 'Return'
+--   instance.
+--   
+--   __WARNING:__ This module is an experiment to see how 'Alternative' may be encoded.
+--   The authors are not aware of any generalized applicatives that make use of 'Alternative'. 
+--   Hence, we do not know if this encoding of it is sufficient. 
+--   Therefore, the encoding is not in its final form and may change in the future.
+class (Functor f) => AlternativeEmpty f where
   type AlternativeEmptyCts f :: Constraint
   type AlternativeEmptyCts f = ()
   empty :: AlternativeEmptyCts f => f a
@@ -100,7 +109,16 @@ instance AlternativeEmpty f => AlternativeEmpty (Generics.M1 i c f) where
 #endif
 
 -- | The encoding of the '<|>' operation.
-class Applicative f g h => AlternativeAlt f g h where
+--  
+--   'Applicative' is not a superclass, because the indices or constraints involved 
+--   in an 'Alternative' instance may differ from those involved with the 'Applicative'
+--   instance.
+--   
+--   __WARNING:__ This module is an experiment to see how 'Alternative' may be encoded.
+--   The authors are not aware of any generalized applicatives that make use of 'Alternative'. 
+--   Hence, we do not know if this encoding of it is sufficient. 
+--   Therefore, the encoding is not in its final form and may change in the future.
+class (Functor f, Functor g, Functor h) => AlternativeAlt f g h where
   type AlternativeAltCts f g h :: Constraint
   type AlternativeAltCts f g h = ()
   (<|>) :: AlternativeAltCts f g h => f a -> g a -> h a

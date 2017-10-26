@@ -41,9 +41,18 @@ import Control.Super.Monad.Constrained.Alternative
   ( AlternativeEmpty(..), AlternativeAlt(..) )
 
 -- | The encoding of the 'mzero' operation.
-class (AlternativeEmpty m, Return m) => MonadPlusZero m where
+--  
+--   'Return' is not a superclass, because the indices or constraints involved 
+--   in an 'MonadPlusZero' instance may differ from those involved with the 'Return'
+--   instance.
+--   
+--   __WARNING:__ This module is an experiment to see how 'MonadPlus' may be encoded.
+--   The authors are not aware of any generalized applicatives that make use of 'MonadPlus'. 
+--   Hence, we do not know if this encoding of it is sufficient. 
+--   Therefore, the encoding is not in its final form and may change in the future.
+class (AlternativeEmpty m) => MonadPlusZero m where
   type MonadPlusZeroCts m a :: Constraint
-  type MonadPlusZeroCts m a = ()
+  type MonadPlusZeroCts m a = (AlternativeEmptyCts m a)
   mzero :: MonadPlusZeroCts m a => m a
 
 instance MonadPlusZero [] where
@@ -93,9 +102,18 @@ instance MonadPlusZero f => MonadPlusZero (Generics.M1 i c f) where
 #endif
 
 -- | The encoding of the 'mplus' operation
-class (AlternativeAlt f g h, Bind f g h) => MonadPlusAdd f g h where
+--  
+--   'Bind' is not a superclass, because the indices or constraints involved 
+--   in an 'MonadPlusAdd' instance may differ from those involved with the 'Bind'
+--   instance.
+--   
+--   __WARNING:__ This module is an experiment to see how 'MonadPlus' may be encoded.
+--   The authors are not aware of any generalized applicatives that make use of 'MonadPlus'. 
+--   Hence, we do not know if this encoding of it is sufficient. 
+--   Therefore, the encoding is not in its final form and may change in the future.
+class (AlternativeAlt f g h) => MonadPlusAdd f g h where
   type MonadPlusAddCts f g h a :: Constraint
-  type MonadPlusAddCts f g h a = ()
+  type MonadPlusAddCts f g h a = (AlternativeAltCts f g h a)
   mplus :: MonadPlusAddCts f g h a => f a -> g a -> h a
 
 instance MonadPlusAdd [] [] [] where
