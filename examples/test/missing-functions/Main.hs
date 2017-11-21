@@ -116,6 +116,19 @@ import Control.Super.Monad.Constrained.Functions
   , ap
   , (<$!>), (<$>)
   , ifThenElse
+  
+  , liftA3, liftA2, liftA
+  , voidA
+  , (<**>)
+  , mapA, mapA_
+  , forA, forA_
+  , filterA
+  , sequenceA, sequenceA_
+  , traverse
+  , zipWithA, zipWithA_
+  , mapAndUnzipA
+  , replicateA, replicateA_
+  , whenA, unlessA
   )
 
 main :: P.IO ()
