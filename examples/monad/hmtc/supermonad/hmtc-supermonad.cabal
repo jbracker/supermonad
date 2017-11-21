@@ -14,7 +14,7 @@ executable hmtc-supermonad
   build-depends: base       >= 4.8
                , containers >= 0.5 && < 0.6
                , array      >= 0.5 && < 0.6
-               , supermonad == 0.2
+               , supermonad == 0.2.*
   main-is:       Main.hs
   other-modules: AST
                , CodeGenerator

@@ -19,7 +19,7 @@ executable ll1-parser
 
 executable ll1-parser-sm
   build-depends: base       >= 4.8
-               , supermonad == 0.2
+               , supermonad == 0.2.*
   main-is:             MainSuperapplicative.hs
   hs-source-dirs:      .
   default-language:    Haskell2010
