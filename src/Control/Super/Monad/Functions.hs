@@ -154,6 +154,7 @@ voidA :: ( Applicative m n n, ApplicativeCts m n n
          ) => m a -> n ()
 voidA = (*> pure ())
 
+-- | Ignore the result of a computation, but allow morphing the computational type.
 voidM :: ( Bind m n n, BindCts m n n
          , Return n, ReturnCts n
          ) => m a -> n ()
