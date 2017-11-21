@@ -1,5 +1,5 @@
 name:                hmtc-monad-param
-version:             0.2
+version:             0.2.0
 synopsis:            A small teaching compiler for an imperative toy language.
 category:            Type System, Plugin, Monad
 description:         A small teaching compiler for an imperative toy language.
