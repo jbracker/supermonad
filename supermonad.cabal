@@ -13,8 +13,8 @@ build-type:          Simple
 cabal-version:       >=1.10
 tested-with:         GHC == 7.10.3, GHC == 8.0.2, GHC == 8.2.1
 extra-source-files: README.md
+                  , changelog.md
                   , Makefile
-                  , compile-all.sh
                   , examples/applicative/ll1-parser/ll1-parser-example.cabal
                   , examples/applicative/ll1-parser/*.hs
                   , examples/monad/constrained/constrained-example.cabal
@@ -42,12 +42,18 @@ extra-source-files: README.md
                   , examples/monad/hmtc/supermonad/*.y
                   , examples/monad/hmtc/supermonad/*.hs
                   , examples/monad/hmtc/test-files/*.mt
+                  , examples/test/missing-functions/missing-functions.cabal
+                  , examples/test/missing-functions/*.hs
 description:
 
     The @supermonad@ library adds support for supermonads to GHC
     using a type checker plugin. Plugins are available from GHC 7.10 onwards.
     The base library containing the Haskell representation of super monads
     is also given by this package.
+    
+    Supermonads provide a unified representation of several monadic 
+    generalizations to remove the need for manual disambiguation between
+    these notions and allow sharing of common functions between them.
     
     Additional information can be found in the <https://github.com/jbracker/supermonad README>.
 
