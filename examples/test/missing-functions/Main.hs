@@ -67,7 +67,7 @@ import Control.Super.Monad.Functions
   , forM, forM_
   , sequence, sequence_
   , (=<<), (>=>), (<=<)
-  , forever, void, void'
+  , forever, void, voidM
   , join
   -- , msum, mfilter -- FIXME: Requires an alternative of 'MonadPlus'.
   , filterM
@@ -82,13 +82,26 @@ import Control.Super.Monad.Functions
   , ap
   , (<$!>), (<$>)
   , ifThenElse
+  
+  , liftA3, liftA2, liftA
+  , voidA
+  , (<**>)
+  , mapA, mapA_
+  , forA, forA_
+  , filterA
+  , sequenceA, sequenceA_
+  , traverse
+  , zipWithA, zipWithA_
+  , mapAndUnzipA
+  , replicateA, replicateA_
+  , whenA, unlessA
   )
 import Control.Super.Monad.Constrained.Functions
   ( mapM, mapM_
   , forM, forM_
   , sequence, sequence_
   , (=<<), (>=>), (<=<)
-  , forever, void, void'
+  , forever, void, voidM
   , join
   -- , msum, mfilter -- FIXME: Requires an alternative of 'MonadPlus'.
   , filterM
