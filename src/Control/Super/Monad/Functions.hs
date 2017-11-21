@@ -307,6 +307,7 @@ f <$!> m = do
 -- Functions based on Applicative
 -- -----------------------------------------------------------------------------
   
+-- | Make arguments and result of a pure function applicative.
 liftA2 :: (Applicative m n p, ApplicativeCts m n p) => (a -> b -> c) -> m a -> n b -> p c
 liftA2 f fa fb = fmap f fa <*> fb
 
@@ -318,7 +319,7 @@ liftA2 f fa fb = fmap f fa <*> fb
 liftA :: (Return m, ReturnCts m, Applicative m m n, ApplicativeCts m m n) => (a -> b) -> m a -> n b
 liftA f ma = pure f <*> ma
 
--- | Lift a ternary function to actions.
+-- | Make arguments and result of a pure function applicative.
 liftA3 :: (Applicative m n p, ApplicativeCts m n p, Applicative p p q, ApplicativeCts p p q) => (a -> b -> c -> d) -> m a -> n b -> p c -> q d
 liftA3 f ma nb pc = liftA2 f ma nb <*> pc
 
