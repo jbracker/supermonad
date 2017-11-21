@@ -24,7 +24,7 @@ module Control.Super.Monad.Constrained.Functions
   , sequence, sequence_
   , (=<<)
   , (>=>), (<=<)
-  , forever, void, void'
+  , forever, void, voidM
     -- ** Generalizations of list functions
   , join
   -- , msum, mfilter -- FIXME: Requires an alternative of 'MonadPlus'.
@@ -46,6 +46,19 @@ module Control.Super.Monad.Constrained.Functions
   , (<$>)
     -- * Addition due to RebindableSyntax
   , ifThenElse
+    -- * Functions based on applicatives
+  , liftA3, liftA2, liftA
+  , voidA
+  , (<**>)
+  , mapA, mapA_
+  , forA, forA_
+  , filterA
+  , sequenceA, sequenceA_
+  , traverse
+  , zipWithA, zipWithA_
+  , mapAndUnzipA
+  , replicateA, replicateA_
+  , whenA, unlessA
   ) where
 
 import qualified Prelude as P
@@ -56,7 +69,7 @@ import Prelude
   , not
   , fromInteger
   --, const
-  --, otherwise
+  , otherwise
   , (<=), (-) )
 --import Data.Foldable ( Foldable(..) )
 
@@ -89,7 +102,7 @@ f =<< ma = ma >>= f
 when :: ( Return n, ReturnCts n ()
         , Bind m n n, BindCts m n n () ()
         ) => Bool -> m () -> n ()
-when True  s = void' s
+when True  s = voidM s
 when False _ = return ()
 
 -- | When the condition is false do the given action.
@@ -139,10 +152,16 @@ void :: (Functor m, FunctorCts m a ()) => m a -> m ()
 void = fmap (const ())
 
 -- | Ignore the result of a computation, but allow morphing the computational type.
-void' :: ( Return n, ReturnCts n ()
-         , Bind m n n, BindCts m n n a ()
+voidA :: ( Applicative m n n, ApplicativeCtsR m n n a ()
+         , Return n, ReturnCts n ()
          ) => m a -> n ()
-void' = (>> return ())
+voidA = (*> pure ())
+
+-- | Ignore the result of a computation, but allow morphing the computational type.
+voidM :: ( Bind m n n, BindCts m n n a ()
+         , Return n, ReturnCts n ()
+         ) => m a -> n ()
+voidM = (>> return ())
 
 -- | Execute all computations in the list in order and returns the list of results.
 sequence :: ( Return n, ReturnCts n [b]
@@ -299,3 +318,146 @@ f <$!> m = do
   x <- m
   let z = f x
   z `P.seq` return z
+
+-- -----------------------------------------------------------------------------
+-- Functions based on Applicative
+-- -----------------------------------------------------------------------------
+  
+liftA2 :: ( Applicative m n p, ApplicativeCts m n p b c
+          , FunctorCts m a (b -> c)
+          ) => (a -> b -> c) -> m a -> n b -> p c
+liftA2 f fa fb = fmap f fa <*> fb
+
+-- | A variant of '<*>' with the arguments reversed.
+(<**>) :: ( Applicative m n p, ApplicativeCts m n p (a -> b) b
+          , FunctorCts m a ((a -> b) -> b) 
+          ) => m a -> n (a -> b) -> p b
+(<**>) = liftA2 (\a f -> f a)
+
+-- | Lift a function to actions. Does what fmap does with applicative operations.
+liftA :: (Return m, ReturnCts m (a -> b), Applicative m m n, ApplicativeCts m m n a b) => (a -> b) -> m a -> n b
+liftA f ma = pure f <*> ma
+
+-- | Lift a ternary function to actions.
+liftA3 :: ( Applicative m n p, ApplicativeCts m n p b (c -> d)
+          , Applicative p p q, ApplicativeCts p p q c d
+          , FunctorCts m a (b -> c -> d)
+          ) => (a -> b -> c -> d) -> m a -> n b -> p c -> q d
+liftA3 f ma nb pc = liftA2 f ma nb <*> pc
+
+-- | Like @filterM@ but with an applicative predicate and result.
+filterA :: ( Applicative m n n, ApplicativeCts m n n [a] [a]
+           , Return n, ReturnCts n [a]
+           , FunctorCts m Bool ([a] -> [a])
+           ) => (a -> m Bool) -> [a] -> n [a]
+filterA p = P.foldr (\ x -> liftA2 (\ flg -> if flg then (x:) else id) (p x)) (pure [])
+
+-- | Applicative version of 'mapM'
+mapA :: ( Return n, ReturnCts n [b]
+        , Applicative m n n, ApplicativeCts m n n [b] [b]
+        , FunctorCts m b ([b] -> [b])
+        ) => (a -> m b) -> [a] -> n [b]
+mapA f = P.foldr k (return [])
+  where
+    k a r = fmap (\x xs -> x : xs) (f a) <*> r
+
+-- | 'mapA' ignoring the result.
+mapA_ :: ( Return n, ReturnCts n [b]
+         , Applicative m n n, ApplicativeCts m n n [b] [b]
+         , FunctorCts m b ([b] -> [b])
+         , FunctorCts n [b] ()
+         ) => (a -> m b) -> [a] -> n ()
+mapA_ f = void . mapA f
+
+-- | 'flip'ped version of 'mapA'.
+forA :: ( Return n, ReturnCts n [b]
+        , Applicative m n n, ApplicativeCts m n n [b] [b]
+        , FunctorCts m b ([b] -> [b])
+        ) => [a] -> (a -> m b) -> n [b]
+forA = flip mapA
+
+-- | 'forA' ignoring the result.
+forA_ :: ( Return n, ReturnCts n [b]
+         , Applicative m n n, ApplicativeCts m n n [b] [b]
+         , FunctorCts m b ([b] -> [b])
+         , FunctorCts n [b] ()
+         ) => [a] -> (a -> m b) -> n ()
+forA_ xs = void . forA xs
+
+-- | Specialization of the 'Traversable' variant for list and applicatives.
+sequenceA :: ( Return n, ReturnCts n [a]
+             , Applicative m n n, ApplicativeCts m n n [a] [a]
+             , FunctorCts m a ([a] -> [a])
+             ) => [m a] -> n [a]
+sequenceA = P.foldr (\ ma nas -> fmap (\ a as -> a : as) ma <*> nas) (pure [])
+
+-- | 'sequenceA' ignoring the result.
+sequenceA_ :: ( Return n, ReturnCts n [a]
+              , Applicative m n n, ApplicativeCts m n n [a] [a]
+              , FunctorCts m a ([a] -> [a])
+              , FunctorCts n [a] ()
+              ) => [m a] -> n ()
+sequenceA_ = void . sequenceA
+
+-- | Specialization of the 'Traversable' variant for list and applicatives.
+traverse :: ( Return n, ReturnCts n [b]
+            , Applicative m n n, ApplicativeCts m n n [b] [b]
+            , FunctorCts m b ([b] -> [b])
+            ) => (a -> m b) -> [a] -> n [b]
+traverse f mas = sequenceA $ fmap f mas
+
+-- | Like @mapAndUnzipM@ but with an applicative predicate and result.
+mapAndUnzipA :: ( Return n, ReturnCts n [(b, c)]
+                , Applicative m n n, ApplicativeCts m n n [(b, c)] [(b, c)]
+                , FunctorCts m (b, c) ([(b, c)] -> [(b, c)])
+                , FunctorCts n [(b, c)] ([b], [c])
+                ) => (a -> m (b,c)) -> [a] -> n ([b], [c])
+mapAndUnzipA f xs = fmap P.unzip $ traverse f xs
+
+-- | Like 'zipWithM' but with an applicative predicate and result.
+zipWithA :: ( Return n, ReturnCts n [c]
+            , Applicative m n n, ApplicativeCts m n n [c] [c]
+            , FunctorCts m c ([c] -> [c])
+            ) => (a -> b -> m c) -> [a] -> [b] -> n [c]
+zipWithA f xs ys  = sequenceA (P.zipWith f xs ys)
+
+-- | Like 'zipWithM_' but with an applicative predicate and result.
+zipWithA_ :: ( Return n, ReturnCts n [c]
+             , Applicative m n n, ApplicativeCts m n n [c] [c]
+             , FunctorCts m c ([c] -> [c])
+             , FunctorCts n [c] ()
+             ) => (a -> b -> m c) -> [a] -> [b] -> n ()
+zipWithA_ f xs ys =  sequenceA_ (P.zipWith f xs ys)
+
+-- | Like 'replicateM' but with applicatves.
+replicateA :: ( Return n, ReturnCts n [a]
+              , Applicative m n n, ApplicativeCts m n n [a] [a]
+              , FunctorCts m a ([a] -> [a])
+              ) => Int -> m a -> n [a]
+replicateA cnt0 f =
+    loop cnt0
+  where
+    loop cnt
+        | cnt <= 0  = pure []
+        | otherwise = liftA2 (:) f (loop (cnt - 1))
+
+-- | Like 'replicateA', but discards the result.
+replicateA_ :: ( Return n, ReturnCts n [a]
+               , Applicative m n n, ApplicativeCts m n n [a] [a]
+               , FunctorCts m a ([a] -> [a])
+               , FunctorCts n [a] ()
+               ) => Int -> m a -> n ()
+replicateA_ cnt0 = void . replicateA cnt0
+
+-- | When the condition is true do the given action.
+whenA :: ( Return n, ReturnCts n ()
+         , Applicative m n n, ApplicativeCtsR m n n () ()
+         ) => Bool -> m () -> n ()
+whenA True  s = voidA s
+whenA False _ = return ()
+
+-- | When the condition is false do the given action.
+unlessA :: ( Return n, ReturnCts n ()
+           , Applicative m n n, ApplicativeCtsR m n n () ()
+           ) => Bool -> m () -> n ()
+unlessA b = whenA (not b)
