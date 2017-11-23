@@ -30,8 +30,8 @@ data Nat = Z | S Nat
 -- Internal function used to compute the maximum of two numbers on the 
 -- type-level.
 type family MaxInternal (nRec :: Nat) (mRec :: Nat) (n :: Nat) (m :: Nat) where
-  MaxInternal 'Z _ n m = m
-  MaxInternal ('S _) ('Z) n m = n
+  MaxInternal 'Z mRec n m = m
+  MaxInternal ('S nRec) ('Z) n m = n
   MaxInternal ('S nRec) ('S mRec) n m = MaxInternal nRec mRec n m
 
 -- Compute the maximum of two numbers on the type-level.
@@ -40,7 +40,7 @@ type family Max (n :: Nat) (m :: Nat) :: Nat where
 
 -- Check if n is lesser or equal to m.
 type family Leq (n :: Nat) (m :: Nat) :: Bool where
-  Leq 'Z _ = 'True -- zero is less or equal to anything
+  Leq 'Z m = 'True -- zero is less or equal to anything
   Leq ('S n) 'Z = 'False -- succ of n cannot be smaller then zero.
   Leq ('S n) ('S m) = Leq n m
 
