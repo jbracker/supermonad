@@ -17,3 +17,11 @@ executable bankers-sm
   hs-source-dirs:      .
   default-language:    Haskell2010
   ghc-options:         -Wall -dynamic -dcore-lint
+
+executable bankers-minimal-bug-sm
+  build-depends: base       >=4.8
+               , supermonad == 0.2.*
+  main-is:             MainMinimalBug.hs
+  hs-source-dirs:      .
+  default-language:    Haskell2010
+  ghc-options:         -Wall -dynamic -dcore-lint
