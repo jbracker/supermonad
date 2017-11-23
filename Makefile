@@ -56,7 +56,7 @@ non-super-examples: install session-chat-orig-example hmtc-orig-example hmtc-mon
 
 supermonad-examples: install minimal-example session-example session-chat-supermonad-example effect-example constrained-example hmtc-supermonad-example
 
-superapplicative-examples: install ll1-parser-example
+superapplicative-examples: install ll1-parser-example bankers-example
 
 # Compilation of (super)monad examples.
 minimal-example: install
@@ -89,4 +89,7 @@ hmtc-monad-param-example: init
 # Compilation of (super)applicative examples.
 ll1-parser-example: install
 	cabal install ./examples/applicative/ll1-parser
+
+bankers-example: install
+	cabal install ./examples/applicative/bankers
 
