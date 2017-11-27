@@ -19,6 +19,8 @@
 
 module Main where
 
+import Data.Proxy
+
 import Control.Super.Monad.Prelude
 
 main :: IO ()
@@ -162,7 +164,8 @@ type Six = 'S Five
 -- We need to make sure that the maximim number of available resources 
 -- provided to the run functions exceeds the maximum number of 
 -- resources required by the processes in the execution environment.
-run :: ( Leq ma' ma ~ 'True, Leq mb' mb ~ 'True
+run :: ( ToNatV ma', ToNatV mb'
+       , Leq ma' ma ~ 'True, Leq mb' mb ~ 'True
        ) => NatV ma -> NatV mb -> Exec ('MaxRes ma' mb') a -> IO a
 run ma mb (Exec a) = return a
 
@@ -221,3 +224,10 @@ test = do
   --run zero zero exec
   --run four three exec
   --run five two exec
+
+class ToNatV (n :: Nat) where
+  toNatV :: proxy n -> NatV n
+instance ToNatV Z where
+  toNatV _ = Zero
+instance ToNatV n => ToNatV (S n) where
+  toNatV _ = Succ (toNatV (Proxy :: Proxy n))
