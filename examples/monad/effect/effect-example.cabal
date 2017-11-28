@@ -67,3 +67,12 @@ executable effect-example3-pm
   hs-source-dirs:      .
   default-language:    Haskell2010
   ghc-options:         -Wall -dynamic -dcore-lint -fno-opt-coercion
+
+executable effect-example-vector
+  build-depends:  base              >= 4.8,
+                  effect-monad      == 0.7.*,
+                  supermonad        == 0.2.*
+  main-is:             Vector.hs
+  hs-source-dirs:      .
+  default-language:    Haskell2010
+  ghc-options:         -Wall -dynamic -dcore-lint -fno-opt-coercion
