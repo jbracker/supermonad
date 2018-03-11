@@ -1,6 +1,12 @@
 # Supermonads package changelog
 
-## 0.2
+## 0.2.0.1
+
+* Additional examples of supermonads and superapplicatives.
+* Reference the papers explaining supermonads and -applicatves 
+  in the readme.
+
+## 0.2.0
 
 * Introduced super-applicatives through the `Applicative` class.
   This is a natural broadening of our approach.
