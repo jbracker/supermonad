@@ -1,8 +1,10 @@
 # Supermonads and superapplicatives for GHC
 
 Implementation of supermonads for GHC. See the 
-"Supermonads: One Notion to Bind Them All" paper for detailed explanation
-of version 0.1.
+[Supermonads: One Notion to Bind Them All](http://jbracker.de/publications/2016-BrackerNilsson-Supermonads.pdf) 
+paper for detailed explanation of version 0.1.
+An [updated version of the paper](http://jbracker.de/publications/2017-BrackerNilsson-SupermonadsAndSuperapplicatives-UnderConsideration.pdf) 
+that also adds superapplicatives has been submitted to JFP
 
 ## Supermonads
 
