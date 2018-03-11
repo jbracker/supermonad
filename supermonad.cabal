@@ -1,5 +1,5 @@
 name:                supermonad
-version:             0.2.0
+version:             0.2.0.1
 synopsis:            Plugin and base library to support supermonads in Haskell
 category:            Type System, Plugin, Monad
 license:             BSD3
@@ -17,6 +17,8 @@ extra-source-files: README.md
                   , Makefile
                   , examples/applicative/ll1-parser/ll1-parser-example.cabal
                   , examples/applicative/ll1-parser/*.hs
+                  , examples/applicative/bankers/bankers.cabal
+                  , examples/applicative/bankers/*.hs
                   , examples/monad/constrained/constrained-example.cabal
                   , examples/monad/constrained/*.hs
                   , examples/monad/effect/effect-example.cabal
