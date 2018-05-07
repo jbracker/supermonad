@@ -8,9 +8,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 
-{-# LANGUAGE InstanceSigs         #-} -- for 'ListT' instance.
-{-# LANGUAGE ScopedTypeVariables  #-} -- for 'ListT' instance.
-{-# LANGUAGE UndecidableInstances #-} -- for 'ListT' instance.
+{-# LANGUAGE UndecidableInstances #-}
 
 {-# LANGUAGE TypeOperators #-} -- For ':*:' instance and others.
 
@@ -71,7 +69,6 @@ import qualified GHC.Generics as Generics
 import qualified Control.Monad.Trans.Cont     as Cont
 import qualified Control.Monad.Trans.Except   as Except
 import qualified Control.Monad.Trans.Identity as Identity
-import qualified Control.Monad.Trans.List     as List
 import qualified Control.Monad.Trans.Maybe    as Maybe
 import qualified Control.Monad.Trans.RWS.Lazy      as RWSL
 import qualified Control.Monad.Trans.RWS.Strict    as RWSS
@@ -295,12 +292,6 @@ instance (Applicative m n p) => Applicative (Identity.IdentityT m) (Identity.Ide
   Identity.IdentityT m <*> Identity.IdentityT k = Identity.IdentityT $ m <*> k
   {-# INLINE (<*>) #-}
 
--- Requires undecidable instances.
-instance (Applicative m n p) => Applicative (List.ListT m) (List.ListT n) (List.ListT p) where
-  type ApplicativeCts (List.ListT m) (List.ListT n) (List.ListT p) = (ApplicativeCts m n p)
-  List.ListT fs <*> List.ListT as = List.ListT $ fmap (<*>) fs <*> as
-  {-# INLINE (<*>) #-}
-
 instance (Applicative m n p) => Applicative (Maybe.MaybeT m) (Maybe.MaybeT n) (Maybe.MaybeT p) where
   type ApplicativeCts (Maybe.MaybeT m) (Maybe.MaybeT n) (Maybe.MaybeT p) = (ApplicativeCts m n p)
   Maybe.MaybeT f <*> Maybe.MaybeT x = Maybe.MaybeT $ fmap (<*>) f <*> x
@@ -502,18 +493,6 @@ instance (Bind m n p) => Bind (Identity.IdentityT m) (Identity.IdentityT n) (Ide
   m >>= k = Identity.IdentityT $ Identity.runIdentityT m >>= (Identity.runIdentityT . k) 
   {-# INLINE (>>=) #-}
 
--- Requires undecidable instances.
-instance (Bind m n p, Bind n n n, Return n) => Bind (List.ListT m) (List.ListT n) (List.ListT p) where
-  type BindCts (List.ListT m) (List.ListT n) (List.ListT p) = (BindCts m n p, BindCts n n n, ReturnCts n)
-  (>>=) :: forall a b. (BindCts m n p, BindCts n n n, ReturnCts n) => List.ListT m a -> (a -> List.ListT n b) -> List.ListT p b
-  m >>= f = List.ListT $
-      List.runListT m >>=
-      \ a -> fmap P.concat $ P.foldr k (return []) a
-    where
-      k :: (BindCts n n n) => a -> n [[b]] -> n [[b]]
-      k a r = List.runListT (f a) >>= \ x -> fmap (x :) r
-  {-# INLINE (>>=) #-}
-
 instance (Return n, Bind m n p) => Bind (Maybe.MaybeT m) (Maybe.MaybeT n) (Maybe.MaybeT p) where
   type BindCts (Maybe.MaybeT m) (Maybe.MaybeT n) (Maybe.MaybeT p) = (ReturnCts n, BindCts m n p)
   x >>= f = Maybe.MaybeT $
@@ -695,11 +674,6 @@ instance (Return m) => Return (Identity.IdentityT m) where
   return = (Identity.IdentityT) . return
   {-# INLINE return #-}
 
-instance (Return m) => Return (List.ListT m) where
-  type ReturnCts (List.ListT m) = ReturnCts m
-  return a = List.ListT $ return [a]
-  {-# INLINE return #-}
-
 instance (Return m) => Return (Maybe.MaybeT m) where
   type ReturnCts (Maybe.MaybeT m) = ReturnCts m
   return = Maybe.MaybeT . return . Just
@@ -852,11 +826,6 @@ instance (Fail m) => Fail (Except.ExceptT e m) where
 instance (Fail m) => Fail (Identity.IdentityT m) where
   type FailCts (Identity.IdentityT m) = (FailCts m)
   fail msg = Identity.IdentityT $ fail msg
-  {-# INLINE fail #-}
-
-instance (Return m) => Fail (List.ListT m) where
-  type FailCts (List.ListT m) = (ReturnCts m)
-  fail _ = List.ListT $ return []
   {-# INLINE fail #-}
 
 instance (Return m) => Fail (Maybe.MaybeT m) where

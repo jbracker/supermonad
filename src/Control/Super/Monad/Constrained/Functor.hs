@@ -56,7 +56,6 @@ import qualified Data.Set as S
 import qualified Control.Monad.Trans.Cont     as Cont
 import qualified Control.Monad.Trans.Except   as Except
 import qualified Control.Monad.Trans.Identity as Identity
-import qualified Control.Monad.Trans.List     as List
 import qualified Control.Monad.Trans.Maybe    as Maybe
 import qualified Control.Monad.Trans.RWS.Lazy      as RWSL
 import qualified Control.Monad.Trans.RWS.Strict    as RWSS
@@ -230,11 +229,6 @@ instance Functor m => Functor (Except.ExceptT e m) where
 instance (Functor m) => Functor (Identity.IdentityT m) where
   type FunctorCts (Identity.IdentityT m) a b = FunctorCts m a b
   fmap f = Identity.mapIdentityT (fmap f)
-  {-# INLINE fmap #-}
-
-instance (Functor m) => Functor (List.ListT m) where
-  type FunctorCts (List.ListT m) a b = FunctorCts m [a] [b]
-  fmap f = List.mapListT $ fmap $ P.map f
   {-# INLINE fmap #-}
 
 instance (Functor m) => Functor (Maybe.MaybeT m) where
