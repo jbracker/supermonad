@@ -1,4 +1,6 @@
 
+{-# LANGUAGE CPP #-}
+
 --{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -22,6 +24,10 @@ import Prelude hiding ( null, lookup, map, filter )
 
 import Data.Data ( Data )
 
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
+import Data.Semigroup ( Semigroup(..) )
+#endif
+
 import Unique ( Uniquable, getUnique )
 import UniqFM ( UniqFM )
 import qualified UniqFM as U
@@ -36,6 +42,12 @@ newtype Map k a = Map { unMap :: UniqFM (k, a) } deriving Data
 instance (Eq k, Eq a) => Eq (Map k a) where
   ma == mb = unMap ma == unMap mb
   ma /= mb = unMap ma /= unMap mb
+
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
+-- | Semigroup based on union.
+instance Semigroup (Map k a) where
+  (<>) = union
+#endif
 
 -- | Monoid based on union and the empty map.
 instance Monoid (Map k a) where

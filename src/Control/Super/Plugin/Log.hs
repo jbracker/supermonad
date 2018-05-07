@@ -1,4 +1,6 @@
 
+{-# LANGUAGE CPP #-}
+
 -- | Log message formatting and debuging functions.
 module Control.Super.Plugin.Log
   ( pprToStr, sDocToStr
@@ -111,7 +113,11 @@ formatConstraint ct
     formatCtDataCon :: Ct -> String
     formatCtDataCon c = case c of
       CDictCan      {} -> "CDictCan"
+#if MIN_VERSION_GLASGOW_HASKELL(8,4,0,0)
+      CIrredCan     {} -> "CIrredCan"
+#else
       CIrredEvCan   {} -> "CIrredEvCan"
+#endif
       CTyEqCan      {} -> "CTyEqCan"
       CFunEqCan     {} -> "CFunEqCan"
       CNonCanonical {} -> "CNonCanonical"

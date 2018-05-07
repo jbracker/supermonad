@@ -1,4 +1,6 @@
 
+{-# LANGUAGE CPP #-}
+
 -- | Provides the type for instance dictionaries.
 module Control.Super.Plugin.InstanceDict 
   ( InstanceDict
@@ -8,6 +10,10 @@ module Control.Super.Plugin.InstanceDict
   , instDictToList ) where
 
 import Data.Maybe ( maybeToList, fromMaybe )
+
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
+import Data.Semigroup ( Semigroup(..) )
+#endif
 
 import Class ( Class )
 import InstEnv ( ClsInst )
@@ -33,6 +39,11 @@ instance Monoid InstanceDict where
       combineClsMaps tc = (fromMaybe M.empty $ M.lookup tc dictA) `M.union` (fromMaybe M.empty $ M.lookup tc dictB)
       
   mempty = emptyInstDict
+
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
+instance Semigroup InstanceDict where
+  (<>) = mappend
+#endif
 
 instance O.Outputable InstanceDict where
   ppr (InstanceDict instDict) = O.text "InstanceDict " O.<> O.parens (O.ppr instDict)

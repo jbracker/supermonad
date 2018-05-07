@@ -1,4 +1,6 @@
 
+{-# LANGUAGE CPP #-}
+
 -- {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 
@@ -19,6 +21,10 @@ import Prelude hiding ( null, filter, map )
 
 import Data.Data ( Data )
 
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
+import Data.Semigroup ( Semigroup(..) )
+#endif
+
 import Unique ( Uniquable )
 import UniqSet ( UniqSet )
 import qualified UniqSet as U
@@ -33,6 +39,13 @@ instance (Eq a) => Eq (Set a) where
   sa == sb = unSet sa == unSet sb
   sa /= sb = unSet sa /= unSet sb
 
+
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
+-- | Semigroup based on union.
+instance Semigroup (Set a) where
+  (<>) = union
+#endif
+  
 -- | Monoid based on union and the empty set.
 instance Monoid (Set a) where
   mempty = empty

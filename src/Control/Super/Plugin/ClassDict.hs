@@ -1,4 +1,6 @@
 
+{-# LANGUAGE CPP #-}
+
 -- | Provides the type to store classes and instances used by the plugin.
 module Control.Super.Plugin.ClassDict 
   ( ClassDict
@@ -13,6 +15,10 @@ module Control.Super.Plugin.ClassDict
 import qualified Data.Set as S
 import qualified Data.Map.Strict as M
 
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
+import Data.Semigroup ( Semigroup(..) )
+#endif
+
 import Control.Monad ( join )
 
 import Class ( Class )
@@ -25,6 +31,12 @@ type Optional = Bool
 -- | Dictionary type to lookup classes and their available instances based
 --   on string identifiers.
 newtype ClassDict = ClassDict (M.Map String (Optional, Maybe (Class, [ClsInst])))
+
+#if MIN_VERSION_GLASGOW_HASKELL(8,0,0,0)
+-- | Semigroup based on union.
+instance Semigroup ClassDict where
+  (<>) (ClassDict clsDictA) (ClassDict clsDictB) = ClassDict $ mappend clsDictA clsDictB
+#endif
 
 -- | See 'M.union'.
 instance Monoid ClassDict where
