@@ -1,5 +1,5 @@
 name:                supermonad
-version:             0.2.0.1
+version:             0.2.1.1
 synopsis:            Plugin and base library to support supermonads in Haskell
 category:            Type System, Plugin, Monad
 license:             BSD3
@@ -8,7 +8,7 @@ author:              Jan Bracker <jan.bracker@googlemail.com>
 maintainer:          Jan Bracker <jan.bracker@googlemail.com>
 bug-reports:         https://github.com/jbracker/supermonad/issues
 stability:           experimental
-copyright:           Copyright (c) 2016, Jan Bracker
+copyright:           Copyright (c) 2016-2018, Jan Bracker
 build-type:          Simple
 cabal-version:       >=1.10
 tested-with:         GHC == 7.10.3, GHC == 8.0.2, GHC == 8.2.1, GHC == 8.4.2
